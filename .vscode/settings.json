@@ -1,0 +1,20 @@
+{
+  "cmake.copyCompileCommands": "${workspaceFolder}/compile_commands.json",
+  "clangd.arguments": [
+    "--background-index"
+  ],
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "files.watcherExclude": {
+    "**/vendor/**": true
+  },
+  "search.exclude": {
+    "**/vendor/**": true
+  },
+  "python.analysis.exclude": [
+    "**/vendor/**"
+  ],
+  "python.analysis.ignore": [
+    "**/vendor/**"
+  ],
+  "git.detectSubmodules": false
+}

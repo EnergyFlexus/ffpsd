@@ -1,0 +1,8 @@
+[package]
+name = "ffpsd-example"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# No crates: the bindings to ffpsd's C API are written by hand in src/ffi.rs.
+[dependencies]

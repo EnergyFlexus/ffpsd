@@ -1,0 +1,16 @@
+exclude: ^vendor/
+repos:
+  - repo: local
+    hooks:
+      - id: file-naming
+        name: Check file naming convention
+        entry: python scripts/check_filenames.py
+        language: system
+        files: '\.(h|hpp|c|cpp|cc)$'
+
+      - id: clang-format
+        name: Format C/C++ sources
+        entry: clang-format -i
+        language: python
+        additional_dependencies: ['clang-format==23.1.0']
+        files: '\.(h|hpp|c|cpp|cc)$'
