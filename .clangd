@@ -1,0 +1,9 @@
+# Third-party code under vendor/ is not ours to fix: no diagnostics, no background index.
+If:
+  PathMatch: vendor/.*
+Diagnostics:
+  Suppress: "*"
+  ClangTidy:
+    Remove: "*"
+Index:
+  Background: Skip

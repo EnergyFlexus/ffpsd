@@ -1,0 +1,12 @@
+[submodule "vendor/zlib-ng"]
+	path = vendor/zlib-ng
+	url = https://github.com/zlib-ng/zlib-ng
+[submodule "vendor/libpng"]
+	path = vendor/libpng
+	url = https://github.com/pnggroup/libpng
+[submodule "vendor/googletest"]
+	path = vendor/googletest
+	url = https://github.com/google/googletest
+[submodule "vendor/benchmark"]
+	path = vendor/benchmark
+	url = https://github.com/google/benchmark

@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Debug with the tests, static and shared, on every platform.
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        kind: [static, shared]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive # libpng, zlib-ng and googletest under vendor/
+          lfs: true # the PSD files the smoke tests read
+
+      - name: Ninja (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      # Configures, builds and runs ctest; on Windows it sets up MSVC itself, as build.py does.
+      - run: python scripts/run_tests.py ${{ matrix.kind == 'shared' && '--shared' || '' }}
+
+  # The Release package the way build.py makes it, installed but not uploaded yet.
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        kind: [shared, static]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Ninja (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - run: python build.py ${{ matrix.kind == 'static' && '--static' || '' }}
+
+  # The same checks as the pre-commit hooks: clang-format and the file names.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install pre-commit
+      - run: pre-commit run --all-files --show-diff-on-failure

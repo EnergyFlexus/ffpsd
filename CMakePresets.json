@@ -1,0 +1,88 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 23, "patch": 0 },
+
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+
+    {
+      "name": "static-debug",
+      "displayName": "Static · Debug",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_SHARED_LIBS": "OFF",
+        "FFPSD_MSVC_STATIC_RUNTIME": "ON",
+        "FFPSD_BUILD_TESTS": "ON",
+        "FFPSD_BUILD_EXAMPLES": "ON",
+        "FFPSD_BUILD_BENCHMARKS": "ON"
+      }
+    },
+    {
+      "name": "static-release",
+      "displayName": "Static · Release",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_SHARED_LIBS": "OFF",
+        "FFPSD_MSVC_STATIC_RUNTIME": "ON"
+      }
+    },
+    {
+      "name": "bench-release",
+      "displayName": "Benchmarks · Release",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_SHARED_LIBS": "OFF",
+        "FFPSD_MSVC_STATIC_RUNTIME": "ON",
+        "FFPSD_BUILD_TOOLS": "OFF",
+        "FFPSD_BUILD_BENCHMARKS": "ON"
+      }
+    },
+    {
+      "name": "shared-debug",
+      "displayName": "Shared (DLL) · Debug",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_SHARED_LIBS": "ON",
+        "FFPSD_MSVC_STATIC_RUNTIME": "OFF",
+        "FFPSD_BUILD_TESTS": "ON",
+        "FFPSD_BUILD_EXAMPLES": "ON",
+        "FFPSD_BUILD_BENCHMARKS": "ON"
+      }
+    },
+    {
+      "name": "shared-release",
+      "displayName": "Shared (DLL) · Release",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_SHARED_LIBS": "ON",
+        "FFPSD_MSVC_STATIC_RUNTIME": "OFF"
+      }
+    }
+  ],
+
+  "buildPresets": [
+    { "name": "static-debug",   "configurePreset": "static-debug" },
+    { "name": "static-release", "configurePreset": "static-release" },
+    { "name": "shared-debug",   "configurePreset": "shared-debug" },
+    { "name": "shared-release", "configurePreset": "shared-release" },
+    { "name": "bench-release",  "configurePreset": "bench-release" }
+  ],
+
+  "testPresets": [
+    { "name": "static-debug", "configurePreset": "static-debug", "output": { "outputOnFailure": true } },
+    { "name": "shared-debug", "configurePreset": "shared-debug", "output": { "outputOnFailure": true } }
+  ]
+}

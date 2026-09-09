@@ -1,0 +1,26 @@
+#ifndef FFPSD_ADJUSTMENTS_HPP_
+#define FFPSD_ADJUSTMENTS_HPP_
+
+#include <cstdint>
+#include <vector>
+
+namespace ffpsd
+{
+    // The Levels adjustment, block 'levl'.
+    struct LevelsInfo
+    {
+        struct Channel
+        {
+            std::uint16_t input_floor = 0;      // 0 to 253
+            std::uint16_t input_ceiling = 255;  // 2 to 255, above the floor
+            std::uint16_t output_floor = 0;     // 0 to 255
+            std::uint16_t output_ceiling = 255; // 0 to 255
+            double gamma = 1.0;                 // 0.1 to 9.99, stored in hundredths
+        };
+
+        // [0] is all color channels, [1] channel 0 and so on; a channel gets its own record, then [0].
+        std::vector<Channel> channels;
+    };
+} // namespace ffpsd
+
+#endif // FFPSD_ADJUSTMENTS_HPP_
