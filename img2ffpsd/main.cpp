@@ -168,7 +168,7 @@ namespace
         if (only.empty())
             return true;
 
-        std::cout << kRed << "[!] Files ONLY in '" << Utf8(fs::absolute(folder)) << "':\n";
+        std::cout << kRed << "error: files only in '" << Utf8(fs::absolute(folder)) << "':\n";
         for (const fs::path& file : only)
             std::cout << "    - " << Utf8(file) << "\n";
         std::cout << kEnd << "\n";
@@ -224,7 +224,7 @@ namespace
         {
             if (!fs::is_directory(folder))
             {
-                std::cout << kRed << "[!] " << Utf8(fs::absolute(folder)) << " does not exist." << kEnd << "\n";
+                std::cout << kRed << "error: " << Utf8(fs::absolute(folder)) << " does not exist." << kEnd << "\n";
                 return false;
             }
         }
@@ -237,8 +237,8 @@ namespace
         {
             const std::size_t difference =
                 bottoms.size() > tops.size() ? bottoms.size() - tops.size() : tops.size() - bottoms.size();
-            std::cout << kRed << "[!] Number of files difference: " << bottoms.size() << " vs " << tops.size()
-                      << " files. (" << difference << ")" << kEnd << "\n";
+            std::cout << kRed << "error: number of files differs: " << bottoms.size() << " vs " << tops.size() << " ("
+                      << difference << ")" << kEnd << "\n";
             match = false;
         }
         match = CheckOnlyIn(options.bottom, bottoms, tops) && match;
@@ -251,7 +251,8 @@ namespace
         }
         if (bottoms.empty())
         {
-            std::cout << kYellow << "[!] No PNG files in " << Utf8(fs::absolute(options.bottom)) << "." << kEnd << "\n";
+            std::cout << kYellow << "warning: no PNG files in " << Utf8(fs::absolute(options.bottom)) << "." << kEnd
+                      << "\n";
             return true;
         }
 
@@ -262,7 +263,7 @@ namespace
         }
         else
         {
-            std::cout << kYellow << "[!] Possible misses:\n";
+            std::cout << kYellow << "warning: possible misses:\n";
             for (const std::string& gap : gaps)
                 std::cout << "    - " << gap << "\n";
             std::cout << kEnd << "\n"
@@ -272,7 +273,7 @@ namespace
 
         if (fs::is_directory(options.output) && !fs::is_empty(options.output))
         {
-            std::cout << kYellow << "[!] " << Utf8(fs::absolute(options.output))
+            std::cout << kYellow << "warning: " << Utf8(fs::absolute(options.output))
                       << " is not empty. Are you sure? Data may be lost." << kEnd << "\n";
             Pause();
         }
@@ -359,7 +360,7 @@ namespace
             {
                 // The error takes the bar's line; the bar is drawn again below it.
                 ++failed_;
-                std::cout << "\r\033[K" << kRed << "[!] Error " << Utf8(file) << ": " << error << kEnd << "\n";
+                std::cout << "\r\033[K" << kRed << "error: " << Utf8(file) << ": " << error << kEnd << "\n";
             }
             Draw();
         }
