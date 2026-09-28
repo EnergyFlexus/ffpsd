@@ -50,7 +50,10 @@ namespace ffpsd::detail
         for (std::size_t i = 0; i < layer_count; ++i)
         {
             for (std::size_t c = 0; c < info.records[i].channels.size(); ++c)
-                ReadChannelImageData(reader, end, channel_lengths[i][c], info.records[i].channels[c]);
+            {
+                ChannelImageData& channel = info.records[i].channels[c];
+                channel = ParseChannelImageData(reader, end, channel.id, channel_lengths[i][c]);
+            }
         }
 
         reader.Skip(end - reader.Tell());
