@@ -1,5 +1,6 @@
 #include "support/test_support.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <ffpsd/ffpsd.hpp>
@@ -386,6 +387,37 @@ TEST(DocumentTest, AMissingFileIsAFilesystemError)
     const std::filesystem::path missing = std::filesystem::path(FFPSD_TEST_DATA_DIR) / "no_such_file.psd";
 
     EXPECT_THROW(ffpsd::Document::Parse(missing.string()), std::filesystem::filesystem_error);
+}
+
+TEST(DocumentTest, ABlockPaddedToTwoAsTheSpecificationSaysIsReadToo)
+{
+    // Our writer pads a section block of 6 bytes to 8 after its length; take those 2 bytes out, as a
+    // writer that follows the specification would, and the next block starts right after the data.
+    ffpsd::Document doc = NewDocument();
+    doc.SetTaggedBlock(Block("aaaa", {1, 2, 3, 4, 5, 6}));
+    doc.SetTaggedBlock(Block("bbbb", {7, 8, 9, 10}));
+    std::vector<std::uint8_t> bytes = doc.Save();
+
+    const std::uint8_t key[] = {'8', 'B', 'I', 'M', 'a', 'a', 'a', 'a'};
+    const auto block = std::search(bytes.begin(), bytes.end(), std::begin(key), std::end(key));
+    ASSERT_NE(block, bytes.end());
+    bytes.erase(block + 12 + 6, block + 12 + 8);
+
+    // The layer and mask section, after the header, the color mode data and the resources, is 2 shorter.
+    const std::size_t resources =
+        26 + 4 + BigEndianU32(std::vector<std::uint8_t>(bytes.begin() + 26, bytes.begin() + 30));
+    const std::size_t section =
+        resources + 4 +
+        BigEndianU32(std::vector<std::uint8_t>(bytes.begin() + resources, bytes.begin() + resources + 4));
+    const std::vector<std::uint8_t> length = BigEndianBytes(
+        BigEndianU32(std::vector<std::uint8_t>(bytes.begin() + section, bytes.begin() + section + 4)) - 2);
+    std::copy(length.begin(), length.end(), bytes.begin() + static_cast<std::ptrdiff_t>(section));
+
+    const ffpsd::Document back = ffpsd::Document::Parse(bytes);
+
+    ASSERT_EQ(back.GetTaggedBlockCount(), 2u);
+    EXPECT_EQ(back.GetTaggedBlockByKey(Fourcc("aaaa"))->data, (std::vector<std::uint8_t>{1, 2, 3, 4, 5, 6}));
+    EXPECT_EQ(back.GetTaggedBlockByKey(Fourcc("bbbb"))->data, (std::vector<std::uint8_t>{7, 8, 9, 10}));
 }
 
 TEST(DocumentTest, BytesAndPathGiveTheSameDocument)

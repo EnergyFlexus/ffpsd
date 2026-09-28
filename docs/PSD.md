@@ -389,8 +389,12 @@ Skipping to an even boundary instead desynchronises on the first payload whose
 length is not a multiple of 4, and the failure then lands on the next signature
 check rather than on the block that caused it.
 
-Inside a layer's extra data the lengths are multiples of 4 to begin with, so the
-same rule costs nothing there.
+Inside a layer's extra data Photoshop pads the payload itself and counts the
+padding in the length, so every length there is a multiple of 4: a 3 character
+`luni` has 10 bytes of data and a length of 12. Photoshop reads those blocks by
+their length alone and calls a file incompatible when a layer block's padding
+comes after it. A writer that follows the specification pads to 2 inside the
+length, so a reader skips padding only when no signature follows the data.
 
 **Layer level keys.** `lsct` section divider, `luni` Unicode name, `lyid` layer
 id, `iOpa` fill opacity (1 byte, and *not* the same as the record's opacity),
@@ -621,7 +625,8 @@ number, so the block looks empty instead of broken.
 | Layer info section | multiple of 4 in practice, 2 per the specification |
 | Layer name | multiple of 4 |
 | Global layer mask info | to its declared length |
-| Tagged block data | multiple of 4, not counted in the length |
+| Tagged block data, in section 4 | multiple of 4, not counted in the length |
+| Tagged block data, in a layer | multiple of 4, counted in the length |
 | 1 bit image data rows | whole bytes |
 
 Padding is why a position and a declared length together are the only safe way
@@ -652,8 +657,8 @@ composite can be trusted.
 
 Checked against files Photoshop wrote, and marked in place above:
 
-* a tagged block is padded to a multiple of 4, not to an even byte count, and
-  the padding is not counted in the length;
+* a tagged block is padded to a multiple of 4, not to an even byte count; in
+  section 4 the padding is not counted in the length, in a layer it is;
 * the layer info length is rounded to 4 as well;
 * the legacy Pascal name is in the code page of the writer's system, not
   MacRoman;
