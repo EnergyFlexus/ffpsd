@@ -26,10 +26,41 @@ namespace ffpsd::detail
             Fourcc('l', 'n', 'k', '2'), Fourcc('F', 'E', 'i', 'd'), Fourcc('F', 'X', 'i', 'd'),
             Fourcc('P', 'x', 'S', 'D')};
 
+        bool StartsBlock(const BigEndianReader& reader, std::size_t end)
+        {
+            if (end - reader.Tell() < sizeof(std::uint32_t))
+                return false;
+            const std::uint32_t signature = reader.PeekU32();
+            return signature == kSignature || signature == kSignature64;
+        }
+
         bool UsesLongLength(std::uint32_t key) noexcept
         {
             const auto* at = std::find(std::begin(kLongLengthKeys), std::end(kLongLengthKeys), key);
             return at != std::end(kLongLengthKeys);
+        }
+
+        void WriteBlock(BigEndianWriter& writer, const TaggedBlock& block, bool is_psb, bool pad_in_length)
+        {
+            writer.WriteU32(block.signature);
+            writer.WriteU32(block.key);
+
+            const bool wide = is_psb && UsesLongLength(block.key);
+            const std::size_t length = writer.ReserveLength(wide);
+            const std::size_t data_start = writer.Tell();
+            if (!block.data.empty())
+                writer.WriteU8Array(block.data.data(), block.data.size());
+
+            if (pad_in_length)
+            {
+                writer.PadFrom(data_start, kAlignment);
+                writer.PatchLength(length, wide);
+            }
+            else
+            {
+                writer.PatchLength(length, wide);
+                writer.PadFrom(data_start, kAlignment);
+            }
         }
     } // namespace
 
@@ -73,9 +104,12 @@ namespace ffpsd::detail
             if (!block->data.empty())
                 reader.ReadU8Array(block->data.data(), block->data.size());
 
-            // The pad is not in the length; clamped, since a section's last block may lack it.
+            // Padding to 4 after the length, unless the next block starts right here: a writer that
+            // follows the specification pads to 2 inside the length. Clamped, as a section's last
+            // block may lack it.
             const std::size_t pad = (kAlignment - block->data.size() % kAlignment) % kAlignment;
-            reader.Skip(std::min(pad, end - reader.Tell()));
+            if (pad != 0 && !StartsBlock(reader, end))
+                reader.Skip(std::min(pad, end - reader.Tell()));
 
             blocks.push_back(std::move(block));
         }
@@ -86,21 +120,13 @@ namespace ffpsd::detail
 
     void WriteTaggedBlock(BigEndianWriter& writer, const TaggedBlock& block, bool is_psb)
     {
-        writer.WriteU32(block.signature);
-        writer.WriteU32(block.key);
-
-        const bool wide = is_psb && UsesLongLength(block.key);
-        const std::size_t length = writer.ReserveLength(wide);
-        if (!block.data.empty())
-            writer.WriteU8Array(block.data.data(), block.data.size());
-        writer.PatchLength(length, wide);
-        writer.PadFrom(length + (wide ? sizeof(std::uint64_t) : sizeof(std::uint32_t)), kAlignment);
+        WriteBlock(writer, block, is_psb, false);
     }
 
-    void WriteTaggedBlocks(BigEndianWriter& writer, const TaggedBlocks& blocks, bool is_psb)
+    void WriteLayerTaggedBlocks(BigEndianWriter& writer, const TaggedBlocks& blocks, bool is_psb)
     {
         for (const std::unique_ptr<TaggedBlock>& block : blocks)
-            WriteTaggedBlock(writer, *block, is_psb);
+            WriteBlock(writer, *block, is_psb, true);
     }
 
     TaggedBlocks CloneTaggedBlocks(const TaggedBlocks& blocks)

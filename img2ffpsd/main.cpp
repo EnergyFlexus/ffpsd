@@ -35,6 +35,7 @@ namespace
         fs::path output;
         bool gray = false;
         unsigned jobs = 0; // 0: one per processor
+        ffpsd::ResampleFilter resize = ffpsd::ResampleFilter::kNearest;
     };
 
     // ---- Console -------------------------------------------------------------------------------
@@ -75,12 +76,14 @@ namespace
     void PrintUsage()
     {
         std::cout << "img2ffpsd " << ffpsd::Version() << "\n"
-                  << "usage: img2ffpsd <bottom> <top> <output> [--gray] [--jobs N]\n\n"
+                  << "usage: img2ffpsd <bottom> <top> <output> [--gray] [--jobs N] [--resize nearest|bicubic]\n\n"
                   << "Pairs PNG files by their path in the bottom and top folders into PSD files in\n"
                   << "output: the bottom one as the locked background, the top one as the layer above\n"
                   << "it and the composite. The smaller picture of a pair is resized to the larger one.\n\n"
-                  << "  --gray    grayscale documents instead of RGB\n"
-                  << "  --jobs N  files converted at once, one per processor by default\n";
+                  << "  --gray              grayscale documents instead of RGB\n"
+                  << "  --jobs N            files converted at once, one per processor by default\n"
+                  << "  --resize nearest    resizing that keeps hard pixels, the default\n"
+                  << "  --resize bicubic    smooth resizing\n";
     }
 
     bool ParseArguments(const std::vector<std::string>& args, Options& options)
@@ -92,6 +95,18 @@ namespace
                 options.gray = true;
             else if (args[i] == "--jobs" && i + 1 < args.size())
                 options.jobs = static_cast<unsigned>(std::max(1, std::atoi(args[++i].c_str())));
+            else if (args[i] == "--resize" && i + 1 < args.size())
+            {
+                const std::string& method = args[++i];
+                if (method == "nearest")
+                    options.resize = ffpsd::ResampleFilter::kNearest;
+                else if (method == "bicubic")
+                    options.resize = ffpsd::ResampleFilter::kBicubic;
+                else
+                    return false;
+            }
+            else if (args[i].rfind("--", 0) == 0)
+                return false; // an unknown option
             else
                 folders.push_back(args[i]);
         }
@@ -303,7 +318,7 @@ namespace
         }
         else
         {
-            doc.AddLayer("Background", bottom)->Resize(width, height);
+            doc.AddLayer("Background", bottom)->Resize(width, height, options.resize);
             doc.SetBackgroundLayer(0);
         }
 
@@ -315,7 +330,7 @@ namespace
         }
         else
         {
-            layer->Resize(width, height);
+            layer->Resize(width, height, options.resize);
             doc.SetMergedImage(layer->GetPixels());
         }
 

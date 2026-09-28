@@ -82,6 +82,32 @@ TEST(SaveTest, StackEditsSurvive)
     EXPECT_FALSE(back.GetHasRealMergedData());
 }
 
+TEST(SaveTest, LayerBlocksCountTheirPaddingAsPhotoshopDoes)
+{
+    // "Layer 1" is 18 bytes of 'luni'. Photoshop reads a layer's blocks by their length alone, so the
+    // padding to 4 has to be in it; otherwise it calls the file incompatible.
+    ffpsd::Document doc = NewDocument();
+    ffpsd::Layer* layer = doc.AddLayer("Layer 1", Pattern(2, 2, 4));
+    ffpsd::TaggedBlock odd;
+    odd.key = Fourcc("abcd");
+    odd.data = {1, 2, 3, 4, 5};
+    layer->SetTaggedBlock(odd);
+
+    const std::vector<std::uint8_t> saved = doc.Save();
+
+    const std::uint8_t luni[] = {'8', 'B', 'I', 'M', 'l', 'u', 'n', 'i'};
+    const auto at = std::search(saved.begin(), saved.end(), std::begin(luni), std::end(luni));
+    ASSERT_NE(at, saved.end());
+    const std::uint32_t length = BigEndianU32(std::vector<std::uint8_t>(at + 8, at + 12));
+    EXPECT_EQ(length, 20u);
+    EXPECT_EQ(std::string(at + 12 + length, at + 12 + length + 4), "8BIM");
+
+    const ffpsd::Document back = ffpsd::Document::Parse(saved);
+    const ffpsd::TaggedBlock* read = back.GetLayerByIndex(0)->GetTaggedBlockByKey(Fourcc("abcd"));
+    ASSERT_NE(read, nullptr);
+    EXPECT_EQ(read->data, (std::vector<std::uint8_t>{1, 2, 3, 4, 5, 0, 0, 0}));
+}
+
 TEST(SaveTest, ResourcesAndBlocksSurvive)
 {
     ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
@@ -103,7 +129,10 @@ TEST(SaveTest, ResourcesAndBlocksSurvive)
     EXPECT_EQ(read->data, resource.data);
     const ffpsd::TaggedBlock* layer_block = back.GetLayerByIndex(0)->GetTaggedBlockByKey(Fourcc("abcd"));
     ASSERT_NE(layer_block, nullptr);
-    EXPECT_EQ(layer_block->data, block.data);
+    // A layer block comes back padded to 4, the padding now part of its data.
+    std::vector<std::uint8_t> padded = block.data;
+    padded.resize(8, 0);
+    EXPECT_EQ(layer_block->data, padded);
 }
 
 TEST(SaveTest, WithoutLayersTheCompositeStays)

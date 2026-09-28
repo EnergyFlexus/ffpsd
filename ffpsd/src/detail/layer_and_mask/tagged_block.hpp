@@ -15,10 +15,13 @@ namespace ffpsd::detail
     // One allocation per block, so pointers survive inserts and removals of others.
     using TaggedBlocks = std::vector<std::unique_ptr<TaggedBlock>>;
 
-    // Payloads are padded to 4, not counted in the length; the spec's "even" is wrong.
+    // Padding to 4 after a length is skipped, unless the next block starts right after the data.
     TaggedBlocks ParseTaggedBlocks(BigEndianReader& reader, std::size_t end, bool is_psb);
+    // Section blocks, padded to 4 after the length as Photoshop writes them.
     void WriteTaggedBlock(BigEndianWriter& writer, const TaggedBlock& block, bool is_psb);
-    void WriteTaggedBlocks(BigEndianWriter& writer, const TaggedBlocks& blocks, bool is_psb);
+
+    // Layer blocks: Photoshop counts their padding in the length and rejects them otherwise.
+    void WriteLayerTaggedBlocks(BigEndianWriter& writer, const TaggedBlocks& blocks, bool is_psb);
 
     TaggedBlocks CloneTaggedBlocks(const TaggedBlocks& blocks);
 

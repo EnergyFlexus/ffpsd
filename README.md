@@ -44,13 +44,14 @@ library ships them next to it, and the CMake package links them.
 ## img2ffpsd
 
 ```sh
-img2ffpsd <bottom> <top> <output> [--gray] [--jobs N]
+img2ffpsd <bottom> <top> <output> [--gray] [--jobs N] [--resize nearest|bicubic]
 ```
 
 Pairs the PNG files of two folders by their path into PSD files: the bottom one
 as the locked background, the top one, without its transparency, as the layer
 above it and the composite. The smaller picture of a pair is resized to the
-larger one. RGB, or grayscale with `--gray`.
+larger one, by nearest neighbour or with `--resize bicubic`. RGB, or grayscale
+with `--gray`.
 
 A file in only one folder stops it; gaps in numbered names (`1, 2, 4`; `3-4` is
 two pages) and a non-empty output folder wait for a key, Ctrl+C to stop. Needs

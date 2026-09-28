@@ -177,7 +177,7 @@ namespace ffpsd::detail
         WriteExtraField(writer, record.mask_data);
         WriteExtraField(writer, record.blending_ranges);
         WritePascalString(writer, record.name, kLayerNameAlignment);
-        WriteTaggedBlocks(writer, record.blocks, is_psb);
+        WriteLayerTaggedBlocks(writer, record.blocks, is_psb);
         writer.PatchLength(extra_length, false);
     }
 
