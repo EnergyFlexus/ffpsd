@@ -1,7 +1,6 @@
 #include "support/test_support.hpp"
 
 #include <algorithm>
-#include <cmath>
 #include <cstdint>
 #include <ffpsd/ffpsd.hpp>
 #include <filesystem>
