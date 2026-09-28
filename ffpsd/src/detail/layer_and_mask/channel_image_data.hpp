@@ -18,9 +18,9 @@ namespace ffpsd::detail
         std::vector<std::uint8_t> raw;
     };
 
-    // Pass two of the layer info: the blob a record declared, not past end.
-    void
-    ReadChannelImageData(BigEndianReader& reader, std::size_t end, std::uint64_t length, ChannelImageData& channel);
+    // Pass two of the layer info: the blob a record declared, with the id it gave, not past end.
+    ChannelImageData
+    ParseChannelImageData(BigEndianReader& reader, std::size_t end, std::int16_t id, std::uint64_t length);
 
     // Planar native samples, RLE when smaller; no samples give just the compression field.
     ChannelImageData EncodeChannel(

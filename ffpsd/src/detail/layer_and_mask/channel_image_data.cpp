@@ -7,16 +7,20 @@
 
 namespace ffpsd::detail
 {
-    void ReadChannelImageData(BigEndianReader& reader, std::size_t end, std::uint64_t length, ChannelImageData& channel)
+    ChannelImageData
+    ParseChannelImageData(BigEndianReader& reader, std::size_t end, std::int16_t id, std::uint64_t length)
     {
         if (length > end - reader.Tell())
             throw std::runtime_error(
-                "ffpsd: channel " + std::to_string(channel.id) + " claims " + std::to_string(length) + " bytes, only " +
+                "ffpsd: channel " + std::to_string(id) + " claims " + std::to_string(length) + " bytes, only " +
                 std::to_string(end - reader.Tell()) + " left in the layer info");
 
+        ChannelImageData channel;
+        channel.id = id;
         channel.raw.resize(static_cast<std::size_t>(length));
         if (!channel.raw.empty())
             reader.ReadU8Array(channel.raw.data(), channel.raw.size());
+        return channel;
     }
 
     ChannelImageData EncodeChannel(
