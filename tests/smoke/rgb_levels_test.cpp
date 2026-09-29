@@ -136,7 +136,7 @@ namespace
         EXPECT_EQ(version.writer_name, "Adobe Photoshop");
         EXPECT_EQ(version.reader_name, "Adobe Photoshop 2026");
         EXPECT_EQ(version.file_version, 1u);
-        EXPECT_TRUE(doc.GetHasRealMergedData());
+        EXPECT_TRUE(doc.HasRealMergedData());
     }
 
     void ExpectBackground(const ffpsd::Layer& layer)
@@ -204,7 +204,7 @@ namespace
         EXPECT_EQ(doc.GetHeight(), kHeight);
         EXPECT_EQ(doc.GetChannelCount(), 3u);
         EXPECT_EQ(doc.GetDepth(), 8u);
-        EXPECT_EQ(doc.GetColor(), ffpsd::ColorMode::kRgb);
+        EXPECT_EQ(doc.GetColorMode(), ffpsd::ColorMode::kRgb);
 
         ExpectResources(doc);
 
@@ -291,7 +291,7 @@ TEST(SmokeRgbLevelsTest, EditsChangeOnlyWhatTheyTouch)
     EXPECT_EQ(background_back->GetOpacity(), 128u);
 
     // The composite is now stale; the flag byte says so, and the names of the writer stay.
-    EXPECT_FALSE(back.GetHasRealMergedData());
+    EXPECT_FALSE(back.HasRealMergedData());
     EXPECT_EQ(back.GetVersionInfo().writer_name, "Adobe Photoshop");
 
     // The rest of the Levels records, and everything else, as the file has it.

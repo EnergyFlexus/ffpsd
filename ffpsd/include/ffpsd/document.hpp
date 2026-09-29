@@ -56,13 +56,13 @@ namespace ffpsd
         FFPSD_EXPORT std::uint32_t GetHeight() const noexcept;
         FFPSD_EXPORT std::uint16_t GetChannelCount() const noexcept;
         FFPSD_EXPORT std::uint16_t GetDepth() const noexcept;
-        FFPSD_EXPORT ColorMode GetColor() const noexcept;
+        FFPSD_EXPORT ColorMode GetColorMode() const noexcept;
 
         // PSB: the large document format, with wider lengths.
         FFPSD_EXPORT bool IsPsb() const noexcept;
 
         // False: the composite in section 5 is a placeholder, build the picture from the layers.
-        FFPSD_EXPORT bool GetHasRealMergedData() const noexcept;
+        FFPSD_EXPORT bool HasRealMergedData() const noexcept;
 
         // Resource 1057 in full; allocates for the names.
         FFPSD_EXPORT VersionInfo GetVersionInfo() const;
@@ -74,7 +74,7 @@ namespace ffpsd
         FFPSD_EXPORT void SetHeight(std::uint32_t height);
         FFPSD_EXPORT void SetChannelCount(std::uint16_t channel_count);
         FFPSD_EXPORT void SetDepth(std::uint16_t depth);
-        FFPSD_EXPORT void SetColor(ColorMode color) noexcept;
+        FFPSD_EXPORT void SetColorMode(ColorMode color) noexcept;
 
         // Rewrites the RLE row counts for the other format; throws std::logic_error for an RLE layer mask.
         FFPSD_EXPORT void SetPsb(bool psb);
@@ -124,7 +124,7 @@ namespace ffpsd
         template <class T> FFPSD_EXPORT Layer* AddAdjustmentLayer(const std::string& name, const T& value = T());
 
         // A copy on top, from a document of the same format; a copy of the background is an ordinary layer.
-        FFPSD_EXPORT Layer* AddLayer(const Layer& source);
+        FFPSD_EXPORT Layer* AddLayerCopy(const Layer& source);
 
         // Destroys the layer, so pointers to it dangle.
         FFPSD_EXPORT void RemoveLayer(std::size_t index);
@@ -145,17 +145,14 @@ namespace ffpsd
         // Must match the document's size, channels and depth; sets has_real_merged_data.
         FFPSD_EXPORT void SetMergedImage(const Image& image);
 
-        // The merged image built from the layers; throws std::logic_error, as it is not implemented.
-        FFPSD_EXPORT Image RenderMergedImage() const;
-
     private:
         struct Impl;
         std::unique_ptr<Impl> impl_;
 
         // Repoints the layers at this document after a move.
-        void BindLayers() noexcept;
+        void RebindLayers() noexcept;
 
-        void OnLayersChanged();
+        void MarkStackChanged();
 
         // The next id after resource 1044 and every layer's, written to both.
         void AssignLayerId(detail::LayerRecord& record);

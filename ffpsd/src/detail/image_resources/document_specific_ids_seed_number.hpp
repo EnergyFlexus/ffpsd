@@ -17,7 +17,7 @@ namespace ffpsd::detail
     };
 
     template <>
-    std::optional<DocumentSpecificIdsSeedNumber> ParseImageResource<DocumentSpecificIdsSeedNumber>(const std::vector<std::uint8_t>& data);
+    std::optional<DocumentSpecificIdsSeedNumber> DecodeImageResource<DocumentSpecificIdsSeedNumber>(const std::vector<std::uint8_t>& data);
     template <> std::vector<std::uint8_t> EncodeImageResource<DocumentSpecificIdsSeedNumber>(const DocumentSpecificIdsSeedNumber& value);
 } // namespace ffpsd::detail
 

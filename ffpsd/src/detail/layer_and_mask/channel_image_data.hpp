@@ -27,7 +27,7 @@ namespace ffpsd::detail
         BigEndianReader& reader, std::size_t end, std::int16_t id, std::uint64_t length, const Rect& bounds, std::uint16_t depth);
 
     // Planar native samples, RLE when smaller; no samples give just the compression field.
-    ChannelImageData EncodeChannel(
+    ChannelImageData EncodeChannelImageData(
         std::int16_t id, const std::uint8_t* samples, std::size_t width, std::size_t height, std::size_t bytes_per_sample, bool is_psb);
 } // namespace ffpsd::detail
 

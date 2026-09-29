@@ -323,17 +323,17 @@ namespace ffpsd
         detail::WriteFile(path, EncodePng(image));
     }
 
-    std::vector<std::uint8_t> Layer::SaveAsPng() const
+    std::vector<std::uint8_t> Layer::EncodePng() const
     {
-        const ColorMode color = document_->GetColor();
+        const ColorMode color = document_->GetColorMode();
         if (color != ColorMode::kGrayscale && color != ColorMode::kRgb)
             throw std::invalid_argument(
                 "ffpsd: a PNG takes a gray or RGB layer, not color mode " + std::to_string(static_cast<int>(color)));
-        return EncodePng(GetPixels());
+        return ffpsd::EncodePng(GetPixels());
     }
 
-    void Layer::SaveAsPng(const std::string& path) const
+    void Layer::SavePng(const std::string& path) const
     {
-        detail::WriteFile(path, SaveAsPng());
+        detail::WriteFile(path, EncodePng());
     }
 } // namespace ffpsd

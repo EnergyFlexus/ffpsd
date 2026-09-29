@@ -112,7 +112,7 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    Image WhiteImage(std::uint32_t width, std::uint32_t height, ColorMode color, std::size_t color_count, std::uint16_t depth)
+    Image MakeWhiteImage(std::uint32_t width, std::uint32_t height, ColorMode color, std::size_t color_count, std::uint16_t depth)
     {
         Image image;
         image.width = width;
@@ -138,8 +138,7 @@ namespace ffpsd::detail
         return image;
     }
 
-    void
-    CompositeNormal(Image& target, const Image& source, std::int32_t top, std::int32_t left, std::uint8_t opacity, std::size_t color_count)
+    void BlendNormal(Image& target, const Image& source, std::int32_t top, std::int32_t left, std::uint8_t opacity, std::size_t color_count)
     {
         // An empty layer has nothing to lay down and says nothing about its channels.
         if (source.IsEmpty())

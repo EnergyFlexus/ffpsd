@@ -116,7 +116,7 @@ namespace ffpsd_test
     NewDocument(ffpsd::ColorMode color = ffpsd::ColorMode::kRgb, std::uint16_t depth = 8, std::uint32_t width = 4, std::uint32_t height = 3)
     {
         ffpsd::Document doc;
-        doc.SetColor(color);
+        doc.SetColorMode(color);
         doc.SetDepth(depth);
         doc.SetWidth(width);
         doc.SetHeight(height);

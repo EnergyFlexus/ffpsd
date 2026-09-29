@@ -94,8 +94,8 @@ namespace ffpsd
 
 #if defined(FFPSD_HAS_PNG)
         // GetPixels as a PNG, for gray and RGB documents; declared only in a build with PNG.
-        FFPSD_EXPORT std::vector<std::uint8_t> SaveAsPng() const;
-        FFPSD_EXPORT void SaveAsPng(const std::string& path) const;
+        FFPSD_EXPORT std::vector<std::uint8_t> EncodePng() const;
+        FFPSD_EXPORT void SavePng(const std::string& path) const;
 #endif
 
         // Raw door to this layer's blocks, unchecked; pointers live until the block is removed.

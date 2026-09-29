@@ -2,9 +2,9 @@
 
 namespace ffpsd::detail
 {
-    template <> std::optional<ProtectedSetting> ParseTaggedBlock<ProtectedSetting>(const std::vector<std::uint8_t>& data)
+    template <> std::optional<ProtectedSetting> DecodeTaggedBlock<ProtectedSetting>(const std::vector<std::uint8_t>& data)
     {
-        const std::optional<std::uint32_t> value = ParseU32Block(data);
+        const std::optional<std::uint32_t> value = DecodeU32(data);
         if (!value.has_value())
             return std::nullopt;
         return ProtectedSetting{*value};
@@ -12,6 +12,6 @@ namespace ffpsd::detail
 
     template <> std::vector<std::uint8_t> EncodeTaggedBlock<ProtectedSetting>(const ProtectedSetting& value)
     {
-        return EncodeU32Block(value.flags);
+        return EncodeU32(value.flags);
     }
 } // namespace ffpsd::detail

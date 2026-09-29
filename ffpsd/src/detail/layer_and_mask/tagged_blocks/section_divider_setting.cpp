@@ -2,9 +2,9 @@
 
 namespace ffpsd::detail
 {
-    template <> std::optional<SectionDividerSetting> ParseTaggedBlock<SectionDividerSetting>(const std::vector<std::uint8_t>& data)
+    template <> std::optional<SectionDividerSetting> DecodeTaggedBlock<SectionDividerSetting>(const std::vector<std::uint8_t>& data)
     {
-        const std::optional<std::uint32_t> type = ParseU32Block(data);
+        const std::optional<std::uint32_t> type = DecodeU32(data);
         if (!type.has_value())
             return std::nullopt;
         return SectionDividerSetting{*type};

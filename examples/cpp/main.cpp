@@ -51,7 +51,7 @@ namespace
 
     void PrintDocument(const ffpsd::Document& doc)
     {
-        std::cout << doc.GetWidth() << " x " << doc.GetHeight() << ", " << ColorName(doc.GetColor()) << ", " << doc.GetDepth() << " bit"
+        std::cout << doc.GetWidth() << " x " << doc.GetHeight() << ", " << ColorName(doc.GetColorMode()) << ", " << doc.GetDepth() << " bit"
                   << (doc.IsPsb() ? ", PSB" : "") << "\n";
 
         const ffpsd::ResolutionInfo resolution = doc.GetResolutionInfo();
@@ -101,7 +101,7 @@ int main(int argc, char** argv)
             return 1;
         }
 
-        doc.AddLayer(*top);
+        doc.AddLayerCopy(*top);
         doc.Save(argv[2]);
         std::cout << "\ncopied " << top->GetName() << " to the top, saved " << doc.GetLayerCount() << " layers to " << argv[2] << "\n";
     }

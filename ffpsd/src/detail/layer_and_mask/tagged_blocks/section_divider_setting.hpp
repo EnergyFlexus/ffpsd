@@ -22,7 +22,7 @@ namespace ffpsd::detail
     };
 
     // Read only: writing the type alone would lose the blend mode and sub type after it.
-    template <> std::optional<SectionDividerSetting> ParseTaggedBlock<SectionDividerSetting>(const std::vector<std::uint8_t>& data);
+    template <> std::optional<SectionDividerSetting> DecodeTaggedBlock<SectionDividerSetting>(const std::vector<std::uint8_t>& data);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_LAYER_AND_MASK_TAGGED_BLOCKS_SECTION_DIVIDER_SETTING_HPP_

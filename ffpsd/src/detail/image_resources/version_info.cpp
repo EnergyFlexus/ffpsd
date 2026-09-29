@@ -41,7 +41,7 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    template <> std::optional<VersionInfo> ParseImageResource<VersionInfo>(const std::vector<std::uint8_t>& data)
+    template <> std::optional<VersionInfo> DecodeImageResource<VersionInfo>(const std::vector<std::uint8_t>& data)
     {
         if (data.size() <= kFlagOffset)
             return std::nullopt;
@@ -76,27 +76,23 @@ namespace ffpsd::detail
         return writer.Take();
     }
 
-    bool GetHasRealMergedData(const ImageResources& image_resources)
+    bool HasRealMergedData(const ImageResources& image_resources)
     {
         // Reads the flag byte directly, without allocating for the names.
-        const std::size_t at = FindImageResourceIndex(image_resources, VersionInfo::kId);
-        if (at == kNoImageResource || image_resources[at]->data.size() <= kFlagOffset)
+        const ImageResource* resource = FindImageResource(image_resources, VersionInfo::kId);
+        if (resource == nullptr || resource->data.size() <= kFlagOffset || BlockVersion(resource->data) != kBlockVersion)
             return true;
 
-        if (BlockVersion(image_resources[at]->data) != kBlockVersion)
-            return true;
-
-        return image_resources[at]->data[kFlagOffset] != 0;
+        return resource->data[kFlagOffset] != 0;
     }
 
     void SetHasRealMergedData(ImageResources& image_resources, bool value)
     {
-        const std::size_t at = FindImageResourceIndex(image_resources, VersionInfo::kId);
-        if (at != kNoImageResource && image_resources[at]->data.size() > kFlagOffset &&
-            BlockVersion(image_resources[at]->data) == kBlockVersion)
+        ImageResource* resource = FindImageResource(image_resources, VersionInfo::kId);
+        if (resource != nullptr && resource->data.size() > kFlagOffset && BlockVersion(resource->data) == kBlockVersion)
         {
             // One byte, so that the names of whoever wrote the file stay.
-            image_resources[at]->data[kFlagOffset] = value ? 1 : 0;
+            resource->data[kFlagOffset] = value ? 1 : 0;
             return;
         }
 

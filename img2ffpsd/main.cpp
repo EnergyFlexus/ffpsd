@@ -305,7 +305,7 @@ namespace
         const std::uint32_t height = top_is_larger ? top.height : bottom.height;
 
         ffpsd::Document doc;
-        doc.SetColor(color);
+        doc.SetColorMode(color);
         doc.SetWidth(width);
         doc.SetHeight(height);
         doc.SetChannelCount(color_count);

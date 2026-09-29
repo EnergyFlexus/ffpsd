@@ -10,7 +10,7 @@ namespace ffpsd::detail
         constexpr std::size_t kBlockSize = 16;
     } // namespace
 
-    template <> std::optional<ResolutionInfo> ParseImageResource<ResolutionInfo>(const std::vector<std::uint8_t>& data)
+    template <> std::optional<ResolutionInfo> DecodeImageResource<ResolutionInfo>(const std::vector<std::uint8_t>& data)
     {
         if (data.size() < kBlockSize)
             return std::nullopt;

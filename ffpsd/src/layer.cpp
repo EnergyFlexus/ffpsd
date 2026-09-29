@@ -1,6 +1,7 @@
 #include "detail/color.hpp"
 #include "detail/layer_and_mask/adjustments/adjustment_layer.hpp"
 #include "detail/layer_and_mask/adjustments/levels.hpp"
+#include "detail/layer_and_mask/layer_pixels.hpp"
 #include "detail/layer_and_mask/layer_record.hpp"
 #include "detail/layer_and_mask/tagged_blocks/section_divider_setting.hpp"
 #include "detail/layer_and_mask/tagged_blocks/unicode_layer_name.hpp"
@@ -99,7 +100,7 @@ namespace ffpsd
         if (block == nullptr)
             return std::nullopt;
 
-        return detail::ParseAdjustment<T>(block->data, document_->GetChannelCount());
+        return detail::DecodeAdjustment<T>(block->data, document_->GetChannelCount());
     }
 
     template <class T> void Layer::SetAdjustment(const T& value)
@@ -119,7 +120,7 @@ namespace ffpsd
     Image Layer::GetPixels() const
     {
         return detail::DecodeLayerPixels(
-            *record_, detail::LayerColorChannels(document_->GetColor()), document_->GetDepth(), document_->IsPsb());
+            *record_, detail::LayerColorCount(document_->GetColorMode()), document_->GetDepth(), document_->IsPsb());
     }
 
     void Layer::SetPixels(const Image& image)
@@ -133,7 +134,7 @@ namespace ffpsd
         detail::SamplesView samples = detail::ViewOf(image);
         samples.depth = depth; // an empty image says nothing about its depth
 
-        detail::ReplaceLayerPixels(*record_, samples, detail::LayerColorChannels(document_->GetColor()), document_->IsPsb());
+        detail::ReplaceLayerPixels(*record_, samples, detail::LayerColorCount(document_->GetColorMode()), document_->IsPsb());
         document_->SetHasRealMergedData(false);
     }
 
@@ -176,7 +177,7 @@ namespace ffpsd
         if (pixels.IsEmpty())
             throw std::invalid_argument("ffpsd: an empty layer has nothing to resize");
 
-        const std::size_t color_count = detail::LayerColorChannels(document_->GetColor());
+        const std::size_t color_count = detail::LayerColorCount(document_->GetColorMode());
         const Image resized = detail::Resample(pixels, width, height, color_count, filter);
         detail::ReplaceLayerPixels(*record_, detail::ViewOf(resized), color_count, document_->IsPsb());
         document_->SetHasRealMergedData(false);
@@ -188,11 +189,11 @@ namespace ffpsd
     }
     const TaggedBlock* Layer::GetTaggedBlockByIndex(std::size_t index) const
     {
-        return detail::GetTaggedBlockByIndex(record_->blocks, index);
+        return detail::TaggedBlockAt(record_->blocks, index);
     }
     const TaggedBlock* Layer::GetTaggedBlockByKey(std::uint32_t key) const noexcept
     {
-        return detail::GetTaggedBlockByKey(record_->blocks, key);
+        return detail::FindTaggedBlock(record_->blocks, key);
     }
     void Layer::SetTaggedBlock(const TaggedBlock& block)
     {

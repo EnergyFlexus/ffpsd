@@ -54,7 +54,7 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    template <> LevelsInfo ParseAdjustment<LevelsInfo>(const std::vector<std::uint8_t>& data, std::size_t channel_count)
+    template <> LevelsInfo DecodeAdjustment<LevelsInfo>(const std::vector<std::uint8_t>& data, std::size_t channel_count)
     {
         const std::size_t record_count = channel_count + 1;
         BigEndianReader reader(data);

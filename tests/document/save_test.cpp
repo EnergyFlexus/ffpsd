@@ -123,7 +123,7 @@ TEST(DocumentSaveTest, ADocumentFromScratchGetsABlankComposite)
 
     const ffpsd::Document back = ffpsd::Document::Parse(doc.Save());
 
-    EXPECT_EQ(back.GetColor(), ffpsd::ColorMode::kGrayscale);
+    EXPECT_EQ(back.GetColorMode(), ffpsd::ColorMode::kGrayscale);
     EXPECT_EQ(back.GetWidth(), 4u);
     EXPECT_EQ(back.GetHeight(), 3u);
     ASSERT_EQ(back.GetLayerCount(), 1u);

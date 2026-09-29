@@ -19,7 +19,7 @@ TEST(SmokeTest, HeaderOfAGrayscaleFile)
     EXPECT_EQ(doc.GetHeight(), 1200u);
     EXPECT_EQ(doc.GetChannelCount(), 1u);
     EXPECT_EQ(doc.GetDepth(), 8u);
-    EXPECT_EQ(doc.GetColor(), ffpsd::ColorMode::kGrayscale);
+    EXPECT_EQ(doc.GetColorMode(), ffpsd::ColorMode::kGrayscale);
     EXPECT_FALSE(doc.IsPsb());
 }
 

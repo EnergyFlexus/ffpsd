@@ -11,7 +11,7 @@
 namespace ffpsd::detail
 {
     // Empty when the block is shorter than its 16 bytes.
-    template <> std::optional<ResolutionInfo> ParseImageResource<ResolutionInfo>(const std::vector<std::uint8_t>& data);
+    template <> std::optional<ResolutionInfo> DecodeImageResource<ResolutionInfo>(const std::vector<std::uint8_t>& data);
     template <> std::vector<std::uint8_t> EncodeImageResource<ResolutionInfo>(const ResolutionInfo& value);
 } // namespace ffpsd::detail
 

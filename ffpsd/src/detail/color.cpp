@@ -75,7 +75,7 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    std::size_t LayerColorChannels(ColorMode color) noexcept
+    std::size_t LayerColorCount(ColorMode color)
     {
         switch (color)
         {
@@ -88,7 +88,7 @@ namespace ffpsd::detail
         case ColorMode::kCmyk:
             return 4;
         default:
-            return 0;
+            throw std::invalid_argument("ffpsd: color mode " + std::to_string(static_cast<int>(color)) + " has no layers");
         }
     }
 

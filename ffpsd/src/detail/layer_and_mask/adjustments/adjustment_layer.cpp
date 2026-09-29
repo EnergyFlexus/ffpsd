@@ -2,6 +2,7 @@
 
 #include "detail/io/big_endian_writer.hpp"
 #include "detail/io/fourcc.hpp"
+#include "detail/layer_and_mask/layer_pixels.hpp"
 
 #include <algorithm>
 #include <iterator>
@@ -48,7 +49,7 @@ namespace ffpsd::detail
     {
         // No pixels: each channel is just its compression field, the same in PSD and PSB.
         LayerRecord record = CreateLayerRecord(name, SamplesView(), 0, 0, color_count, false);
-        record.channels.push_back(EncodeChannel(kLayerMaskId, nullptr, 0, 0, 1, false));
+        record.channels.push_back(EncodeChannelImageData(kLayerMaskId, nullptr, 0, 0, 1, false));
         record.mask_data = WhiteMaskData();
         record.flags = kAdjustmentFlags;
 

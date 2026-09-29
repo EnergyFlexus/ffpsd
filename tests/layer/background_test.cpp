@@ -65,7 +65,7 @@ TEST(LayerBackgroundTest, ItGoesUnderEverythingElse)
     EXPECT_EQ(doc.GetLayerByIndex(1), a);
     EXPECT_EQ(doc.GetLayerByIndex(2), b);
     EXPECT_NE(LayerId(*background), 0u);
-    EXPECT_FALSE(doc.GetHasRealMergedData());
+    EXPECT_FALSE(doc.HasRealMergedData());
 }
 
 TEST(LayerBackgroundTest, ItCoversTheCanvasWithoutTransparency)
@@ -178,7 +178,7 @@ TEST(LayerBackgroundTest, ACopyOfItIsAnOrdinaryLayer)
     ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
     const ffpsd::Layer* photoshops_copy = doc.GetLayerByIndex(1);
 
-    const ffpsd::Layer* copy = doc.AddLayer(*doc.GetLayerByIndex(0));
+    const ffpsd::Layer* copy = doc.AddLayerCopy(*doc.GetLayerByIndex(0));
 
     EXPECT_FALSE(copy->IsBackground());
     EXPECT_TRUE(doc.GetLayerByIndex(0)->IsBackground());

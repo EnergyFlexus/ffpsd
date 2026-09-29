@@ -19,7 +19,7 @@ namespace ffpsd::detail
     };
 
     // Empty when the count is more than the block holds.
-    template <> std::optional<UnicodeLayerName> ParseTaggedBlock<UnicodeLayerName>(const std::vector<std::uint8_t>& data);
+    template <> std::optional<UnicodeLayerName> DecodeTaggedBlock<UnicodeLayerName>(const std::vector<std::uint8_t>& data);
     template <> std::vector<std::uint8_t> EncodeTaggedBlock<UnicodeLayerName>(const UnicodeLayerName& value);
 } // namespace ffpsd::detail
 

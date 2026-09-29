@@ -19,7 +19,7 @@ namespace ffpsd::detail
         std::uint32_t id = 0;
     };
 
-    template <> std::optional<LayerNameSourceSetting> ParseTaggedBlock<LayerNameSourceSetting>(const std::vector<std::uint8_t>& data);
+    template <> std::optional<LayerNameSourceSetting> DecodeTaggedBlock<LayerNameSourceSetting>(const std::vector<std::uint8_t>& data);
     template <> std::vector<std::uint8_t> EncodeTaggedBlock<LayerNameSourceSetting>(const LayerNameSourceSetting& value);
 } // namespace ffpsd::detail
 

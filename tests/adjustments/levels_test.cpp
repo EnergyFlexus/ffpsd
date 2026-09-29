@@ -47,7 +47,7 @@ TEST(AdjustmentLevelsTest, AChangeReadsBackAndStalesTheComposite)
     EXPECT_DOUBLE_EQ(after.channels[0].gamma, 1.5);
     EXPECT_EQ(after.channels[3].output_ceiling, 240u);
     EXPECT_EQ(after.channels[1].input_floor, 10u);
-    EXPECT_FALSE(doc.GetHasRealMergedData());
+    EXPECT_FALSE(doc.HasRealMergedData());
 }
 
 TEST(AdjustmentLevelsTest, AGrayscaleDocumentHasTwoRecords)

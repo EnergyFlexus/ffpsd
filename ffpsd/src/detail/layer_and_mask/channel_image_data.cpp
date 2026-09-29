@@ -33,7 +33,7 @@ namespace ffpsd::detail
         return channel;
     }
 
-    ChannelImageData EncodeChannel(
+    ChannelImageData EncodeChannelImageData(
         std::int16_t id, const std::uint8_t* samples, std::size_t width, std::size_t height, std::size_t bytes_per_sample, bool is_psb)
     {
         ChannelImageData channel;

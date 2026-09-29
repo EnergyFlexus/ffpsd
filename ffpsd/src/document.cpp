@@ -13,6 +13,7 @@
 #include "detail/layer_and_mask/adjustments/levels.hpp"
 #include "detail/layer_and_mask/layer_and_mask_info.hpp"
 #include "detail/layer_and_mask/layer_info.hpp"
+#include "detail/layer_and_mask/layer_pixels.hpp"
 #include "detail/layer_and_mask/layer_record.hpp"
 #include "detail/layer_and_mask/tagged_blocks/layer_id.hpp"
 #include "detail/pixel_data.hpp"
@@ -38,7 +39,7 @@ namespace ffpsd
         constexpr double kMaxResolution = 32767.0;
 
         // Why Photoshop could not open the stack, or null; bottom to top, a group's end marker comes first.
-        const char* StackProblem(const detail::Layers& layers)
+        const char* FindStackProblem(const detail::Layers& layers)
         {
             std::size_t open = 0;
             for (std::size_t i = 0; i < layers.size(); ++i)
@@ -64,21 +65,13 @@ namespace ffpsd
             return open == 0 ? nullptr : "breaks the group nesting";
         }
 
-        std::size_t LayerColorCount(ColorMode color)
-        {
-            const std::size_t count = detail::LayerColorChannels(color);
-            if (count == 0)
-                throw std::invalid_argument("ffpsd: color mode " + std::to_string(static_cast<int>(color)) + " has no layers");
-            return count;
-        }
-
         void CheckLayerIndex(std::size_t index, std::size_t count)
         {
             if (index >= count)
                 throw std::out_of_range("ffpsd: layer index " + std::to_string(index) + " of " + std::to_string(count));
         }
 
-        void ValidateResolution(double dpi)
+        void CheckResolution(double dpi)
         {
             // Written as a negated comparison so that a NaN is rejected too.
             if (!(dpi > 0.0) || dpi > kMaxResolution)
@@ -115,16 +108,16 @@ namespace ffpsd
     Document::Document(Document&& other) noexcept
         : impl_(std::move(other.impl_))
     {
-        BindLayers();
+        RebindLayers();
     }
     Document& Document::operator=(Document&& other) noexcept
     {
         impl_ = std::move(other.impl_);
-        BindLayers();
+        RebindLayers();
         return *this;
     }
 
-    void Document::BindLayers() noexcept
+    void Document::RebindLayers() noexcept
     {
         if (impl_ == nullptr)
             return;
@@ -152,7 +145,7 @@ namespace ffpsd
     {
         return impl_->depth;
     }
-    ColorMode Document::GetColor() const noexcept
+    ColorMode Document::GetColorMode() const noexcept
     {
         return impl_->color;
     }
@@ -160,9 +153,9 @@ namespace ffpsd
     {
         return impl_->version == kVersionPsb;
     }
-    bool Document::GetHasRealMergedData() const noexcept
+    bool Document::HasRealMergedData() const noexcept
     {
-        return detail::GetHasRealMergedData(impl_->image_resources);
+        return detail::HasRealMergedData(impl_->image_resources);
     }
     VersionInfo Document::GetVersionInfo() const
     {
@@ -187,8 +180,7 @@ namespace ffpsd
     }
     const ImageResource* Document::GetImageResourceById(std::uint16_t id) const noexcept
     {
-        const std::size_t at = detail::FindImageResourceIndex(impl_->image_resources, id);
-        return at == detail::kNoImageResource ? nullptr : impl_->image_resources[at].get();
+        return detail::FindImageResource(impl_->image_resources, id);
     }
 
     void Document::SetWidth(std::uint32_t width)
@@ -217,7 +209,7 @@ namespace ffpsd
             throw std::invalid_argument("ffpsd: unsupported depth: " + std::to_string(depth));
         impl_->depth = depth;
     }
-    void Document::SetColor(ColorMode color) noexcept
+    void Document::SetColorMode(ColorMode color) noexcept
     {
         impl_->color = color;
     }
@@ -257,8 +249,8 @@ namespace ffpsd
     void Document::SetResolutionInfo(ResolutionInfo value)
     {
         // Both checked before either is stored.
-        ValidateResolution(value.horizontal);
-        ValidateResolution(value.vertical);
+        CheckResolution(value.horizontal);
+        CheckResolution(value.vertical);
 
         detail::SetImageResource(impl_->image_resources, value);
     }
@@ -270,11 +262,13 @@ namespace ffpsd
 
     bool Document::RemoveImageResource(std::uint16_t id)
     {
-        const std::size_t at = detail::FindImageResourceIndex(impl_->image_resources, id);
-        if (at == detail::kNoImageResource)
+        auto& resources = impl_->image_resources;
+        const auto at = std::find_if(
+            resources.begin(), resources.end(), [id](const std::unique_ptr<ImageResource>& resource) { return resource->id == id; });
+        if (at == resources.end())
             return false;
 
-        impl_->image_resources.erase(impl_->image_resources.begin() + static_cast<std::ptrdiff_t>(at));
+        resources.erase(at);
         return true;
     }
 
@@ -306,7 +300,7 @@ namespace ffpsd
         const std::string& name, const std::uint8_t* data, std::size_t size, std::uint32_t width, std::uint32_t height,
         std::uint16_t channel_count, std::int32_t top, std::int32_t left)
     {
-        const std::size_t color_count = LayerColorCount(impl_->color);
+        const std::size_t color_count = detail::LayerColorCount(impl_->color);
 
         // Keeps the size arithmetic below far from overflow.
         detail::CheckLayerSides(width, height, IsPsb());
@@ -322,13 +316,13 @@ namespace ffpsd
         auto record = std::make_unique<detail::LayerRecord>(detail::CreateLayerRecord(name, samples, top, left, color_count, IsPsb()));
         AssignLayerId(*record);
         impl_->layers.push_back(std::unique_ptr<Layer>(new Layer(std::move(record), this)));
-        OnLayersChanged();
+        MarkStackChanged();
         return impl_->layers.back().get();
     }
 
     Layer* Document::AddBackgroundLayer(const std::string& name, const Image& image)
     {
-        const std::size_t color_count = LayerColorCount(impl_->color);
+        const std::size_t color_count = detail::LayerColorCount(impl_->color);
         if (image.depth != impl_->depth)
             throw std::invalid_argument(
                 "ffpsd: a " + std::to_string(image.depth) + " bit image in a " + std::to_string(impl_->depth) + " bit document");
@@ -346,8 +340,8 @@ namespace ffpsd
         Image flattened;
         if (image.channel_count > color_count)
         {
-            flattened = detail::WhiteImage(image.width, image.height, impl_->color, color_count, image.depth);
-            detail::CompositeNormal(flattened, image, 0, 0, 255, color_count);
+            flattened = detail::MakeWhiteImage(image.width, image.height, impl_->color, color_count, image.depth);
+            detail::BlendNormal(flattened, image, 0, 0, 255, color_count);
         }
         const Image& opaque = flattened.IsEmpty() ? image : flattened;
 
@@ -356,7 +350,7 @@ namespace ffpsd
         detail::MarkAsBackground(*record);
         AssignLayerId(*record);
         impl_->layers.insert(impl_->layers.begin(), std::unique_ptr<Layer>(new Layer(std::move(record), this)));
-        OnLayersChanged();
+        MarkStackChanged();
         return impl_->layers.front().get();
     }
 
@@ -374,13 +368,13 @@ namespace ffpsd
         if (detail::HasLayerMask(*layer.record_))
             throw std::invalid_argument("ffpsd: a layer with a mask cannot become the background");
 
-        const std::size_t color_count = LayerColorCount(impl_->color);
-        Image canvas = detail::WhiteImage(impl_->width, impl_->height, impl_->color, color_count, impl_->depth);
+        const std::size_t color_count = detail::LayerColorCount(impl_->color);
+        Image canvas = detail::MakeWhiteImage(impl_->width, impl_->height, impl_->color, color_count, impl_->depth);
         const Rect bounds = layer.GetBounds();
-        detail::CompositeNormal(canvas, layer.GetPixels(), bounds.top, bounds.left, layer.GetOpacity(), color_count);
+        detail::BlendNormal(canvas, layer.GetPixels(), bounds.top, bounds.left, layer.GetOpacity(), color_count);
 
         // Everything that can throw is done; from here on the layer only changes.
-        std::vector<detail::ChannelImageData> channels = detail::EncodeLayerChannels(detail::ViewOf(canvas), color_count, IsPsb());
+        std::vector<detail::ChannelImageData> channels = detail::EncodeLayerPixels(detail::ViewOf(canvas), color_count, IsPsb());
         detail::LayerRecord& record = *layer.record_;
         record.channels = std::move(channels);
         record.bounds = Rect{0, 0, static_cast<std::int32_t>(impl_->height), static_cast<std::int32_t>(impl_->width)};
@@ -390,7 +384,7 @@ namespace ffpsd
 
         const auto first = layers.begin();
         std::rotate(first, first + static_cast<std::ptrdiff_t>(index), first + static_cast<std::ptrdiff_t>(index) + 1);
-        OnLayersChanged();
+        MarkStackChanged();
     }
 
     bool Document::UnsetBackgroundLayer()
@@ -404,7 +398,7 @@ namespace ffpsd
 
     template <class T> Layer* Document::AddAdjustmentLayer(const std::string& name, const T& value)
     {
-        const std::size_t color_count = LayerColorCount(impl_->color);
+        const std::size_t color_count = detail::LayerColorCount(impl_->color);
 
         auto settings = std::make_unique<TaggedBlock>();
         settings->key = T::kKey;
@@ -413,14 +407,14 @@ namespace ffpsd
         auto record = std::make_unique<detail::LayerRecord>(detail::CreateAdjustmentLayerRecord(name, std::move(settings), color_count));
         AssignLayerId(*record);
         impl_->layers.push_back(std::unique_ptr<Layer>(new Layer(std::move(record), this)));
-        OnLayersChanged();
+        MarkStackChanged();
         return impl_->layers.back().get();
     }
 
     // A line per struct in adjustments.hpp, as in layer.cpp.
     template FFPSD_EXPORT Layer* Document::AddAdjustmentLayer<LevelsInfo>(const std::string& name, const LevelsInfo& value);
 
-    Layer* Document::AddLayer(const Layer& source)
+    Layer* Document::AddLayerCopy(const Layer& source)
     {
         const Impl& from = *source.document_->impl_;
         if (from.depth != impl_->depth || from.color != impl_->color || from.version != impl_->version)
@@ -433,15 +427,15 @@ namespace ffpsd
         // The source's id stays with the source.
         AssignLayerId(*record);
 
-        const bool was_valid = StackProblem(impl_->layers) == nullptr;
+        const bool was_valid = FindStackProblem(impl_->layers) == nullptr;
         impl_->layers.push_back(std::unique_ptr<Layer>(new Layer(std::move(record), this)));
-        if (const char* problem = was_valid ? StackProblem(impl_->layers) : nullptr)
+        if (const char* problem = was_valid ? FindStackProblem(impl_->layers) : nullptr)
         {
             impl_->layers.pop_back();
             throw std::invalid_argument(std::string("ffpsd: the copy ") + problem);
         }
 
-        OnLayersChanged();
+        MarkStackChanged();
         return impl_->layers.back().get();
     }
 
@@ -450,16 +444,16 @@ namespace ffpsd
         CheckLayerIndex(index, impl_->layers.size());
 
         auto& layers = impl_->layers;
-        const bool was_valid = StackProblem(layers) == nullptr;
+        const bool was_valid = FindStackProblem(layers) == nullptr;
         std::unique_ptr<Layer> removed = std::move(layers[index]);
         layers.erase(layers.begin() + static_cast<std::ptrdiff_t>(index));
-        if (const char* problem = was_valid ? StackProblem(layers) : nullptr)
+        if (const char* problem = was_valid ? FindStackProblem(layers) : nullptr)
         {
             layers.insert(layers.begin() + static_cast<std::ptrdiff_t>(index), std::move(removed));
             throw std::invalid_argument("ffpsd: removing layer " + std::to_string(index) + " " + problem);
         }
 
-        OnLayersChanged();
+        MarkStackChanged();
     }
 
     void Document::MoveLayer(std::size_t from, std::size_t to)
@@ -482,15 +476,15 @@ namespace ffpsd
                     first + static_cast<std::ptrdiff_t>(a) + 1);
         };
 
-        const bool was_valid = StackProblem(layers) == nullptr;
+        const bool was_valid = FindStackProblem(layers) == nullptr;
         rotate(from, to);
-        if (const char* problem = was_valid ? StackProblem(layers) : nullptr)
+        if (const char* problem = was_valid ? FindStackProblem(layers) : nullptr)
         {
             rotate(to, from);
             throw std::invalid_argument("ffpsd: moving layer " + std::to_string(from) + " to " + std::to_string(to) + " " + problem);
         }
 
-        OnLayersChanged();
+        MarkStackChanged();
     }
 
     std::size_t Document::GetTaggedBlockCount() const noexcept
@@ -499,11 +493,11 @@ namespace ffpsd
     }
     const TaggedBlock* Document::GetTaggedBlockByIndex(std::size_t index) const
     {
-        return detail::GetTaggedBlockByIndex(impl_->layer_and_mask.blocks, index);
+        return detail::TaggedBlockAt(impl_->layer_and_mask.blocks, index);
     }
     const TaggedBlock* Document::GetTaggedBlockByKey(std::uint32_t key) const noexcept
     {
-        return detail::GetTaggedBlockByKey(impl_->layer_and_mask.blocks, key);
+        return detail::FindTaggedBlock(impl_->layer_and_mask.blocks, key);
     }
     void Document::SetTaggedBlock(const TaggedBlock& block)
     {
@@ -533,11 +527,6 @@ namespace ffpsd
         SetHasRealMergedData(true);
     }
 
-    Image Document::RenderMergedImage() const
-    {
-        throw std::logic_error("ffpsd: RenderMergedImage is not implemented yet");
-    }
-
     void Document::AssignLayerId(detail::LayerRecord& record)
     {
         using detail::DocumentSpecificIdsSeedNumber;
@@ -555,7 +544,7 @@ namespace ffpsd
     }
 
     // 1024 holds a layer index and 1026 and 1072 one entry per layer; stale ones are worse than none.
-    void Document::OnLayersChanged()
+    void Document::MarkStackChanged()
     {
         auto& resources = impl_->image_resources;
         resources.erase(
@@ -645,7 +634,7 @@ namespace ffpsd
         doc.SetHeight(header.height);
         doc.SetWidth(header.width);
         doc.SetDepth(header.depth);
-        doc.SetColor(static_cast<ColorMode>(header.color_mode));
+        doc.SetColorMode(static_cast<ColorMode>(header.color_mode));
 
         doc.impl_->color_mode_data = detail::ParseColorModeData(reader);
         doc.impl_->image_resources = detail::ParseImageResources(reader);
