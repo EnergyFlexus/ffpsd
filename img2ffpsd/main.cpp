@@ -1,4 +1,4 @@
-// Two folders of PNG pairs into PSD files: the bottom as the background, the top as a layer.
+// Folders of PNG files into PSD files: the first one as the background, every next one as a layer above it.
 #include <algorithm>
 #include <atomic>
 #include <cctype>
@@ -31,8 +31,7 @@ namespace
 {
     struct Options
     {
-        fs::path bottom;
-        fs::path top;
+        std::vector<fs::path> layers; // the bottom, the top and the optional ones above it
         fs::path output;
         bool gray = false;
         unsigned jobs = 0; // 0: one per processor
@@ -77,10 +76,12 @@ namespace
     void PrintUsage()
     {
         std::cout << "img2ffpsd " << ffpsd::Version() << "\n"
-                  << "usage: img2ffpsd <bottom> <top> <output> [--gray] [--jobs N] [--resize nearest|bicubic]\n\n"
+                  << "usage: img2ffpsd <bottom> <top> [<layer>...] <output> [--gray] [--jobs N] [--resize nearest|bicubic]\n\n"
                   << "Pairs PNG files by their path in the bottom and top folders into PSD files in\n"
                   << "output: the bottom one as the locked background, the top one as the layer above\n"
-                  << "it and the composite. The smaller picture of a pair is resized to the larger one.\n\n"
+                  << "it. Each further folder adds a layer above those where it has the file. The\n"
+                  << "upper layer is the composite. Every picture is resized to the larger one of the\n"
+                  << "bottom and the top.\n\n"
                   << "  --gray              grayscale documents instead of RGB\n"
                   << "  --jobs N            files converted at once, one per processor by default\n"
                   << "  --resize nearest    resizing that keeps hard pixels, the default\n"
@@ -111,12 +112,12 @@ namespace
             else
                 folders.push_back(args[i]);
         }
-        if (folders.size() != 3)
+        if (folders.size() < 3)
             return false;
 
-        options.bottom = fs::u8path(folders[0]);
-        options.top = fs::u8path(folders[1]);
-        options.output = fs::u8path(folders[2]);
+        for (std::size_t i = 0; i + 1 < folders.size(); ++i)
+            options.layers.push_back(fs::u8path(folders[i]));
+        options.output = fs::u8path(folders.back());
         return true;
     }
 
@@ -244,10 +245,10 @@ namespace
         return gaps;
     }
 
-    // The paths both folders have; false, after printing why, when they cannot be converted.
-    bool FindPairs(const Options& options, std::vector<fs::path>& files)
+    // The bottom's paths, which the top must match, and every folder's files; false, after printing why, if they cannot be converted.
+    bool FindFiles(const Options& options, std::vector<fs::path>& files, std::vector<std::set<fs::path>>& found)
     {
-        for (const fs::path& folder : {options.bottom, options.top})
+        for (const fs::path& folder : options.layers)
         {
             if (!fs::is_directory(folder))
             {
@@ -256,8 +257,10 @@ namespace
             }
         }
 
-        const std::set<fs::path> bottoms = FindPngs(options.bottom);
-        const std::set<fs::path> tops = FindPngs(options.top);
+        for (const fs::path& folder : options.layers)
+            found.push_back(FindPngs(folder));
+        const std::set<fs::path>& bottoms = found[0];
+        const std::set<fs::path>& tops = found[1];
 
         bool match = true;
         if (bottoms.size() != tops.size())
@@ -267,8 +270,8 @@ namespace
                       << kEnd << "\n";
             match = false;
         }
-        match = CheckOnlyIn(options.bottom, bottoms, tops) && match;
-        match = CheckOnlyIn(options.top, tops, bottoms) && match;
+        match = CheckOnlyIn(options.layers[0], bottoms, tops) && match;
+        match = CheckOnlyIn(options.layers[1], tops, bottoms) && match;
         if (!match)
         {
             std::cout << kRed << "Bad. Check errors. Conversion cancelled." << kEnd << "\n";
@@ -277,22 +280,42 @@ namespace
         }
         if (bottoms.empty())
         {
-            std::cout << kYellow << "warning: no PNG files in " << Utf8(fs::absolute(options.bottom)) << "." << kEnd << "\n";
+            std::cout << kYellow << "warning: no PNG files in " << Utf8(fs::absolute(options.layers[0])) << "." << kEnd << "\n";
             return true;
         }
 
-        const std::vector<std::string> gaps = FindGaps(bottoms);
-        if (gaps.empty())
+        bool warned = false;
+        for (std::size_t i = 2; i < found.size(); ++i)
         {
-            std::cout << kGreen << "Good. Number of files: " << bottoms.size() << ". The files match." << kEnd << "\n";
+            std::vector<fs::path> only;
+            std::set_difference(found[i].begin(), found[i].end(), bottoms.begin(), bottoms.end(), std::back_inserter(only));
+            if (only.empty())
+                continue;
+            std::cout << kYellow << "warning: files only in '" << Utf8(fs::absolute(options.layers[i])) << "', skipped:\n";
+            for (const fs::path& file : only)
+                std::cout << "    - " << Utf8(file) << "\n";
+            std::cout << kEnd << "\n";
+            warned = true;
         }
-        else
+
+        const std::vector<std::string> gaps = FindGaps(bottoms);
+        if (!gaps.empty())
         {
             std::cout << kYellow << "warning: possible misses:\n";
             for (const std::string& gap : gaps)
                 std::cout << "    - " << gap << "\n";
-            std::cout << kEnd << "\n" << kYellow << "Warnings. But if everything is ok, you can continue." << kEnd << "\n";
+            std::cout << kEnd << "\n";
+            warned = true;
+        }
+
+        if (warned)
+        {
+            std::cout << kYellow << "Warnings. But if everything is ok, you can continue." << kEnd << "\n";
             Pause();
+        }
+        else
+        {
+            std::cout << kGreen << "Good. Number of files: " << bottoms.size() << ". The files match." << kEnd << "\n";
         }
 
         if (fs::is_directory(options.output) && !VisibleFiles(options.output).empty())
@@ -314,19 +337,26 @@ namespace
         return ffpsd::LoadPng(data.data(), data.size(), color_mode, 8);
     }
 
-    void Convert(const Options& options, const fs::path& file)
+    void Convert(const Options& options, const std::vector<std::set<fs::path>>& found, const fs::path& file)
     {
         const ffpsd::ColorMode color_mode = options.gray ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb;
         const std::uint16_t color_count = options.gray ? 1 : 3;
 
-        const ffpsd::Image bottom = LoadPng(options.bottom / file, color_mode);
-        ffpsd::Image top = LoadPng(options.top / file, color_mode);
+        // The bottom and the top pictures, then those of the further folders that have the file.
+        std::vector<ffpsd::Image> images;
+        std::vector<std::size_t> folders; // the folder of each picture, which names its layer
+        for (std::size_t i = 0; i < options.layers.size(); ++i)
+        {
+            if (found[i].count(file) != 0)
+            {
+                images.push_back(LoadPng(options.layers[i] / file, color_mode));
+                folders.push_back(i);
+            }
+        }
 
-        // The top picture loses its transparency, the plane after the color ones.
-        top.channel_count = color_count;
-        top.bytes.resize(top.GetSizeBytes());
-
-        // The document is as large as the larger picture.
+        // The document is as large as the larger of the bottom and the top pictures.
+        const ffpsd::Image& bottom = images[0];
+        const ffpsd::Image& top = images[1];
         const bool top_is_larger = std::uint64_t{top.width} * top.height >= std::uint64_t{bottom.width} * bottom.height;
         const std::uint32_t width = top_is_larger ? top.width : bottom.width;
         const std::uint32_t height = top_is_larger ? top.height : bottom.height;
@@ -343,16 +373,26 @@ namespace
             doc.SetBackgroundLayer(0);
         }
 
-        // The composite is the top picture; only a resized one has to be read back from its layer.
-        ffpsd::Layer* layer = doc.AddLayer("Layer 1", top);
-        if (top.width == width && top.height == height)
+        for (std::size_t i = 1; i < images.size(); ++i)
         {
-            doc.SetMergedImage(top);
-        }
-        else
-        {
-            layer->Resize(width, height, options.resize);
-            doc.SetMergedImage(layer->GetPixels());
+            // A layer loses its transparency, the plane after the color ones.
+            ffpsd::Image& image = images[i];
+            image.channel_count = color_count;
+            image.bytes.resize(image.GetSizeBytes());
+
+            ffpsd::Layer* layer = doc.AddLayer("Layer " + std::to_string(folders[i]), image);
+            const bool resized = image.width != width || image.height != height;
+            if (resized)
+                layer->Resize(width, height, options.resize);
+
+            // The upper layer covers the rest, so it is the composite; a resized one is read back from its layer.
+            if (i + 1 == images.size())
+            {
+                if (resized)
+                    doc.SetMergedImage(layer->GetPixels());
+                else
+                    doc.SetMergedImage(image);
+            }
         }
 
         fs::path target = options.output / file;
@@ -419,8 +459,8 @@ namespace
         std::size_t failed_ = 0;
     };
 
-    // Converts every pair; each thread takes the next file until none are left. Returns the failures.
-    std::size_t ConvertAll(const Options& options, const std::vector<fs::path>& files)
+    // Converts every file; each thread takes the next one until none are left. Returns the failures.
+    std::size_t ConvertAll(const Options& options, const std::vector<std::set<fs::path>>& found, const std::vector<fs::path>& files)
     {
         Progress progress(files.size());
         std::atomic<std::size_t> next{0};
@@ -431,7 +471,7 @@ namespace
                 std::string error;
                 try
                 {
-                    Convert(options, files[i]);
+                    Convert(options, found, files[i]);
                 }
                 catch (const std::exception& e)
                 {
@@ -473,13 +513,14 @@ namespace
         }
 
         std::vector<fs::path> files;
-        if (!FindPairs(options, files))
+        std::vector<std::set<fs::path>> found;
+        if (!FindFiles(options, files, found))
             return 1;
         if (files.empty())
             return 0;
 
         const auto started = std::chrono::steady_clock::now();
-        const std::size_t failed = ConvertAll(options, files);
+        const std::size_t failed = ConvertAll(options, found, files);
         const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
 
         std::cout << "\n\n"
