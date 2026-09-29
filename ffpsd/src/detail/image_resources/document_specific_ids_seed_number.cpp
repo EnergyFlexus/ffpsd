@@ -1,23 +1,24 @@
 #include "detail/image_resources/document_specific_ids_seed_number.hpp"
 
+#include "detail/io/big_endian_reader.hpp"
 #include "detail/io/big_endian_writer.hpp"
 
 namespace ffpsd::detail
 {
-    std::uint32_t GetDocumentSpecificIdsSeedNumber(const ImageResources& image_resources)
+    template <>
+    std::optional<DocumentSpecificIdsSeedNumber> ParseImageResource<DocumentSpecificIdsSeedNumber>(const std::vector<std::uint8_t>& data)
     {
-        const std::size_t at = FindImageResourceIndex(image_resources, ImageResourceId::kDocumentSpecificIdsSeedNumber);
-        if (at == kNoImageResource || image_resources[at]->data.size() < sizeof(std::uint32_t))
-            return 0;
+        if (data.size() < sizeof(std::uint32_t))
+            return std::nullopt;
 
-        BigEndianReader reader(image_resources[at]->data);
-        return reader.ReadU32();
+        BigEndianReader reader(data);
+        return DocumentSpecificIdsSeedNumber{reader.ReadU32()};
     }
 
-    void SetDocumentSpecificIdsSeedNumber(ImageResources& image_resources, std::uint32_t value)
+    template <> std::vector<std::uint8_t> EncodeImageResource<DocumentSpecificIdsSeedNumber>(const DocumentSpecificIdsSeedNumber& value)
     {
         BigEndianWriter writer(sizeof(std::uint32_t));
-        writer.WriteU32(value);
-        FindOrInsertImageResource(image_resources, ImageResourceId::kDocumentSpecificIdsSeedNumber).data = writer.Take();
+        writer.WriteU32(value.value);
+        return writer.Take();
     }
 } // namespace ffpsd::detail

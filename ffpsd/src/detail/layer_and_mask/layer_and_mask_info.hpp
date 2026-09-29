@@ -6,7 +6,7 @@
 #include "detail/layer_and_mask/global_layer_mask_info.hpp"
 #include "detail/layer_and_mask/layer_info.hpp"
 #include "detail/layer_and_mask/layer_record.hpp"
-#include "detail/layer_and_mask/tagged_block.hpp"
+#include "detail/layer_and_mask/tagged_blocks/tagged_block.hpp"
 
 #include <cstdint>
 #include <vector>

@@ -8,18 +8,17 @@
 #include <cstdint>
 #include <ffpsd/image_resources.hpp>
 #include <memory>
+#include <optional>
+#include <utility>
 #include <vector>
 
 namespace ffpsd::detail
 {
-    // Unscoped, so an enumerator converts to std::uint16_t wherever an id is taken.
+    // Resources ffpsd drops but does not read; the ones it reads carry kId in their struct.
     enum ImageResourceId : std::uint16_t
     {
-        kResolutionInfo = 1005,
         kLayerStateInformation = 1024,
         kLayersGroupInformation = 1026,
-        kDocumentSpecificIdsSeedNumber = 1044,
-        kVersionInfo = 1057,
         kLayerGroupsEnabledId = 1072
     };
 
@@ -36,6 +35,26 @@ namespace ffpsd::detail
 
     // A missing id is inserted in ascending order, as Photoshop keeps them.
     ImageResource& FindOrInsertImageResource(ImageResources& image_resources, std::uint16_t id);
+
+    // Specialized by each resource ffpsd interprets, for its struct with kId; empty when the data cannot be read.
+    template <class T> std::optional<T> ParseImageResource(const std::vector<std::uint8_t>& data);
+    template <class T> std::vector<std::uint8_t> EncodeImageResource(const T& value);
+
+    // The resource with T's id, read; empty when there is none or it cannot be read.
+    template <class T> std::optional<T> GetImageResource(const ImageResources& image_resources)
+    {
+        const std::size_t at = FindImageResourceIndex(image_resources, T::kId);
+        if (at == kNoImageResource)
+            return std::nullopt;
+        return ParseImageResource<T>(image_resources[at]->data);
+    }
+
+    // Assigns in place to the resource with T's id, otherwise inserts one.
+    template <class T> void SetImageResource(ImageResources& image_resources, const T& value)
+    {
+        std::vector<std::uint8_t> data = EncodeImageResource(value);
+        FindOrInsertImageResource(image_resources, T::kId).data = std::move(data);
+    }
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_IMAGE_RESOURCES_IMAGE_RESOURCE_HPP_

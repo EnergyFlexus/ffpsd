@@ -3,13 +3,16 @@
 
 #include "detail/image_resources/image_resource.hpp"
 
+#include <cstdint>
 #include <ffpsd/image_resources.hpp>
+#include <optional>
+#include <vector>
 
 namespace ffpsd::detail
 {
-    ResolutionInfo GetResolutionInfo(const ImageResources& image_resources);
-    void SetResolutionInfo(ImageResources& image_resources, ResolutionInfo value);
-
+    // Empty when the block is shorter than its 16 bytes.
+    template <> std::optional<ResolutionInfo> ParseImageResource<ResolutionInfo>(const std::vector<std::uint8_t>& data);
+    template <> std::vector<std::uint8_t> EncodeImageResource<ResolutionInfo>(const ResolutionInfo& value);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_IMAGE_RESOURCES_RESOLUTION_INFO_HPP_

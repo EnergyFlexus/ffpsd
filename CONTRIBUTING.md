@@ -90,17 +90,22 @@ detail/composite.*         the white canvas, normal blending
 detail/file_header.*       section 1
 detail/color_mode_data.*   section 2
 detail/image_resources/    section 3
-detail/layer_and_mask/     section 4; adjustments/ in it holds the adjustment layers
+detail/layer_and_mask/     section 4; tagged_blocks/ holds the blocks, adjustments/ the adjustment layers
 detail/image_data.*        section 5
-detail/pixel_data.*        raw and RLE rows, which sections 4 and 5 share
+detail/pixel_data.*        PixelData: raw and RLE rows, which sections 4 and 5 share
 detail/resample.*          resizing layers: nearest and bicubic
 ```
 
 * **`detail/io/` knows nothing about PSD** and never includes another `detail/`
   subdirectory.
-* A newly interpreted resource is a new file in `detail/image_resources/`, named
-  as Adobe names it: `resolution_info` for 1005. A new adjustment is a struct
-  with its `kKey` in `adjustments.hpp`, a file in
+* A newly interpreted resource is a struct with its `kId` in a file of
+  `detail/image_resources/`, named as Adobe names it (`resolution_info` for
+  1005), specializing `ParseImageResource` and `EncodeImageResource`; it is read
+  and written with `GetImageResource<T>` and `SetImageResource`.
+* A layer block is the same with `kKey` in `detail/layer_and_mask/tagged_blocks/`
+  (`layer_id` for `lyid`): `ParseTaggedBlock`, `EncodeTaggedBlock`,
+  `GetTaggedBlock<T>` and `SetTaggedBlock`.
+* An adjustment is a struct with its `kKey` in `adjustments.hpp`, a file in
   `detail/layer_and_mask/adjustments/` specializing `ParseAdjustment` and
   `EncodeAdjustment` (`levels` for `levl`), and a line in the instantiation
   lists of `layer.cpp` and `document.cpp`.

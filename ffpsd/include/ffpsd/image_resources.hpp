@@ -7,9 +7,11 @@
 
 namespace ffpsd
 {
-    // Resource 1005. Resolutions are in pixels per inch; the units only affect display.
+    // Resolutions are in pixels per inch; the units only affect display.
     struct ResolutionInfo
     {
+        static constexpr std::uint16_t kId = 1005;
+
         double horizontal = 72.0;
         std::int16_t horizontal_unit = 1; // 1 pixels per inch, 2 per centimeter
         std::int16_t width_unit = 1;      // 1 in, 2 cm, 3 pt, 4 picas, 5 columns
@@ -18,9 +20,11 @@ namespace ffpsd
         std::int16_t height_unit = 1;
     };
 
-    // Resource 1057. Only block version 1 is read past the version field.
+    // Only block version 1 is read past the version field.
     struct VersionInfo
     {
+        static constexpr std::uint16_t kId = 1057;
+
         std::uint32_t version = 1;
         bool has_real_merged_data = true;
         std::string writer_name;

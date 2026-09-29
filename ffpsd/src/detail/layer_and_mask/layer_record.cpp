@@ -3,6 +3,9 @@
 #include "detail/file_header.hpp"
 #include "detail/io/big_endian_writer.hpp"
 #include "detail/io/strings.hpp"
+#include "detail/layer_and_mask/tagged_blocks/layer_name_source_setting.hpp"
+#include "detail/layer_and_mask/tagged_blocks/protected_setting.hpp"
+#include "detail/layer_and_mask/tagged_blocks/unicode_layer_name.hpp"
 #include "detail/pixel_data.hpp"
 
 #include <limits>
@@ -14,19 +17,12 @@ namespace ffpsd::detail
     namespace
     {
         constexpr std::uint32_t kBlockSignature = Fourcc('8', 'B', 'I', 'M');
-        constexpr std::uint32_t kUnicodeNameKey = Fourcc('l', 'u', 'n', 'i');
-        constexpr std::uint32_t kLayerIdKey = Fourcc('l', 'y', 'i', 'd');
-        constexpr std::uint32_t kNameSourceKey = Fourcc('l', 'n', 's', 'r');
-        constexpr std::uint32_t kProtectionKey = Fourcc('l', 's', 'p', 'f');
-        constexpr std::uint32_t kBackgroundSource = Fourcc('b', 'g', 'n', 'd');
-        constexpr std::uint32_t kLayerSource = Fourcc('l', 'a', 'y', 'r');
 
         // Bit 0 of the flags; Photoshop sets it on a background and nowhere else by default.
         constexpr std::uint8_t kTransparencyLocked = 0x01;
 
         // Transparency, position and bit 3, which the specification leaves out, as Photoshop writes it.
         constexpr std::uint32_t kBackgroundProtection = 0x0000000D;
-        constexpr std::int16_t kTransparencyId = -1;
         constexpr std::uint16_t kMaxChannels = 56;
 
         // Bit 3, written by Photoshop 5.0 and later: Photoshop sets it on every layer.
@@ -67,25 +63,6 @@ namespace ffpsd::detail
             if (!field.empty())
                 writer.WriteU8Array(field.data(), field.size());
             writer.PatchLength(length, false);
-        }
-
-        void SetU32Block(LayerRecord& record, std::uint32_t key, std::uint32_t value)
-        {
-            BigEndianWriter writer(sizeof(std::uint32_t));
-            writer.WriteU32(value);
-            FindOrAppendTaggedBlock(record.blocks, key).data = writer.Take();
-        }
-
-        std::unique_ptr<TaggedBlock> UnicodeName(const std::string& name)
-        {
-            BigEndianWriter writer;
-            WriteUnicodeString(writer, name);
-
-            auto block = std::make_unique<TaggedBlock>();
-            block->signature = kBlockSignature;
-            block->key = kUnicodeNameKey;
-            block->data = writer.Take();
-            return block;
         }
     } // namespace
 
@@ -142,8 +119,7 @@ namespace ffpsd::detail
         return record;
     }
 
-    void WriteLayerRecord(
-        BigEndianWriter& writer, const LayerRecord& record, const std::vector<const std::vector<std::uint8_t>*>& channels, bool is_psb)
+    void WriteLayerRecord(BigEndianWriter& writer, const LayerRecord& record, const std::vector<const PixelData*>& channels, bool is_psb)
     {
         writer.WriteI32(record.bounds.top);
         writer.WriteI32(record.bounds.left);
@@ -153,7 +129,7 @@ namespace ffpsd::detail
         writer.WriteU16(static_cast<std::uint16_t>(record.channels.size()));
         for (std::size_t i = 0; i < record.channels.size(); ++i)
         {
-            const std::size_t size = channels.at(i)->size();
+            const std::size_t size = channels.at(i)->GetBytes().size();
             writer.WriteI16(record.channels[i].id);
             if (is_psb)
                 writer.WriteU64(size);
@@ -178,45 +154,24 @@ namespace ffpsd::detail
         writer.PatchLength(extra_length, false);
     }
 
-    std::uint32_t GetLayerId(const LayerRecord& record) noexcept
-    {
-        const TaggedBlock* block = GetTaggedBlockByKey(record.blocks, kLayerIdKey);
-        if (block == nullptr || block->data.size() < sizeof(std::uint32_t))
-            return 0;
-
-        BigEndianReader reader(block->data);
-        return reader.ReadU32();
-    }
-
-    void SetLayerId(LayerRecord& record, std::uint32_t id)
-    {
-        BigEndianWriter writer(sizeof(std::uint32_t));
-        writer.WriteU32(id);
-        FindOrAppendTaggedBlock(record.blocks, kLayerIdKey).data = writer.Take();
-    }
-
     bool IsBackground(const LayerRecord& record) noexcept
     {
-        const TaggedBlock* block = GetTaggedBlockByKey(record.blocks, kNameSourceKey);
-        if (block == nullptr || block->data.size() < sizeof(std::uint32_t))
-            return false;
-
-        BigEndianReader reader(block->data);
-        return reader.ReadU32() == kBackgroundSource;
+        const std::optional<LayerNameSourceSetting> source = GetTaggedBlock<LayerNameSourceSetting>(record.blocks);
+        return source.has_value() && source->id == LayerNameSourceSetting::kBackground;
     }
 
     void MarkAsBackground(LayerRecord& record)
     {
         record.flags = static_cast<std::uint8_t>(record.flags | kTransparencyLocked);
-        SetU32Block(record, kNameSourceKey, kBackgroundSource);
-        SetU32Block(record, kProtectionKey, kBackgroundProtection);
+        SetTaggedBlock(record.blocks, LayerNameSourceSetting{LayerNameSourceSetting::kBackground});
+        SetTaggedBlock(record.blocks, ProtectedSetting{kBackgroundProtection});
     }
 
     void UnmarkBackground(LayerRecord& record)
     {
         record.flags = static_cast<std::uint8_t>(record.flags & ~kTransparencyLocked);
-        SetU32Block(record, kNameSourceKey, kLayerSource);
-        SetU32Block(record, kProtectionKey, 0);
+        SetTaggedBlock(record.blocks, LayerNameSourceSetting{LayerNameSourceSetting::kLayer});
+        SetTaggedBlock(record.blocks, ProtectedSetting{0});
     }
 
     LayerRecord CopyLayerRecord(const LayerRecord& source)
@@ -349,10 +304,9 @@ namespace ffpsd::detail
         image.channel_count = static_cast<std::uint16_t>(colors.size());
         image.bytes.resize(image.GetSizeBytes());
 
-        const std::size_t row_bytes = std::size_t{image.width} * image.GetBytesPerSample();
-        const std::size_t plane = row_bytes * image.height;
+        const std::size_t plane = std::size_t{image.width} * image.height * image.GetBytesPerSample();
         for (std::size_t i = 0; i < colors.size(); ++i)
-            DecodePixelData(colors[i]->raw.data(), colors[i]->raw.size(), image.height, row_bytes, is_psb, image.bytes.data() + i * plane);
+            colors[i]->data.Decode(is_psb, image.bytes.data() + i * plane);
 
         SwapSampleBytes(image.bytes, image.GetBytesPerSample());
         return image;
@@ -382,7 +336,7 @@ namespace ffpsd::detail
         record.bounds = PlaceSamples(samples, top, left);
         record.flags = kFlagsPhotoshop5;
         record.blending_ranges = DefaultBlendingRanges();
-        record.blocks.push_back(UnicodeName(name));
+        SetTaggedBlock(record.blocks, UnicodeLayerName{name});
         return record;
     }
 } // namespace ffpsd::detail

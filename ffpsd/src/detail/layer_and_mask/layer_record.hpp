@@ -5,7 +5,7 @@
 #include "detail/io/big_endian_writer.hpp"
 #include "detail/io/fourcc.hpp"
 #include "detail/layer_and_mask/channel_image_data.hpp"
-#include "detail/layer_and_mask/tagged_block.hpp"
+#include "detail/layer_and_mask/tagged_blocks/tagged_block.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -43,10 +43,6 @@ namespace ffpsd::detail
         TaggedBlocks blocks;
     };
 
-    // From the 'lyid' block; zero when the layer has none.
-    std::uint32_t GetLayerId(const LayerRecord& record) noexcept;
-    void SetLayerId(LayerRecord& record, std::uint32_t id);
-
     // Photoshop's background: transparency locked, 'lnsr' of 'bgnd' and position locked in 'lspf'.
     bool IsBackground(const LayerRecord& record) noexcept;
     void MarkAsBackground(LayerRecord& record);
@@ -61,8 +57,7 @@ namespace ffpsd::detail
     LayerRecord ParseLayerRecord(BigEndianReader& reader, bool is_psb, std::vector<std::uint64_t>& channel_lengths);
 
     // Pass one again, with the data written for each channel, which may differ from the record's.
-    void WriteLayerRecord(
-        BigEndianWriter& writer, const LayerRecord& record, const std::vector<const std::vector<std::uint8_t>*>& channels, bool is_psb);
+    void WriteLayerRecord(BigEndianWriter& writer, const LayerRecord& record, const std::vector<const PixelData*>& channels, bool is_psb);
 
     // Borrowed planar samples in native byte order; the caller keeps them alive for the call.
     struct SamplesView
