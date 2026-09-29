@@ -95,8 +95,11 @@ detail/resample.*          resizing layers: nearest and bicubic
 * **`detail/io/` knows nothing about PSD** and never includes another `detail/`
   subdirectory.
 * A newly interpreted resource is a new file in `detail/image_resources/`, named
-  as Adobe names it: `resolution_info` for 1005. A new adjustment is a file in
-  `detail/layer_and_mask/adjustments/`: `levels` for `levl`.
+  as Adobe names it: `resolution_info` for 1005. A new adjustment is a struct
+  with its `kKey` in `adjustments.hpp`, a file in
+  `detail/layer_and_mask/adjustments/` specializing `ParseAdjustment` and
+  `EncodeAdjustment` (`levels` for `levl`), and a line in the instantiation
+  lists of `layer.cpp` and `document.cpp`.
 * Parsing a structure and writing it back live in the same file, so offsets,
   padding and defaults cannot drift apart.
 

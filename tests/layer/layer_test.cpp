@@ -31,7 +31,7 @@ TEST(LayerTest, ANewLayerIsVisibleOpaqueAndNormal)
     EXPECT_EQ(layer->GetOpacity(), 255u);
     EXPECT_EQ(layer->GetBlendKey(), Fourcc("norm"));
     EXPECT_EQ(layer->GetAdjustmentKey(), 0u);
-    EXPECT_FALSE(layer->GetLevels().has_value());
+    EXPECT_FALSE(layer->GetAdjustment<ffpsd::LevelsInfo>().has_value());
 }
 
 TEST(LayerTest, VisibilityTogglesBackAndForth)

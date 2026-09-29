@@ -156,7 +156,7 @@ TEST(ReadPsdTest, LevelsLayerOfAnRgbFile)
     EXPECT_TRUE(levels->GetPixels().bytes.empty());
 
     // All of RGB, then red, green and blue; every gamma left at 1.
-    const std::optional<ffpsd::LevelsInfo> info = levels->GetLevels();
+    const std::optional<ffpsd::LevelsInfo> info = levels->GetAdjustment<ffpsd::LevelsInfo>();
     ASSERT_TRUE(info.has_value());
     ASSERT_EQ(info->channels.size(), 4u);
     const std::uint16_t expected[4][4] = {{70, 200, 0, 255}, {10, 245, 0, 255}, {20, 250, 0, 255}, {10, 250, 0, 255}};

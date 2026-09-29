@@ -15,9 +15,9 @@ using namespace ffpsd_test;
 
 namespace
 {
-    const std::string kRgbaPng = DataFile("rgba_8bit.png");
-    const std::string kGray16Png = DataFile("gray_16bit.png");
-    const std::string kPalettePng = DataFile("palette_transparent.png");
+    const std::string kRgbaPng = DataFile("generated/rgba_8bit.png");
+    const std::string kGray16Png = DataFile("generated/gray_16bit.png");
+    const std::string kPalettePng = DataFile("generated/palette_transparent.png");
 
     // Planes of rgba_8bit.png: red, green at half alpha, clear blue; white, black, gray at quarter alpha.
     const std::vector<std::uint8_t> kRgbaPlanes = {255, 0,   0,   255, 0,   128, // R

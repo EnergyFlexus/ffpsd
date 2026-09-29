@@ -4,7 +4,7 @@ One program in three languages: it opens a PSD, prints its size, color mode,
 resolution, writer and layers, puts a copy of the top layer on top and saves.
 
 ```sh
-ffpsd_example_cpp tests/data/rgb_levels.psd out.psd
+ffpsd_example_cpp tests/data/photoshop/rgb_levels.psd out.psd
 ```
 
 ```
@@ -43,7 +43,7 @@ Links a shared ffpsd from `ffpsd-out/`, or from `FFPSD_DIR`:
 ```sh
 python build.py
 cd examples/rust
-cargo run -- ../../tests/data/rgb_levels.psd out.psd
+cargo run -- ../../tests/data/photoshop/rgb_levels.psd out.psd
 ```
 
 On Windows `ffpsd-out/bin` must be on the `PATH`; on Linux and macOS the program

@@ -431,13 +431,13 @@ namespace ffpsd
         return true;
     }
 
-    Layer* Document::AddLevelsLayer(const std::string& name, const LevelsInfo& levels)
+    template <class T> Layer* Document::AddAdjustmentLayer(const std::string& name, const T& value)
     {
         const std::size_t color_count = LayerColorCount(impl_->color);
 
         auto settings = std::make_unique<TaggedBlock>();
-        settings->key = detail::kLevelsKey;
-        settings->data = detail::EncodeLevels(levels);
+        settings->key = T::kKey;
+        settings->data = detail::EncodeAdjustment(value);
 
         auto record = std::make_unique<detail::LayerRecord>(
             detail::CreateAdjustmentLayerRecord(name, std::move(settings), color_count));
@@ -446,6 +446,10 @@ namespace ffpsd
         OnLayersChanged();
         return impl_->layers.back().get();
     }
+
+    // A line per struct in adjustments.hpp, as in layer.cpp.
+    template FFPSD_EXPORT Layer*
+    Document::AddAdjustmentLayer<LevelsInfo>(const std::string& name, const LevelsInfo& value);
 
     Layer* Document::AddLayer(const Layer& source)
     {

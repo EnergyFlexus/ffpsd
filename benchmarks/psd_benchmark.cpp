@@ -39,7 +39,7 @@ namespace
     }
 } // namespace
 
-BENCHMARK_CAPTURE(Read, grayscale, "grayscale_two_layers.psd")->Unit(benchmark::kMillisecond);
-BENCHMARK_CAPTURE(Read, rgb, "rgb_two_layers.psd")->Unit(benchmark::kMillisecond);
-BENCHMARK_CAPTURE(Write, grayscale, "grayscale_two_layers.psd")->Unit(benchmark::kMillisecond);
-BENCHMARK_CAPTURE(Write, rgb, "rgb_two_layers.psd")->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(Read, grayscale, "photoshop/grayscale_two_layers.psd")->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(Read, rgb, "photoshop/rgb_two_layers.psd")->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(Write, grayscale, "photoshop/grayscale_two_layers.psd")->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(Write, rgb, "photoshop/rgb_two_layers.psd")->Unit(benchmark::kMillisecond);

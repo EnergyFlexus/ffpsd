@@ -74,11 +74,11 @@ namespace ffpsd
         // The block of an adjustment layer, such as 'levl', or 0; raw, so unknown ones are seen too.
         FFPSD_EXPORT std::uint32_t GetAdjustmentKey() const noexcept;
 
-        // Null unless this is a Levels layer; one record for all channels, then one per channel.
-        FFPSD_EXPORT std::optional<LevelsInfo> GetLevels() const;
+        // T is a struct from adjustments.hpp; null unless this layer is that adjustment.
+        template <class T> FFPSD_EXPORT std::optional<T> GetAdjustment() const;
 
-        // Only on a Levels layer; the composite goes stale.
-        FFPSD_EXPORT void SetLevels(const LevelsInfo& levels);
+        // Only on a layer of T's kind; the composite goes stale.
+        template <class T> FFPSD_EXPORT void SetAdjustment(const T& value);
 
         // Color planes by channel id, then transparency when the layer has one; decoded on each call.
         FFPSD_EXPORT Image GetPixels() const;

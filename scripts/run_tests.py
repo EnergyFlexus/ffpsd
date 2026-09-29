@@ -30,7 +30,7 @@ def check_googletest_submodule():
 
 def check_test_data():
     """A clone without Git LFS has pointer files where the PSDs should be."""
-    pointers = [path.name for path in sorted(TEST_DATA.glob("*.ps[db]"))
+    pointers = [path.name for path in sorted(TEST_DATA.rglob("*.ps[db]"))
                 if path.read_bytes()[:len(LFS_POINTER)] == LFS_POINTER]
     if pointers:
         build.fail("tests/data holds Git LFS pointers, not files: " + ", ".join(pointers),

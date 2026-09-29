@@ -31,11 +31,11 @@ namespace
     }
 } // namespace
 
-class SaveUnchangedTest : public testing::TestWithParam<PsdFile>
+class DocumentSaveUnchangedTest : public testing::TestWithParam<PsdFile>
 {
 };
 
-TEST_P(SaveUnchangedTest, GivesBackTheSameBytes)
+TEST_P(DocumentSaveUnchangedTest, GivesBackTheSameBytes)
 {
     const std::vector<std::uint8_t> original = ReadFile(GetParam().path);
     ASSERT_FALSE(original.empty());
@@ -47,13 +47,13 @@ TEST_P(SaveUnchangedTest, GivesBackTheSameBytes)
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    PhotoshopFiles, SaveUnchangedTest,
+    PhotoshopFiles, DocumentSaveUnchangedTest,
     testing::Values(
         PsdFile{"grayscale_two_layers", kGrayscalePsd}, PsdFile{"rgb_two_layers", kRgbPsd},
         PsdFile{"rgb_levels", kRgbLevelsPsd}),
     FileName);
 
-TEST(SaveTest, StackEditsSurvive)
+TEST(DocumentSaveTest, StackEditsSurvive)
 {
     // The background stays at the bottom; the new layer goes under the copy.
     ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
@@ -82,7 +82,7 @@ TEST(SaveTest, StackEditsSurvive)
     EXPECT_FALSE(back.GetHasRealMergedData());
 }
 
-TEST(SaveTest, LayerBlocksCountTheirPaddingAsPhotoshopDoes)
+TEST(DocumentSaveTest, LayerBlocksCountTheirPaddingAsPhotoshopDoes)
 {
     // "Layer 1" is 18 bytes of 'luni'. Photoshop reads a layer's blocks by their length alone, so the
     // padding to 4 has to be in it; otherwise it calls the file incompatible.
@@ -108,7 +108,7 @@ TEST(SaveTest, LayerBlocksCountTheirPaddingAsPhotoshopDoes)
     EXPECT_EQ(read->data, (std::vector<std::uint8_t>{1, 2, 3, 4, 5, 0, 0, 0}));
 }
 
-TEST(SaveTest, ResourcesAndBlocksSurvive)
+TEST(DocumentSaveTest, ResourcesAndBlocksSurvive)
 {
     ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
     ffpsd::ImageResource resource;
@@ -135,7 +135,7 @@ TEST(SaveTest, ResourcesAndBlocksSurvive)
     EXPECT_EQ(layer_block->data, padded);
 }
 
-TEST(SaveTest, WithoutLayersTheCompositeStays)
+TEST(DocumentSaveTest, WithoutLayersTheCompositeStays)
 {
     ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
     doc.RemoveLayer(1);
@@ -147,7 +147,7 @@ TEST(SaveTest, WithoutLayersTheCompositeStays)
     EXPECT_EQ(PlaneSum(back.GetMergedImage(), 0), 678522862u);
 }
 
-TEST(SaveTest, ADocumentFromScratchGetsABlankComposite)
+TEST(DocumentSaveTest, ADocumentFromScratchGetsABlankComposite)
 {
     ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kGrayscale);
     doc.AddLayer("one", Pattern(4, 3, 2));
@@ -162,12 +162,12 @@ TEST(SaveTest, ADocumentFromScratchGetsABlankComposite)
     EXPECT_EQ(back.GetMergedImage().bytes, std::vector<std::uint8_t>(4 * 3, 0));
 }
 
-class SaveDeepTest : public testing::TestWithParam<std::uint16_t>
+class DocumentSaveDeepTest : public testing::TestWithParam<std::uint16_t>
 {
 };
 
 // 16 and 32 bit layers go into 'Lr16' and 'Lr32'; the samples stay in native order.
-TEST_P(SaveDeepTest, LayersGoIntoTheirOwnBlock)
+TEST_P(DocumentSaveDeepTest, LayersGoIntoTheirOwnBlock)
 {
     const std::uint16_t depth = GetParam();
     ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kRgb, depth);
@@ -182,9 +182,9 @@ TEST_P(SaveDeepTest, LayersGoIntoTheirOwnBlock)
     EXPECT_EQ(back.GetMergedImage().bytes, Pattern(4, 3, 3, depth).bytes);
 }
 
-INSTANTIATE_TEST_SUITE_P(Depths, SaveDeepTest, testing::Values<std::uint16_t>(16, 32));
+INSTANTIATE_TEST_SUITE_P(Depths, DocumentSaveDeepTest, testing::Values<std::uint16_t>(16, 32));
 
-TEST(SaveTest, APsbRoundTrips)
+TEST(DocumentSaveTest, APsbRoundTrips)
 {
     ffpsd::Document doc = NewDocument();
     doc.SetPsb(true);
@@ -197,7 +197,7 @@ TEST(SaveTest, APsbRoundTrips)
     EXPECT_EQ(back.GetMergedImage().bytes.size(), 4u * 3 * 3);
 }
 
-TEST(SaveTest, SwitchingTheFormatRepacksTheRows)
+TEST(DocumentSaveTest, SwitchingTheFormatRepacksTheRows)
 {
     // Photoshop's RLE, with 2 byte row counts, through a PSB with 4 byte ones and back.
     const ffpsd::Document original = ffpsd::Document::Parse(kRgbPsd);
@@ -218,7 +218,7 @@ TEST(SaveTest, SwitchingTheFormatRepacksTheRows)
     }
 }
 
-TEST(SaveTest, RawAsksForUnpackedPixels)
+TEST(DocumentSaveTest, RawAsksForUnpackedPixels)
 {
     const ffpsd::Document original = ffpsd::Document::Parse(kRgbPsd);
 
@@ -236,7 +236,7 @@ TEST(SaveTest, RawAsksForUnpackedPixels)
         EXPECT_EQ(back.GetLayerByIndex(i)->GetPixels().bytes, original.GetLayerByIndex(i)->GetPixels().bytes);
 }
 
-TEST(SaveTest, RawAndRleGoBothWays)
+TEST(DocumentSaveTest, RawAndRleGoBothWays)
 {
     const ffpsd::Document original = ffpsd::Document::Parse(kRgbPsd);
     const std::vector<std::uint8_t> raw = original.Save(ffpsd::Compression::kRaw);
@@ -249,7 +249,7 @@ TEST(SaveTest, RawAndRleGoBothWays)
     EXPECT_EQ(back.GetLayerByIndex(1)->GetPixels().bytes, original.GetLayerByIndex(1)->GetPixels().bytes);
 }
 
-TEST(SaveTest, ABlankCompositeComesInEitherCompression)
+TEST(DocumentSaveTest, ABlankCompositeComesInEitherCompression)
 {
     ffpsd::Document doc = NewDocument();
 
@@ -260,7 +260,7 @@ TEST(SaveTest, ABlankCompositeComesInEitherCompression)
     EXPECT_EQ(rle.GetMergedImage().bytes, std::vector<std::uint8_t>(4 * 3 * 3, 0));
 }
 
-TEST(SaveTest, FlatPixelsAreWrittenSmall)
+TEST(DocumentSaveTest, FlatPixelsAreWrittenSmall)
 {
     ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kRgb, 8, 1000, 1000);
     ffpsd::Image flat = Pattern(1000, 1000, 4);
@@ -279,7 +279,7 @@ TEST(SaveTest, FlatPixelsAreWrittenSmall)
     EXPECT_EQ(back.GetMergedImage().bytes, merged.bytes);
 }
 
-TEST(SaveTest, PixelsThatDoNotPackAreWrittenRaw)
+TEST(DocumentSaveTest, PixelsThatDoNotPackAreWrittenRaw)
 {
     // Every byte differs from its neighbour, so RLE would only grow them.
     ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kRgb, 8, 64, 64);
@@ -294,7 +294,7 @@ TEST(SaveTest, PixelsThatDoNotPackAreWrittenRaw)
     EXPECT_EQ(ffpsd::Document::Parse(saved).GetLayerByIndex(0)->GetPixels().bytes, noise.bytes);
 }
 
-TEST(SaveTest, ARowTooLongForATwoByteCountIsWrittenRaw)
+TEST(DocumentSaveTest, ARowTooLongForATwoByteCountIsWrittenRaw)
 {
     // 20000 float samples are 80000 bytes a row: noise does not pack below 65535, the zeros do.
     ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kGrayscale, 32, 20000, 2);
@@ -307,12 +307,12 @@ TEST(SaveTest, ARowTooLongForATwoByteCountIsWrittenRaw)
     EXPECT_EQ(back.GetLayerByIndex(0)->GetPixels().bytes, image.bytes);
 }
 
-TEST(SaveTest, ADocumentWithoutASizeIsRefused)
+TEST(DocumentSaveTest, ADocumentWithoutASizeIsRefused)
 {
     EXPECT_THROW(ffpsd::Document().Save(), std::logic_error);
 }
 
-TEST(SaveTest, APathGetsTheSameBytes)
+TEST(DocumentSaveTest, APathGetsTheSameBytes)
 {
     const std::filesystem::path path = TempPath("ffpsd_save_test.psd");
 
@@ -322,7 +322,7 @@ TEST(SaveTest, APathGetsTheSameBytes)
     std::filesystem::remove(path);
 }
 
-TEST(SaveTest, AnUnwritablePathIsASystemError)
+TEST(DocumentSaveTest, AnUnwritablePathIsASystemError)
 {
     const std::filesystem::path path = TempPath("no_such_directory") / "out.psd";
     const ffpsd::Document doc = ffpsd::Document::Parse(kGrayscalePsd);

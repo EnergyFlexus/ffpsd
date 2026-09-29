@@ -108,24 +108,28 @@ namespace ffpsd
         return detail::FindAdjustmentKey(record_->blocks);
     }
 
-    std::optional<LevelsInfo> Layer::GetLevels() const
+    template <class T> std::optional<T> Layer::GetAdjustment() const
     {
-        const TaggedBlock* block = GetTaggedBlockByKey(detail::kLevelsKey);
+        const TaggedBlock* block = GetTaggedBlockByKey(T::kKey);
         if (block == nullptr)
             return std::nullopt;
 
-        return detail::ParseLevels(block->data, std::size_t{document_->GetChannelCount()} + 1);
+        return detail::ParseAdjustment<T>(block->data, document_->GetChannelCount());
     }
 
-    void Layer::SetLevels(const LevelsInfo& levels)
+    template <class T> void Layer::SetAdjustment(const T& value)
     {
-        if (GetAdjustmentKey() != detail::kLevelsKey)
-            throw std::invalid_argument("ffpsd: SetLevels needs a Levels adjustment layer");
+        if (GetAdjustmentKey() != T::kKey)
+            throw std::invalid_argument("ffpsd: SetAdjustment needs an adjustment layer of the same kind");
 
-        std::vector<std::uint8_t> data = detail::EncodeLevels(levels);
-        detail::FindOrAppendTaggedBlock(record_->blocks, detail::kLevelsKey).data = std::move(data);
+        std::vector<std::uint8_t> data = detail::EncodeAdjustment(value);
+        detail::FindOrAppendTaggedBlock(record_->blocks, T::kKey).data = std::move(data);
         document_->SetHasRealMergedData(false);
     }
+
+    // A line per struct in adjustments.hpp, as in document.cpp.
+    template FFPSD_EXPORT std::optional<LevelsInfo> Layer::GetAdjustment<LevelsInfo>() const;
+    template FFPSD_EXPORT void Layer::SetAdjustment<LevelsInfo>(const LevelsInfo& value);
 
     Image Layer::GetPixels() const
     {
