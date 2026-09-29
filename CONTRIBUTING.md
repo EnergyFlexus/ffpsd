@@ -33,7 +33,7 @@ ffpsd/src/             the library
 ffpsd/src/detail/      everything not in the public API
 img2ffpsd/             the command line tool
 docs/                  PSD.md, the format reference
-vendor/                libpng, zlib-ng, googletest, benchmark: submodules pinned to tags
+vendor/                libpng, zlib-ng, libjpeg-turbo, googletest, benchmark: submodules pinned to tags
 tests/                 GoogleTest, built with FFPSD_BUILD_TESTS
 benchmarks/            Google Benchmark, built with FFPSD_BUILD_BENCHMARKS
 examples/              programs that use the installed package
@@ -221,8 +221,8 @@ Shouty case, always `FFPSD_`: a macro ignores namespaces. `FFPSD_BUILDING`,
 * A layer name goes into the caller's buffer, cut to fit, with its full length.
 * `int` stands for `bool`; an enum is a C enum in a parameter, a fixed-width
   integer in a struct.
-* The declarations do not depend on build options: without PNG, the PNG calls
-  return `FFPSD_STATUS_UNSUPPORTED`.
+* The declarations do not depend on build options: without PNG or JPEG, their
+  calls return `FFPSD_STATUS_UNSUPPORTED`.
 
 Exceptions map to statuses: `invalid_argument` and `length_error` to
 `INVALID_ARGUMENT`, `out_of_range` to `OUT_OF_RANGE`, other `logic_error` to
@@ -258,8 +258,9 @@ so review and `git add` again. Without committing:
 ## Third-party code
 
 `vendor/` is theirs: not formatted, not renamed, skipped by the hooks.
-`vendor/CMakeLists.txt` is ours and builds everything static with our CRT. To
-update one:
+`vendor/CMakeLists.txt` is ours and builds everything static with our CRT.
+libjpeg-turbo refuses `add_subdirectory`, so it is an `ExternalProject` installed
+into the build tree and imported as `ffpsd_jpeg`. To update one:
 
 ```sh
 git -C vendor/libpng fetch --tags
@@ -288,8 +289,8 @@ Tests, `tests/README.md` has the folders:
 
 * The public headers: `document.hpp`, `image_resources.hpp`, `adjustments.hpp`,
   `tagged_block.hpp`, `types.hpp`, `image.hpp`, `layer.hpp`, `png.hpp` (with
-  `FFPSD_WITH_PNG`), `c_api.h`, `export.h`, and the `ffpsd.hpp` umbrella, which
-  includes everything.
+  `FFPSD_WITH_PNG`), `jpeg.hpp` (with `FFPSD_WITH_JPEG`), `c_api.h`, `export.h`,
+  and the `ffpsd.hpp` umbrella, which includes everything.
 * A new one goes into `ffpsd/include/ffpsd/` and `FILE_SET HEADERS`, or it is not
   installed.
 * A feature that makes sense for bindings gets a C entry point too.

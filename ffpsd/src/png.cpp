@@ -1,6 +1,7 @@
 #include "detail/color.hpp"
 #include "detail/io/byte_order.hpp"
 #include "detail/io/file.hpp"
+#include "detail/planes.hpp"
 
 #include <cstdint>
 #include <cstdio>
@@ -236,22 +237,7 @@ namespace ffpsd
         if (!Decode(reader, depth, decoded))
             throw std::runtime_error(std::string("ffpsd: PNG: ") + reader.error);
 
-        Image image;
-        image.width = decoded.width;
-        image.height = decoded.height;
-        image.channel_count = decoded.channels;
-        image.depth = depth;
-        image.bytes.resize(image.GetSizeBytes());
-
-        // libpng hands out interleaved pixels; Image keeps one plane per channel.
-        const std::size_t sample = image.GetBytesPerSample();
-        const std::size_t pixels = std::size_t{image.width} * image.height;
-        for (std::size_t channel = 0; channel < decoded.channels; ++channel)
-        {
-            std::uint8_t* plane = image.bytes.data() + channel * pixels * sample;
-            for (std::size_t i = 0; i < pixels; ++i)
-                std::memcpy(plane + i * sample, decoded.bytes.data() + (i * decoded.channels + channel) * sample, sample);
-        }
+        const Image image = detail::Deinterleave(decoded.bytes.data(), decoded.width, decoded.height, decoded.channels, depth);
 
         const bool is_rgb = image.channel_count >= 3;
         if (color_mode == ColorMode::kGrayscale && is_rgb)
@@ -287,19 +273,9 @@ namespace ffpsd
         interleaved.height = image.height;
         interleaved.bit_depth = image.depth;
         interleaved.color_type = ColorType(image.channel_count);
-        interleaved.bytes.resize(image.bytes.size());
+        interleaved.bytes = detail::Interleave(image, image.channel_count);
 
-        // Image keeps one plane per channel; libpng takes interleaved pixels.
-        const std::size_t sample = image.GetBytesPerSample();
-        const std::size_t pixels = std::size_t{image.width} * image.height;
-        for (std::size_t channel = 0; channel < image.channel_count; ++channel)
-        {
-            const std::uint8_t* plane = image.bytes.data() + channel * pixels * sample;
-            for (std::size_t i = 0; i < pixels; ++i)
-                std::memcpy(interleaved.bytes.data() + (i * image.channel_count + channel) * sample, plane + i * sample, sample);
-        }
-
-        const std::size_t row_bytes = std::size_t{image.width} * image.channel_count * sample;
+        const std::size_t row_bytes = std::size_t{image.width} * image.channel_count * image.GetBytesPerSample();
         interleaved.rows.resize(image.height);
         for (std::size_t y = 0; y < image.height; ++y)
             interleaved.rows[y] = interleaved.bytes.data() + y * row_bytes;

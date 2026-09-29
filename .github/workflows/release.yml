@@ -35,7 +35,7 @@ jobs:
           fi
           gh release create "$GITHUB_REF_NAME" --draft --title "$GITHUB_REF_NAME" --generate-notes --notes \
           "- \`ffpsd-*\`: the shared library, its headers and CMake package, and img2ffpsd using it.
-          - \`img2ffpsd-*\`: img2ffpsd alone, with ffpsd, libpng and zlib built in.
+          - \`img2ffpsd-*\`: img2ffpsd alone, with ffpsd, libpng, zlib-ng and libjpeg-turbo built in, and their licenses.
 
           macOS builds are for Apple Silicon and unsigned: run \`xattr -d com.apple.quarantine\` on them once.
 
@@ -56,7 +56,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          submodules: recursive # libpng and zlib-ng under vendor/
+          submodules: recursive # libpng, zlib-ng and libjpeg-turbo under vendor/
 
       - uses: actions/setup-python@v7
         with:
@@ -83,6 +83,7 @@ jobs:
             name="img2ffpsd-$GITHUB_REF_NAME-${{ matrix.target.name }}"
             mkdir "$name"
             cp ffpsd-out/bin/img2ffpsd* "$name"/
+            cp -R ffpsd-out/share/ffpsd/licenses "$name"/licenses
           fi
           cp LICENSE "$name"/
 

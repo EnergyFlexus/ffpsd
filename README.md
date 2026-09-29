@@ -8,7 +8,7 @@ A PSD/PSB library with two APIs from one build:
 Code style: [CONTRIBUTING.md](CONTRIBUTING.md). Programs in C++, C and Rust:
 [examples/](examples/README.md).
 
-libpng, zlib-ng, GoogleTest and Google Benchmark are git submodules under
+libpng, zlib-ng, libjpeg-turbo, GoogleTest and Google Benchmark are git submodules under
 `vendor/`; the test PSD files are in Git LFS (`git lfs install` before cloning).
 
 ```sh
@@ -28,18 +28,19 @@ python build.py --static   # static library
 
 It checks for CMake >= 3.23, Ninja and a compiler, sets up MSVC on Windows by
 itself and fetches missing submodules. Flags: `--clean`, `--jobs N`,
-`--no-tools`, `--no-png`, `--crt static|dynamic`, `--out DIR`.
+`--no-tools`, `--no-png`, `--no-jpeg`, `--crt static|dynamic`, `--out DIR`.
 
 ```
 ffpsd-out/bin/        ffpsd.dll, img2ffpsd
 ffpsd-out/lib/        ffpsd.lib / libffpsd.a, cmake/ffpsd/
-                      static only: libpng16_static.lib, zlibstatic.lib
+                      static only: libpng16_static.lib, zlibstatic.lib, jpeg-static.lib
 ffpsd-out/include/    ffpsd/*.hpp, ffpsd/c_api.h, ffpsd/export.h
 ffpsd-out/share/      ffpsd/licenses/
 ```
 
-A DLL has libpng and zlib-ng inside and exports none of their symbols; a static
-library ships them next to it, and the CMake package links them.
+A DLL has libpng, zlib-ng and libjpeg-turbo inside and exports none of their
+symbols; a static library ships them next to it, and the CMake package links them.
+libjpeg-turbo is plain C, without SIMD, so no assembler is needed.
 
 ## img2ffpsd
 
@@ -47,18 +48,21 @@ library ships them next to it, and the CMake package links them.
 img2ffpsd <bottom> <top> [<layer>...] <output> [--gray] [--jobs N] [--resize nearest|bicubic]
 ```
 
-Pairs the PNG files of the bottom and top folders by their path into PSD files:
-the bottom one as the locked background, the top one as the layer above it. Each
-further folder adds a layer above those, where it has the file. A layer is named
-by its folder: `Layer 1` from the top one, `Layer 2` from the next. Layers lose
-their transparency, and the upper one is the composite. Every picture is resized
-to the larger one of the bottom and the top, by nearest neighbour or with
+Pairs the PNG and JPEG files of the bottom and top folders by their path without
+the extension into PSD files: `raw/01.jpg` goes with `scaled/01.png`. A JPEG is
+turned upright by its EXIF orientation, as Photoshop opens it. The bottom one is
+the locked background, the top one the layer above it. Each further folder adds
+a layer above those, where it has the file. A layer is named by its folder:
+`Layer 1` from the top one, `Layer 2` from the next. Layers lose their
+transparency, and the upper one is the composite. Every picture is resized to the
+larger one of the bottom and the top, by nearest neighbour or with
 `--resize bicubic`. RGB, or grayscale with `--gray`.
 
-A file in only the bottom or the top folder stops it; one that only a further
-folder has is skipped with a warning. Gaps in numbered names (`1, 2, 4`; `3-4` is
-two pages) and a non-empty output folder wait for a key, Ctrl+C to stop. Needs
-`FFPSD_WITH_PNG`.
+A file in only the bottom or the top folder stops it, and so do two pictures of
+one name in a folder, `01.png` and `01.jpg`; a file that only a further folder
+has is skipped with a warning. Gaps in numbered names (`1, 2, 4`; `3-4` is two
+pages) and a non-empty output folder wait for a key, Ctrl+C to stop. Needs
+`FFPSD_WITH_PNG`; JPEG files are read with `FFPSD_WITH_JPEG`.
 
 ## Build with CMake
 
@@ -123,6 +127,7 @@ Benchmark's `compare.py`, which needs
 | `BUILD_SHARED_LIBS` | `OFF`   | shared instead of static           |
 | `FFPSD_BUILD_TOOLS` | `ON`    | `img2ffpsd`                        |
 | `FFPSD_WITH_PNG`    | `ON`    | `ffpsd/png.hpp`, with libpng and zlib-ng |
+| `FFPSD_WITH_JPEG`   | `ON`    | `ffpsd/jpeg.hpp`, with libjpeg-turbo |
 | `FFPSD_BUILD_TESTS` | `OFF`, `ON` in the debug presets | `tests/` |
 | `FFPSD_BUILD_BENCHMARKS` | `OFF`, `ON` in `bench-release` and the debug presets | `benchmarks/` |
 | `FFPSD_BUILD_EXAMPLES` | `OFF`, `ON` in the debug presets | `examples/` in C and C++ |

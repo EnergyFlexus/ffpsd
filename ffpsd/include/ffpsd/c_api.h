@@ -305,6 +305,20 @@ extern "C"
     FFPSD_EXPORT ffpsd_status_t ffpsd_png_save(const ffpsd_image_view_t* image, const char* path);
     FFPSD_EXPORT ffpsd_status_t ffpsd_png_save_memory(const ffpsd_image_view_t* image, ffpsd_buffer_t** out);
 
+    /* Every JPEG call is UNSUPPORTED in a build without JPEG; quality is 1 to 100. */
+    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_save_as_jpeg(const ffpsd_layer_t* layer, const char* path, int quality);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_save_as_jpeg_memory(const ffpsd_layer_t* layer, int quality, ffpsd_buffer_t** out);
+
+    /* Gray or RGB, 8 or 16 bit; a nonzero apply_orientation turns the pixels upright by the EXIF Orientation tag. */
+    FFPSD_EXPORT ffpsd_status_t
+    ffpsd_jpeg_load(const char* path, ffpsd_color_mode_t color_mode, uint16_t depth, int apply_orientation, ffpsd_image_t** out);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_jpeg_load_memory(
+        const uint8_t* data, size_t size, ffpsd_color_mode_t color_mode, uint16_t depth, int apply_orientation, ffpsd_image_t** out);
+
+    /* Gray from 1 or 2 channels, RGB from 3 or 4; alpha is dropped and 16 bit narrowed to 8. */
+    FFPSD_EXPORT ffpsd_status_t ffpsd_jpeg_save(const ffpsd_image_view_t* image, const char* path, int quality);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_jpeg_save_memory(const ffpsd_image_view_t* image, int quality, ffpsd_buffer_t** out);
+
 #ifdef __cplusplus
 }
 #endif

@@ -12,12 +12,16 @@ target_sources(ffpsd
         src/detail/color_mode_data.cpp
         src/detail/composite.cpp
         src/detail/composite.hpp
+        src/detail/exif.cpp
+        src/detail/exif.hpp
         src/detail/color_mode_data.hpp
         src/detail/file_header.cpp
         src/detail/image_data.cpp
         src/detail/image_data.hpp
         src/detail/pixel_data.cpp
         src/detail/pixel_data.hpp
+        src/detail/planes.cpp
+        src/detail/planes.hpp
         src/detail/resample.cpp
         src/detail/resample.hpp
         src/detail/file_header.hpp
@@ -97,11 +101,28 @@ if(FFPSD_WITH_PNG)
                 include/ffpsd/png.hpp)
     target_link_libraries(ffpsd PRIVATE png_static)
     target_compile_definitions(ffpsd PUBLIC FFPSD_HAS_PNG)
+endif()
 
-    # Keeps the libpng and zlib symbols inside the .so.
-    if(BUILD_SHARED_LIBS AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        target_link_options(ffpsd PRIVATE "LINKER:--exclude-libs,ALL")
-    endif()
+if(FFPSD_WITH_JPEG)
+    target_sources(ffpsd
+        PRIVATE
+            src/jpeg.cpp
+        PUBLIC
+            FILE_SET HEADERS
+            FILES
+                include/ffpsd/jpeg.hpp)
+    # An imported library cannot join the export set, so a static package names the file it installs.
+    get_target_property(ffpsd_jpeg_location ffpsd_jpeg IMPORTED_LOCATION)
+    get_filename_component(ffpsd_jpeg_file "${ffpsd_jpeg_location}" NAME)
+    target_link_libraries(ffpsd PRIVATE
+        "$<BUILD_INTERFACE:ffpsd_jpeg>"
+        "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_LIBDIR}/${ffpsd_jpeg_file}>")
+    target_compile_definitions(ffpsd PUBLIC FFPSD_HAS_JPEG)
+endif()
+
+# Keeps the symbols of the vendored libraries inside the .so.
+if(BUILD_SHARED_LIBS AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_options(ffpsd PRIVATE "LINKER:--exclude-libs,ALL")
 endif()
 
 if(BUILD_SHARED_LIBS)
@@ -126,6 +147,9 @@ install(TARGETS ffpsd
 # A static ffpsd needs them at link time, so they ship in the same package.
 if(FFPSD_WITH_PNG AND NOT BUILD_SHARED_LIBS)
     install(TARGETS png_static zlib-ng EXPORT ffpsd-targets)
+endif()
+if(FFPSD_WITH_JPEG AND NOT BUILD_SHARED_LIBS)
+    install(FILES "${ffpsd_jpeg_location}" DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 endif()
 
 install(EXPORT ffpsd-targets

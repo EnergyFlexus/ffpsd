@@ -1,4 +1,4 @@
-// Folders of PNG files into PSD files: the first one as the background, every next one as a layer above it.
+// Folders of PNG or JPEG files into PSD files: the first one as the background, every next one as a layer above it.
 #include <algorithm>
 #include <atomic>
 #include <cctype>
@@ -29,6 +29,9 @@ namespace fs = std::filesystem;
 
 namespace
 {
+    // A folder's pictures: the relative path without the extension, which pairs them, to the file itself.
+    using Pictures = std::map<fs::path, fs::path>;
+
     struct Options
     {
         std::vector<fs::path> layers; // the bottom, the top and the optional ones above it
@@ -77,11 +80,11 @@ namespace
     {
         std::cout << "img2ffpsd " << ffpsd::Version() << "\n"
                   << "usage: img2ffpsd <bottom> <top> [<layer>...] <output> [--gray] [--jobs N] [--resize nearest|bicubic]\n\n"
-                  << "Pairs PNG files by their path in the bottom and top folders into PSD files in\n"
-                  << "output: the bottom one as the locked background, the top one as the layer above\n"
-                  << "it. Each further folder adds a layer above those where it has the file. The\n"
-                  << "upper layer is the composite. Every picture is resized to the larger one of the\n"
-                  << "bottom and the top.\n\n"
+                  << "Pairs PNG or JPEG files by their path without the extension in the bottom and\n"
+                  << "top folders into PSD files in output: the bottom one as the locked background,\n"
+                  << "the top one as the layer above it. Each further folder adds a layer above those\n"
+                  << "where it has the file. The upper layer is the composite. Every picture is\n"
+                  << "resized to the larger one of the bottom and the top.\n\n"
                   << "  --gray              grayscale documents instead of RGB\n"
                   << "  --jobs N            files converted at once, one per processor by default\n"
                   << "  --resize nearest    resizing that keeps hard pixels, the default\n"
@@ -140,15 +143,31 @@ namespace
             throw std::runtime_error("cannot write " + Utf8(path));
     }
 
-    bool IsPng(const fs::path& path)
+    std::string Extension(const fs::path& path)
     {
         std::string extension = path.extension().u8string();
         for (char& c : extension)
             c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return extension == ".png";
+        return extension;
     }
 
-    // What the system leaves behind: Finder's .DS_Store and ._ files, which are no PNG, Thumbs.db and the like.
+    bool IsJpeg(const fs::path& path)
+    {
+#if defined(FFPSD_HAS_JPEG)
+        const std::string extension = Extension(path);
+        return extension == ".jpg" || extension == ".jpeg";
+#else
+        (void)path;
+        return false;
+#endif
+    }
+
+    bool IsPicture(const fs::path& path)
+    {
+        return Extension(path) == ".png" || IsJpeg(path);
+    }
+
+    // What the system leaves behind: Finder's .DS_Store and ._ files, which are no pictures, Thumbs.db and the like.
     bool IsHidden(const fs::path& path)
     {
         const std::string name = path.filename().u8string();
@@ -174,25 +193,55 @@ namespace
         return files;
     }
 
-    // Paths relative to the folder, sorted.
-    std::set<fs::path> FindPngs(const fs::path& folder)
+    // Prints the names that more than one picture of the folder has, 01.png and 01.jpg; true when there are none.
+    bool FindPictures(const fs::path& folder, Pictures& pictures)
     {
-        std::set<fs::path> files;
+        std::map<fs::path, std::vector<fs::path>> by_name;
         for (const fs::path& file : VisibleFiles(folder))
         {
-            if (IsPng(file))
-                files.insert(file.lexically_relative(folder));
+            if (!IsPicture(file))
+                continue;
+            const fs::path relative = file.lexically_relative(folder);
+            by_name[fs::path(relative).replace_extension()].push_back(relative);
         }
-        return files;
+
+        bool unique = true;
+        for (const auto& [name, files] : by_name)
+        {
+            if (files.size() == 1)
+            {
+                pictures[name] = files[0];
+                continue;
+            }
+            if (unique)
+                std::cout << kRed << "error: pictures with the same name in '" << Utf8(fs::absolute(folder)) << "':\n";
+            for (const fs::path& file : files)
+                std::cout << "    - " << Utf8(file) << "\n";
+            unique = false;
+        }
+        if (!unique)
+            std::cout << kEnd << "\n";
+        return unique;
+    }
+
+    // The pictures whose name the other folder lacks.
+    std::vector<fs::path> OnlyIn(const Pictures& pictures, const Pictures& other)
+    {
+        std::vector<fs::path> only;
+        for (const auto& [name, file] : pictures)
+        {
+            if (other.count(name) == 0)
+                only.push_back(file);
+        }
+        return only;
     }
 
     // ---- Checking the folders ------------------------------------------------------------------
 
     // Prints the files of one folder that the other lacks; true when there are none.
-    bool CheckOnlyIn(const fs::path& folder, const std::set<fs::path>& files, const std::set<fs::path>& other)
+    bool CheckOnlyIn(const fs::path& folder, const Pictures& pictures, const Pictures& other)
     {
-        std::vector<fs::path> only;
-        std::set_difference(files.begin(), files.end(), other.begin(), other.end(), std::back_inserter(only));
+        const std::vector<fs::path> only = OnlyIn(pictures, other);
         if (only.empty())
             return true;
 
@@ -225,11 +274,11 @@ namespace
     }
 
     // Pages missing between the first and the last page of each folder.
-    std::vector<std::string> FindGaps(const std::set<fs::path>& files)
+    std::vector<std::string> FindGaps(const Pictures& pictures)
     {
         std::map<fs::path, std::set<long long>> pages_by_folder;
-        for (const fs::path& file : files)
-            AddPages(file.stem().u8string(), pages_by_folder[file.parent_path()]);
+        for (const auto& [name, file] : pictures)
+            AddPages(name.filename().u8string(), pages_by_folder[name.parent_path()]);
 
         std::vector<std::string> gaps;
         for (const auto& [folder, pages] : pages_by_folder)
@@ -246,7 +295,7 @@ namespace
     }
 
     // The bottom's paths, which the top must match, and every folder's files; false, after printing why, if they cannot be converted.
-    bool FindFiles(const Options& options, std::vector<fs::path>& files, std::vector<std::set<fs::path>>& found)
+    bool FindFiles(const Options& options, std::vector<fs::path>& files, std::vector<Pictures>& found)
     {
         for (const fs::path& folder : options.layers)
         {
@@ -257,12 +306,13 @@ namespace
             }
         }
 
-        for (const fs::path& folder : options.layers)
-            found.push_back(FindPngs(folder));
-        const std::set<fs::path>& bottoms = found[0];
-        const std::set<fs::path>& tops = found[1];
-
         bool match = true;
+        found.resize(options.layers.size());
+        for (std::size_t i = 0; i < options.layers.size(); ++i)
+            match = FindPictures(options.layers[i], found[i]) && match;
+        const Pictures& bottoms = found[0];
+        const Pictures& tops = found[1];
+
         if (bottoms.size() != tops.size())
         {
             const std::size_t difference = bottoms.size() > tops.size() ? bottoms.size() - tops.size() : tops.size() - bottoms.size();
@@ -280,15 +330,14 @@ namespace
         }
         if (bottoms.empty())
         {
-            std::cout << kYellow << "warning: no PNG files in " << Utf8(fs::absolute(options.layers[0])) << "." << kEnd << "\n";
+            std::cout << kYellow << "warning: no pictures in " << Utf8(fs::absolute(options.layers[0])) << "." << kEnd << "\n";
             return true;
         }
 
         bool warned = false;
         for (std::size_t i = 2; i < found.size(); ++i)
         {
-            std::vector<fs::path> only;
-            std::set_difference(found[i].begin(), found[i].end(), bottoms.begin(), bottoms.end(), std::back_inserter(only));
+            const std::vector<fs::path> only = OnlyIn(found[i], bottoms);
             if (only.empty())
                 continue;
             std::cout << kYellow << "warning: files only in '" << Utf8(fs::absolute(options.layers[i])) << "', skipped:\n";
@@ -325,19 +374,25 @@ namespace
             Pause();
         }
 
-        files.assign(bottoms.begin(), bottoms.end());
+        for (const auto& [name, file] : bottoms)
+            files.push_back(name);
         return true;
     }
 
     // ---- Converting one pair -------------------------------------------------------------------
 
-    ffpsd::Image LoadPng(const fs::path& path, ffpsd::ColorMode color_mode)
+    // A JPEG is turned upright by its EXIF orientation, as Photoshop opens it.
+    ffpsd::Image LoadPicture(const fs::path& path, ffpsd::ColorMode color_mode)
     {
         const std::vector<std::uint8_t> data = ReadFile(path);
+#if defined(FFPSD_HAS_JPEG)
+        if (IsJpeg(path))
+            return ffpsd::LoadJpeg(data.data(), data.size(), color_mode, 8);
+#endif
         return ffpsd::LoadPng(data.data(), data.size(), color_mode, 8);
     }
 
-    void Convert(const Options& options, const std::vector<std::set<fs::path>>& found, const fs::path& file)
+    void Convert(const Options& options, const std::vector<Pictures>& found, const fs::path& file)
     {
         const ffpsd::ColorMode color_mode = options.gray ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb;
         const std::uint16_t color_count = options.gray ? 1 : 3;
@@ -347,9 +402,10 @@ namespace
         std::vector<std::size_t> folders; // the folder of each picture, which names its layer
         for (std::size_t i = 0; i < options.layers.size(); ++i)
         {
-            if (found[i].count(file) != 0)
+            const auto picture = found[i].find(file);
+            if (picture != found[i].end())
             {
-                images.push_back(LoadPng(options.layers[i] / file, color_mode));
+                images.push_back(LoadPicture(options.layers[i] / picture->second, color_mode));
                 folders.push_back(i);
             }
         }
@@ -396,7 +452,7 @@ namespace
         }
 
         fs::path target = options.output / file;
-        target.replace_extension(".psd");
+        target += ".psd"; // the name has no extension left to replace
         WriteFile(target, doc.Save());
     }
 
@@ -460,7 +516,7 @@ namespace
     };
 
     // Converts every file; each thread takes the next one until none are left. Returns the failures.
-    std::size_t ConvertAll(const Options& options, const std::vector<std::set<fs::path>>& found, const std::vector<fs::path>& files)
+    std::size_t ConvertAll(const Options& options, const std::vector<Pictures>& found, const std::vector<fs::path>& files)
     {
         Progress progress(files.size());
         std::atomic<std::size_t> next{0};
@@ -513,7 +569,7 @@ namespace
         }
 
         std::vector<fs::path> files;
-        std::vector<std::set<fs::path>> found;
+        std::vector<Pictures> found;
         if (!FindFiles(options, files, found))
             return 1;
         if (files.empty())

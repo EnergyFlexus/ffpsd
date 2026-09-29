@@ -25,6 +25,9 @@ add_executable(ffpsd_tests
 if(FFPSD_WITH_PNG)
     target_sources(ffpsd_tests PRIVATE png/png_test.cpp)
 endif()
+if(FFPSD_WITH_JPEG)
+    target_sources(ffpsd_tests PRIVATE jpeg/jpeg_test.cpp)
+endif()
 
 target_include_directories(ffpsd_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(ffpsd_tests PRIVATE FFPSD_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")

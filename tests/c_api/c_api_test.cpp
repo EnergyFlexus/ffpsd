@@ -437,3 +437,30 @@ TEST(CApiTest, PngThroughC)
     EXPECT_EQ(png, nullptr);
 #endif
 }
+
+TEST(CApiTest, JpegThroughC)
+{
+    OpenDocument file(kRgbPsd);
+    const ffpsd_layer_t* layer = Layer(file.doc, 1);
+    ffpsd_buffer_t* jpeg = nullptr;
+    const ffpsd_status_t status = ffpsd_layer_save_as_jpeg_memory(layer, 90, &jpeg);
+
+#if defined(FFPSD_HAS_JPEG)
+    ASSERT_EQ(status, FFPSD_STATUS_OK) << ffpsd_last_error();
+    ffpsd_image_t* image = nullptr;
+    ASSERT_EQ(
+        ffpsd_jpeg_load_memory(ffpsd_buffer_get_data(jpeg), ffpsd_buffer_get_size(jpeg), FFPSD_COLOR_MODE_RGB, 8, 1, &image),
+        FFPSD_STATUS_OK)
+        << ffpsd_last_error();
+    ffpsd_image_view_t view = {};
+    ASSERT_EQ(ffpsd_image_get_view(image, &view), FFPSD_STATUS_OK);
+    EXPECT_EQ(view.channel_count, 3u);
+    EXPECT_EQ(view.size, Pixels(layer).size() / 4 * 3); // the layer's transparency is dropped
+    ffpsd_image_destroy(image);
+    ffpsd_buffer_destroy(jpeg);
+    EXPECT_EQ(ffpsd_layer_save_as_jpeg_memory(layer, 0, &jpeg), FFPSD_STATUS_INVALID_ARGUMENT);
+#else
+    EXPECT_EQ(status, FFPSD_STATUS_UNSUPPORTED);
+    EXPECT_EQ(jpeg, nullptr);
+#endif
+}
