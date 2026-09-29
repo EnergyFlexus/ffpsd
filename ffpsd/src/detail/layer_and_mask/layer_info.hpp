@@ -6,6 +6,7 @@
 #include "detail/layer_and_mask/layer_record.hpp"
 
 #include <cstddef>
+#include <cstdint>
 #include <ffpsd/layer.hpp>
 #include <memory>
 #include <vector>

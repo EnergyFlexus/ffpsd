@@ -7,7 +7,9 @@
 #endif
 
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
+#include <exception>
 #include <new>
 #include <optional>
 #include <stdexcept>

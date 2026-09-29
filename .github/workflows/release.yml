@@ -27,8 +27,12 @@ jobs:
             exit 1
           fi
 
+      # A tag pushed again reuses its draft; the archives below replace the old ones.
       - name: Draft release
         run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            exit 0
+          fi
           gh release create "$GITHUB_REF_NAME" --draft --title "$GITHUB_REF_NAME" --generate-notes --notes \
           "ffpsd-*: the shared library, its headers and CMake package, and img2ffpsd using it.
           img2ffpsd-*: img2ffpsd alone, with ffpsd, libpng and zlib built in.

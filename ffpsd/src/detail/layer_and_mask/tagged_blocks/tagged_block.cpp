@@ -3,6 +3,7 @@
 #include "detail/io/fourcc.hpp"
 
 #include <algorithm>
+#include <iterator>
 #include <stdexcept>
 #include <string>
 
