@@ -147,14 +147,40 @@ namespace
         return extension == ".png";
     }
 
+    // What the system leaves behind: Finder's .DS_Store and ._ files, which are no PNG, Thumbs.db and the like.
+    bool IsHidden(const fs::path& path)
+    {
+        const std::string name = path.filename().u8string();
+        return name[0] == '.' || name == "Thumbs.db" || name == "desktop.ini";
+    }
+
+    // The regular files under the folder, hidden files and whatever hidden folders hold left out.
+    std::vector<fs::path> VisibleFiles(const fs::path& folder)
+    {
+        std::vector<fs::path> files;
+        for (auto entry = fs::recursive_directory_iterator(folder); entry != fs::recursive_directory_iterator(); ++entry)
+        {
+            if (IsHidden(entry->path()))
+            {
+                if (entry->is_directory())
+                    entry.disable_recursion_pending();
+            }
+            else if (entry->is_regular_file())
+            {
+                files.push_back(entry->path());
+            }
+        }
+        return files;
+    }
+
     // Paths relative to the folder, sorted.
     std::set<fs::path> FindPngs(const fs::path& folder)
     {
         std::set<fs::path> files;
-        for (const fs::directory_entry& entry : fs::recursive_directory_iterator(folder))
+        for (const fs::path& file : VisibleFiles(folder))
         {
-            if (entry.is_regular_file() && IsPng(entry.path()))
-                files.insert(entry.path().lexically_relative(folder));
+            if (IsPng(file))
+                files.insert(file.lexically_relative(folder));
         }
         return files;
     }
@@ -269,7 +295,7 @@ namespace
             Pause();
         }
 
-        if (fs::is_directory(options.output) && !fs::is_empty(options.output))
+        if (fs::is_directory(options.output) && !VisibleFiles(options.output).empty())
         {
             std::cout << kYellow << "warning: " << Utf8(fs::absolute(options.output)) << " is not empty. Are you sure? Data may be lost."
                       << kEnd << "\n";
