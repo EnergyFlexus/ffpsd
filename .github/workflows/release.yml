@@ -34,10 +34,11 @@ jobs:
             exit 0
           fi
           gh release create "$GITHUB_REF_NAME" --draft --title "$GITHUB_REF_NAME" --generate-notes --notes \
-          "ffpsd-*: the shared library, its headers and CMake package, and img2ffpsd using it.
-          img2ffpsd-*: img2ffpsd alone, with ffpsd, libpng and zlib built in.
+          "- \`ffpsd-*\`: the shared library, its headers and CMake package, and img2ffpsd using it.
+          - \`img2ffpsd-*\`: img2ffpsd alone, with ffpsd, libpng and zlib built in.
 
           macOS builds are for Apple Silicon and unsigned: run \`xattr -d com.apple.quarantine\` on them once.
+
           Linux builds need glibc 2.35 or later."
 
   # Two archives per system: the shared library with the tool, and the tool alone.
