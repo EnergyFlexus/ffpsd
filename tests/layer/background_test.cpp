@@ -6,6 +6,7 @@
 #include <ffpsd/ffpsd.hpp>
 #include <gtest/gtest.h>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 using namespace ffpsd_test;
@@ -24,12 +25,6 @@ namespace
             at += sizeof(marker);
         }
         return flags;
-    }
-
-    std::vector<std::uint8_t> BlockData(const ffpsd::Layer& layer, const char (&key)[5])
-    {
-        const ffpsd::TaggedBlock* block = layer.GetTaggedBlockByKey(Fourcc(key));
-        return block == nullptr ? std::vector<std::uint8_t>() : block->data;
     }
 } // namespace
 

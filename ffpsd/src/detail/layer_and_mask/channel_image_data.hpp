@@ -22,8 +22,7 @@ namespace ffpsd::detail
         PixelData data;
     };
 
-    // Pass two of the layer info: the bytes a record declared, not past end. Color and transparency
-    // cover the layer's bounds; a mask has its own rectangle, not read yet, so its size is unknown.
+    // Pass two of the layer info; a mask covers its own rectangle, which is not read, so its size is unknown.
     ChannelImageData ParseChannelImageData(
         BigEndianReader& reader, std::size_t end, std::int16_t id, std::uint64_t length, const Rect& bounds, std::uint16_t depth);
 

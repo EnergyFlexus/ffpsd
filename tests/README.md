@@ -2,24 +2,26 @@
 
 GoogleTest, built by the debug presets; the top-level README shows how to run them.
 
-A folder per public header, and a few for the rest. A new test goes where the
-header it tests is, and its suite is named after the folder, so
-`run_tests.py --filter Layer` runs `layer/`.
+A folder per public header, and a file per part of it. A suite is the folder
+and the file, `DocumentStackTest` for `document/stack_test.cpp`, just the folder
+for the folder's main file, so `run_tests.py --filter Document` runs `document/`.
 
 ```
-smoke/         Photoshop files read end to end, checked against an independent dump
-document/      document.hpp: header, image resources, the stack, groups, saving
-layer/         layer.hpp: properties, name, kind, blocks, pixels, background, resizing
+smoke/         Photoshop files end to end against scripts/dump_psd.py, read and written
+document/      document.hpp: the header, resources, the stack, parsing, saving,
+               PSD and PSB, compression
+layer/         layer.hpp: properties, name, kind and blocks, pixels and position,
+               the background, resizing
 adjustments/   adjustments.hpp: Levels
 png/           png.hpp; only with FFPSD_WITH_PNG
 c_api/         c_api.h alone; c_header_check.c compiles it as C
 support/       test_support.hpp: the data files, their layer names, small builders
 data/          photoshop/: written by Photoshop; generated/: written by scripts/
-scripts/       what writes data/generated/; run by hand, never by the build
+scripts/       what writes data/generated/ and dumps data/photoshop/; run by hand
 ```
 
 One behaviour per test, named as a sentence:
-`DocumentTest.AStackChangeThatBreaksAGroupIsRolledBack`. A refusal is checked
+`DocumentStackTest.AStackChangeThatBreaksAGroupIsRolledBack`. A refusal is checked
 together with what it leaves behind.
 
 | File | What it holds |

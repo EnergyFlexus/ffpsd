@@ -6,7 +6,7 @@
 
 namespace ffpsd
 {
-    // The settings of adjustment layers, a struct per kind; kKey is the block holding them.
+    // A struct per kind of adjustment layer; kKey is the block that holds its settings.
 
     // Records not given are the identity, so they leave their channel untouched.
     struct LevelsInfo

@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ffpsd_test
@@ -54,6 +55,19 @@ namespace ffpsd_test
     {
         std::ifstream file(path, std::ios::binary);
         return std::vector<std::uint8_t>(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+    }
+
+    // FNV-1a 64, as tests/scripts/dump_psd.py computes it.
+    inline std::uint64_t Fnv1a64(const std::uint8_t* data, std::size_t size)
+    {
+        std::uint64_t hash = 0xCBF29CE484222325u;
+        for (std::size_t i = 0; i < size; ++i)
+            hash = (hash ^ data[i]) * 0x100000001B3u;
+        return hash;
+    }
+    inline std::uint64_t Fnv1a64(const std::vector<std::uint8_t>& data)
+    {
+        return Fnv1a64(data.data(), data.size());
     }
 
     // The sum of one 8 bit plane, compared with an independent decoder's.
@@ -114,6 +128,21 @@ namespace ffpsd_test
     {
         const ffpsd::TaggedBlock* block = layer.GetTaggedBlockByKey(Fourcc("lyid"));
         return block == nullptr ? 0 : BigEndianU32(block->data);
+    }
+
+    inline ffpsd::TaggedBlock Block(const char (&key)[5], std::vector<std::uint8_t> data)
+    {
+        ffpsd::TaggedBlock block;
+        block.key = Fourcc(key);
+        block.data = std::move(data);
+        return block;
+    }
+
+    // Empty when the layer has no such block.
+    inline std::vector<std::uint8_t> BlockData(const ffpsd::Layer& layer, const char (&key)[5])
+    {
+        const ffpsd::TaggedBlock* block = layer.GetTaggedBlockByKey(Fourcc(key));
+        return block == nullptr ? std::vector<std::uint8_t>() : block->data;
     }
 
     // Makes a layer a group marker through the raw door: 1 open, 2 closed, 3 end.

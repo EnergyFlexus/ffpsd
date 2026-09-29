@@ -26,7 +26,7 @@ namespace ffpsd
         kLab = 9
     };
 
-    // The values of the compression field; RLE falls back to raw where it would not be smaller.
+    // The values of the compression field; RLE falls back to raw where it is not smaller.
     enum class Compression : std::uint16_t
     {
         kRaw = 0,
@@ -58,7 +58,7 @@ namespace ffpsd
         FFPSD_EXPORT std::uint16_t GetDepth() const noexcept;
         FFPSD_EXPORT ColorMode GetColor() const noexcept;
 
-        // PSB: the large document format, same structures with wider lengths.
+        // PSB: the large document format, with wider lengths.
         FFPSD_EXPORT bool IsPsb() const noexcept;
 
         // False: the composite in section 5 is a placeholder, build the picture from the layers.
@@ -114,7 +114,7 @@ namespace ffpsd
         // Photoshop's locked background: at the bottom, the document's size, one at most; alpha goes onto white.
         FFPSD_EXPORT Layer* AddBackgroundLayer(const std::string& name, const Image& image);
 
-        // As "Background from Layer": a raster layer without a mask, over white, fitted to the canvas, moved down.
+        // A raster layer without a mask becomes the background: over white, fitted to the canvas, moved down.
         FFPSD_EXPORT void SetBackgroundLayer(std::size_t index);
 
         // Makes the background an ordinary layer where it is, unlocked; false when there is none.
@@ -145,7 +145,7 @@ namespace ffpsd
         // Must match the document's size, channels and depth; sets has_real_merged_data.
         FFPSD_EXPORT void SetMergedImage(const Image& image);
 
-        // The merged image built from the layers. Not implemented yet: throws std::logic_error.
+        // The merged image built from the layers; throws std::logic_error, as it is not implemented.
         FFPSD_EXPORT Image RenderMergedImage() const;
 
     private:

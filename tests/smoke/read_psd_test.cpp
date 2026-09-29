@@ -11,7 +11,7 @@
 
 using namespace ffpsd_test;
 
-TEST(ReadPsdTest, HeaderOfAGrayscaleFile)
+TEST(SmokeTest, HeaderOfAGrayscaleFile)
 {
     const ffpsd::Document doc = ffpsd::Document::Parse(kGrayscalePsd);
 
@@ -23,7 +23,7 @@ TEST(ReadPsdTest, HeaderOfAGrayscaleFile)
     EXPECT_FALSE(doc.IsPsb());
 }
 
-TEST(ReadPsdTest, LayersOfAGrayscaleFile)
+TEST(SmokeTest, LayersOfAGrayscaleFile)
 {
     const ffpsd::Document doc = ffpsd::Document::Parse(kGrayscalePsd);
     ASSERT_EQ(doc.GetLayerCount(), 2u);
@@ -48,7 +48,7 @@ TEST(ReadPsdTest, LayersOfAGrayscaleFile)
     EXPECT_EQ(LayerId(*fill), 5u);
 }
 
-TEST(ReadPsdTest, LayerPixelsOfAGrayscaleFile)
+TEST(SmokeTest, LayerPixelsOfAGrayscaleFile)
 {
     // A background has no transparency; the layer above it has, as the last plane.
     const ffpsd::Document doc = ffpsd::Document::Parse(kGrayscalePsd);
@@ -64,7 +64,7 @@ TEST(ReadPsdTest, LayerPixelsOfAGrayscaleFile)
     EXPECT_EQ(PlaneSum(fill, 1), 255816000u);
 }
 
-TEST(ReadPsdTest, ImageResourcesOfAnRgbFile)
+TEST(SmokeTest, ImageResourcesOfAnRgbFile)
 {
     const ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
 
@@ -92,7 +92,7 @@ TEST(ReadPsdTest, ImageResourcesOfAnRgbFile)
     EXPECT_EQ(target->data, (std::vector<std::uint8_t>{0, 1}));
 }
 
-TEST(ReadPsdTest, LayersAndMergedImageOfAnRgbFile)
+TEST(SmokeTest, LayersAndMergedImageOfAnRgbFile)
 {
     const ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
     ASSERT_EQ(doc.GetLayerCount(), 2u);
@@ -110,7 +110,7 @@ TEST(ReadPsdTest, LayersAndMergedImageOfAnRgbFile)
     EXPECT_EQ(PlaneSum(merged, 2), 641365113u);
 }
 
-TEST(ReadPsdTest, LayerPixelsOfAnRgbFile)
+TEST(SmokeTest, LayerPixelsOfAnRgbFile)
 {
     const ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
     const ffpsd::Image background = doc.GetLayerByIndex(0)->GetPixels();
@@ -125,7 +125,7 @@ TEST(ReadPsdTest, LayerPixelsOfAnRgbFile)
     EXPECT_EQ(PlaneSum(copy, 3), 682923150u);
 }
 
-TEST(ReadPsdTest, SectionBlocksOfAnRgbFile)
+TEST(SmokeTest, SectionBlocksOfAnRgbFile)
 {
     const ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
 
@@ -140,7 +140,7 @@ TEST(ReadPsdTest, SectionBlocksOfAnRgbFile)
     }
 }
 
-TEST(ReadPsdTest, LevelsLayerOfAnRgbFile)
+TEST(SmokeTest, LevelsLayerOfAnRgbFile)
 {
     const ffpsd::Document doc = ffpsd::Document::Parse(kRgbLevelsPsd);
     ASSERT_EQ(doc.GetLayerCount(), 2u);

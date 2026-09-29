@@ -17,8 +17,7 @@ namespace ffpsd::detail
         return depth == 1 ? (std::size_t{width} + 7) / 8 : std::size_t{width} * (depth / 8u);
     }
 
-    // A layer channel or section 5 as stored: the compression field, then raw rows or RLE counts and rows.
-    // RLE counts are 2 bytes in a PSD and 4 in a PSB; the document knows which, so each call is told.
+    // A layer channel or section 5 as stored; RLE row counts are 2 bytes in a PSD and 4 in a PSB.
     class PixelData
     {
     public:
@@ -45,8 +44,7 @@ namespace ffpsd::detail
         // Whether Converted gives other bytes: RLE changing format, or rows packed another way.
         bool NeedsConversion(bool from_psb, bool to_psb, std::uint16_t compression) const noexcept;
 
-        // RLE changing format only rewrites the counts. ZIP and unsized data keep their compression,
-        // and unsized RLE cannot change format.
+        // RLE changing format rewrites only the counts; unsized RLE cannot change format and throws.
         PixelData Converted(bool from_psb, bool to_psb, std::uint16_t compression) const;
 
     private:

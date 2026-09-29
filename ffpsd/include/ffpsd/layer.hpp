@@ -93,7 +93,7 @@ namespace ffpsd
         FFPSD_EXPORT void Resize(std::uint32_t width, std::uint32_t height, ResampleFilter filter = ResampleFilter::kBicubic);
 
 #if defined(FFPSD_HAS_PNG)
-        // GetPixels as a PNG, for gray and RGB documents; only with PNG, as png.hpp.
+        // GetPixels as a PNG, for gray and RGB documents; declared only in a build with PNG.
         FFPSD_EXPORT std::vector<std::uint8_t> SaveAsPng() const;
         FFPSD_EXPORT void SaveAsPng(const std::string& path) const;
 #endif
