@@ -1,0 +1,99 @@
+name: Release
+
+# A tag such as v0.2.0 builds the packages and publishes them; pushes to main do not.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write # to create the release and attach the archives
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+
+jobs:
+  # The tag must name the version in CMakeLists.txt; the release starts as a draft nobody sees.
+  draft:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Tag matches VERSION
+        run: |
+          version=$(sed -nE 's/^[[:space:]]*VERSION[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt | head -n 1)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME, but CMakeLists.txt has VERSION $version"
+            exit 1
+          fi
+
+      - name: Draft release
+        run: |
+          gh release create "$GITHUB_REF_NAME" --draft --title "$GITHUB_REF_NAME" --generate-notes --notes \
+          "ffpsd-*: the shared library, its headers and CMake package, and img2ffpsd using it.
+          img2ffpsd-*: img2ffpsd alone, with ffpsd, libpng and zlib built in.
+
+          macOS builds are for Apple Silicon and unsigned: run \`xattr -d com.apple.quarantine\` on them once.
+          Linux builds need glibc 2.35 or later."
+
+  # Two archives per system: the shared library with the tool, and the tool alone.
+  package:
+    needs: draft
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { os: windows-latest, name: windows-x64 }
+          - { os: ubuntu-22.04, name: linux-x64 } # glibc 2.35, so older distributions run it too
+          - { os: macos-latest, name: macos-arm64 }
+        kind: [shared, static]
+    runs-on: ${{ matrix.target.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive # libpng and zlib-ng under vendor/
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Ninja (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      # Static means /MT on Windows: the tool needs no Visual C++ runtime.
+      - run: python build.py ${{ matrix.kind == 'static' && '--static' || '' }}
+
+      - name: Archive and attach
+        shell: bash
+        run: |
+          if [ "${{ matrix.kind }}" = shared ]; then
+            name="ffpsd-$GITHUB_REF_NAME-${{ matrix.target.name }}"
+            cp -R ffpsd-out "$name"
+          else
+            name="img2ffpsd-$GITHUB_REF_NAME-${{ matrix.target.name }}"
+            mkdir "$name"
+            cp ffpsd-out/bin/img2ffpsd* "$name"/
+          fi
+          cp LICENSE "$name"/
+
+          # tar keeps the executable bit and the symlinks of a .so or .dylib.
+          if [ "$RUNNER_OS" = Windows ]; then
+            7z a "$name.zip" "$name" > /dev/null
+            archive="$name.zip"
+          else
+            tar -czf "$name.tar.gz" "$name"
+            archive="$name.tar.gz"
+          fi
+          gh release upload "$GITHUB_REF_NAME" "$archive" --clobber
+
+  # Only when every archive is attached does the release become public.
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh release edit "$GITHUB_REF_NAME" --draft=false
