@@ -23,8 +23,7 @@ namespace ffpsd::detail
         {
             if (in >= size)
                 throw std::runtime_error(
-                    "ffpsd: PackBits data ends after " + std::to_string(written) + " of " + std::to_string(out_size) +
-                    " bytes");
+                    "ffpsd: PackBits data ends after " + std::to_string(written) + " of " + std::to_string(out_size) + " bytes");
 
             const auto header = static_cast<std::int8_t>(data[in++]);
             if (header >= 0)

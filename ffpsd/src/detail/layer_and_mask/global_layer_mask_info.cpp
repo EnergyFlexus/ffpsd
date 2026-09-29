@@ -10,8 +10,7 @@ namespace ffpsd::detail
         const std::uint32_t length = reader.ReadU32();
         if (reader.Tell() > end || length > end - reader.Tell())
             throw std::runtime_error(
-                "ffpsd: global layer mask info claims " + std::to_string(length) +
-                " bytes, more than the section holds");
+                "ffpsd: global layer mask info claims " + std::to_string(length) + " bytes, more than the section holds");
 
         GlobalLayerMaskInfo info;
         info.raw.resize(length);

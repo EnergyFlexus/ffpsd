@@ -12,7 +12,7 @@ ContinuationIndentWidth: 4
 AccessModifierOffset: -4
 NamespaceIndentation: All
 
-ColumnLimit: 120
+ColumnLimit: 140
 
 # A line that does not fit breaks right after the opening bracket and indents by
 # ContinuationIndentWidth, instead of aligning under the bracket far to the right.

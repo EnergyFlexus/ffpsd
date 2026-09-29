@@ -46,8 +46,8 @@ namespace ffpsd_test
     inline std::vector<std::uint8_t> BigEndianBytes(std::uint32_t value)
     {
         return {
-            static_cast<std::uint8_t>(value >> 24), static_cast<std::uint8_t>(value >> 16),
-            static_cast<std::uint8_t>(value >> 8), static_cast<std::uint8_t>(value)};
+            static_cast<std::uint8_t>(value >> 24), static_cast<std::uint8_t>(value >> 16), static_cast<std::uint8_t>(value >> 8),
+            static_cast<std::uint8_t>(value)};
     }
 
     inline std::vector<std::uint8_t> ReadFile(const std::string& path)
@@ -67,8 +67,7 @@ namespace ffpsd_test
     }
 
     // Every sample distinct enough that a swapped plane or a shifted row shows.
-    inline ffpsd::Image
-    Pattern(std::uint32_t width, std::uint32_t height, std::uint16_t channels, std::uint16_t depth = 8)
+    inline ffpsd::Image Pattern(std::uint32_t width, std::uint32_t height, std::uint16_t channels, std::uint16_t depth = 8)
     {
         ffpsd::Image image;
         image.width = width;
@@ -99,9 +98,8 @@ namespace ffpsd_test
     }
 
     // A small document with no layers; the size and channels a new one lacks.
-    inline ffpsd::Document NewDocument(
-        ffpsd::ColorMode color = ffpsd::ColorMode::kRgb, std::uint16_t depth = 8, std::uint32_t width = 4,
-        std::uint32_t height = 3)
+    inline ffpsd::Document
+    NewDocument(ffpsd::ColorMode color = ffpsd::ColorMode::kRgb, std::uint16_t depth = 8, std::uint32_t width = 4, std::uint32_t height = 3)
     {
         ffpsd::Document doc;
         doc.SetColor(color);

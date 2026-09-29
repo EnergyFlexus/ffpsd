@@ -162,19 +162,16 @@ extern "C"
     FFPSD_EXPORT ffpsd_status_t ffpsd_levels_create(ffpsd_levels_t** out);
     FFPSD_EXPORT void ffpsd_levels_destroy(ffpsd_levels_t* levels);
     FFPSD_EXPORT size_t ffpsd_levels_get_count(const ffpsd_levels_t* levels);
-    FFPSD_EXPORT ffpsd_status_t
-    ffpsd_levels_get_channel(const ffpsd_levels_t* levels, size_t index, ffpsd_levels_channel_t* out);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_levels_get_channel(const ffpsd_levels_t* levels, size_t index, ffpsd_levels_channel_t* out);
 
     /* Past the end, the records in between are added as the identity. */
-    FFPSD_EXPORT ffpsd_status_t
-    ffpsd_levels_set_channel(ffpsd_levels_t* levels, size_t index, const ffpsd_levels_channel_t* channel);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_levels_set_channel(ffpsd_levels_t* levels, size_t index, const ffpsd_levels_channel_t* channel);
 
     /* Paths are passed to the C++ API as they are, in the system's narrow encoding. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_create(ffpsd_document_t** out);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_open(const char* path, ffpsd_document_t** out);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_open_memory(const uint8_t* data, size_t size, ffpsd_document_t** out);
-    FFPSD_EXPORT ffpsd_status_t
-    ffpsd_document_save(const ffpsd_document_t* doc, const char* path, ffpsd_compression_t compression);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_save(const ffpsd_document_t* doc, const char* path, ffpsd_compression_t compression);
     FFPSD_EXPORT ffpsd_status_t
     ffpsd_document_save_memory(const ffpsd_document_t* doc, ffpsd_compression_t compression, ffpsd_buffer_t** out);
     FFPSD_EXPORT void ffpsd_document_destroy(ffpsd_document_t* doc);
@@ -196,15 +193,11 @@ extern "C"
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_has_real_merged_data(ffpsd_document_t* doc, int value);
 
     /* 72 dpi when the file has no resource 1005. */
-    FFPSD_EXPORT ffpsd_status_t
-    ffpsd_document_get_resolution_info(const ffpsd_document_t* doc, ffpsd_resolution_info_t* out);
-    FFPSD_EXPORT ffpsd_status_t
-    ffpsd_document_set_resolution_info(ffpsd_document_t* doc, const ffpsd_resolution_info_t* info);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_get_resolution_info(const ffpsd_document_t* doc, ffpsd_resolution_info_t* out);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_resolution_info(ffpsd_document_t* doc, const ffpsd_resolution_info_t* info);
 
-    FFPSD_EXPORT ffpsd_status_t
-    ffpsd_document_get_version_info(const ffpsd_document_t* doc, ffpsd_version_info_t** out);
-    FFPSD_EXPORT ffpsd_status_t
-    ffpsd_document_set_version_info(ffpsd_document_t* doc, const ffpsd_version_info_t* info);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_get_version_info(const ffpsd_document_t* doc, ffpsd_version_info_t** out);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_version_info(ffpsd_document_t* doc, const ffpsd_version_info_t* info);
 
     /* A NULL name is an empty one. A new id is inserted in id order. */
     FFPSD_EXPORT size_t ffpsd_document_get_image_resource_count(const ffpsd_document_t* doc);
@@ -212,8 +205,7 @@ extern "C"
     ffpsd_document_get_image_resource_by_index(const ffpsd_document_t* doc, size_t index, ffpsd_image_resource_t* out);
     FFPSD_EXPORT ffpsd_status_t
     ffpsd_document_get_image_resource_by_id(const ffpsd_document_t* doc, uint16_t id, ffpsd_image_resource_t* out);
-    FFPSD_EXPORT ffpsd_status_t
-    ffpsd_document_set_image_resource(ffpsd_document_t* doc, const ffpsd_image_resource_t* resource);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_image_resource(ffpsd_document_t* doc, const ffpsd_image_resource_t* resource);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_remove_image_resource(ffpsd_document_t* doc, uint16_t id);
 
     /* Bottom to top; a stack change drops resources 1024, 1026, 1072 and the real composite flag. */
@@ -222,12 +214,11 @@ extern "C"
 
     /* A raster layer on top; a NULL image is an empty layer. The name is UTF-8. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_add_layer(
-        ffpsd_document_t* doc, const char* name, const ffpsd_image_view_t* image, int32_t top, int32_t left,
-        ffpsd_layer_t** out);
+        ffpsd_document_t* doc, const char* name, const ffpsd_image_view_t* image, int32_t top, int32_t left, ffpsd_layer_t** out);
 
     /* Photoshop's locked background: at the bottom, the document's size, one at most. */
-    FFPSD_EXPORT ffpsd_status_t ffpsd_document_add_background_layer(
-        ffpsd_document_t* doc, const char* name, const ffpsd_image_view_t* image, ffpsd_layer_t** out);
+    FFPSD_EXPORT ffpsd_status_t
+    ffpsd_document_add_background_layer(ffpsd_document_t* doc, const char* name, const ffpsd_image_view_t* image, ffpsd_layer_t** out);
 
     /* A raster layer without a mask becomes the background, over white and fitted to the canvas. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_background_layer(ffpsd_document_t* doc, size_t index);
@@ -236,12 +227,11 @@ extern "C"
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_unset_background_layer(ffpsd_document_t* doc);
 
     /* NULL levels change nothing. */
-    FFPSD_EXPORT ffpsd_status_t ffpsd_document_add_levels_layer(
-        ffpsd_document_t* doc, const char* name, const ffpsd_levels_t* levels, ffpsd_layer_t** out);
+    FFPSD_EXPORT ffpsd_status_t
+    ffpsd_document_add_levels_layer(ffpsd_document_t* doc, const char* name, const ffpsd_levels_t* levels, ffpsd_layer_t** out);
 
     /* From this document or one of the same depth, color mode and format. */
-    FFPSD_EXPORT ffpsd_status_t
-    ffpsd_document_add_layer_copy(ffpsd_document_t* doc, const ffpsd_layer_t* source, ffpsd_layer_t** out);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_add_layer_copy(ffpsd_document_t* doc, const ffpsd_layer_t* source, ffpsd_layer_t** out);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_remove_layer(ffpsd_document_t* doc, size_t index);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_move_layer(ffpsd_document_t* doc, size_t from, size_t to);
 
@@ -251,8 +241,7 @@ extern "C"
     ffpsd_document_get_tagged_block_by_index(const ffpsd_document_t* doc, size_t index, ffpsd_tagged_block_t* out);
     FFPSD_EXPORT ffpsd_status_t
     ffpsd_document_get_tagged_block_by_key(const ffpsd_document_t* doc, uint32_t key, ffpsd_tagged_block_t* out);
-    FFPSD_EXPORT ffpsd_status_t
-    ffpsd_document_set_tagged_block(ffpsd_document_t* doc, const ffpsd_tagged_block_t* block);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_tagged_block(ffpsd_document_t* doc, const ffpsd_tagged_block_t* block);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_remove_tagged_block(ffpsd_document_t* doc, uint32_t key);
 
     /* An empty image when the file has none. Setting it sets has_real_merged_data. */
@@ -263,8 +252,7 @@ extern "C"
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_get_bounds(const ffpsd_layer_t* layer, ffpsd_rect_t* out);
 
     /* UTF-8, cut to fit and null-terminated; length gets the full size. */
-    FFPSD_EXPORT ffpsd_status_t
-    ffpsd_layer_get_name(const ffpsd_layer_t* layer, char* buffer, size_t capacity, size_t* length);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_get_name(const ffpsd_layer_t* layer, char* buffer, size_t capacity, size_t* length);
 
     FFPSD_EXPORT uint8_t ffpsd_layer_get_opacity(const ffpsd_layer_t* layer);
     FFPSD_EXPORT int ffpsd_layer_is_visible(const ffpsd_layer_t* layer);
@@ -283,8 +271,7 @@ extern "C"
 
     /* A raster layer without a mask; the background does not move or resize. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_position(ffpsd_layer_t* layer, int32_t top, int32_t left);
-    FFPSD_EXPORT ffpsd_status_t
-    ffpsd_layer_resize(ffpsd_layer_t* layer, uint32_t width, uint32_t height, ffpsd_resample_filter_t filter);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_resize(ffpsd_layer_t* layer, uint32_t width, uint32_t height, ffpsd_resample_filter_t filter);
 
     /* Color planes by channel id, then transparency when the layer has one. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_get_pixels(const ffpsd_layer_t* layer, ffpsd_image_t** out);
@@ -292,10 +279,8 @@ extern "C"
 
     /* Unchecked; keys may repeat, so a get or remove by key finds the first. */
     FFPSD_EXPORT size_t ffpsd_layer_get_tagged_block_count(const ffpsd_layer_t* layer);
-    FFPSD_EXPORT ffpsd_status_t
-    ffpsd_layer_get_tagged_block_by_index(const ffpsd_layer_t* layer, size_t index, ffpsd_tagged_block_t* out);
-    FFPSD_EXPORT ffpsd_status_t
-    ffpsd_layer_get_tagged_block_by_key(const ffpsd_layer_t* layer, uint32_t key, ffpsd_tagged_block_t* out);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_get_tagged_block_by_index(const ffpsd_layer_t* layer, size_t index, ffpsd_tagged_block_t* out);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_get_tagged_block_by_key(const ffpsd_layer_t* layer, uint32_t key, ffpsd_tagged_block_t* out);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_tagged_block(ffpsd_layer_t* layer, const ffpsd_tagged_block_t* block);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_remove_tagged_block(ffpsd_layer_t* layer, uint32_t key);
 
@@ -304,10 +289,9 @@ extern "C"
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_save_as_png_memory(const ffpsd_layer_t* layer, ffpsd_buffer_t** out);
 
     /* Every PNG call is UNSUPPORTED in a build without PNG. */
+    FFPSD_EXPORT ffpsd_status_t ffpsd_png_load(const char* path, ffpsd_color_mode_t color, uint16_t depth, ffpsd_image_t** out);
     FFPSD_EXPORT ffpsd_status_t
-    ffpsd_png_load(const char* path, ffpsd_color_mode_t color, uint16_t depth, ffpsd_image_t** out);
-    FFPSD_EXPORT ffpsd_status_t ffpsd_png_load_memory(
-        const uint8_t* data, size_t size, ffpsd_color_mode_t color, uint16_t depth, ffpsd_image_t** out);
+    ffpsd_png_load_memory(const uint8_t* data, size_t size, ffpsd_color_mode_t color, uint16_t depth, ffpsd_image_t** out);
 
     /* Gray, gray with alpha, RGB or RGBA by the channel count; 8 or 16 bit. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_png_save(const ffpsd_image_view_t* image, const char* path);

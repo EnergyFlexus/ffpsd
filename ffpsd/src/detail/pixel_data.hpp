@@ -12,13 +12,12 @@ namespace ffpsd::detail
     constexpr std::uint16_t kCompressionRle = 1;
 
     // A layer channel or section 5: compression, then raw rows or RLE counts and rows; out stays big endian.
-    void DecodePixelData(
-        const std::uint8_t* data, std::size_t size, std::size_t rows, std::size_t row_bytes, bool is_psb,
-        std::uint8_t* out);
+    void
+    DecodePixelData(const std::uint8_t* data, std::size_t size, std::size_t rows, std::size_t row_bytes, bool is_psb, std::uint8_t* out);
 
     // RLE falls back to raw when it is not smaller or a row's count does not fit its field.
-    std::vector<std::uint8_t> EncodePixelData(
-        const std::uint8_t* data, std::size_t rows, std::size_t row_bytes, bool is_psb, std::uint16_t compression);
+    std::vector<std::uint8_t>
+    EncodePixelData(const std::uint8_t* data, std::size_t rows, std::size_t row_bytes, bool is_psb, std::uint16_t compression);
 
     // The compression field, or raw for data too short to have one.
     std::uint16_t GetPixelCompression(const std::vector<std::uint8_t>& data) noexcept;

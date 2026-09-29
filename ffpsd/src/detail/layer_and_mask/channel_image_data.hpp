@@ -19,13 +19,11 @@ namespace ffpsd::detail
     };
 
     // Pass two of the layer info: the blob a record declared, with the id it gave, not past end.
-    ChannelImageData
-    ParseChannelImageData(BigEndianReader& reader, std::size_t end, std::int16_t id, std::uint64_t length);
+    ChannelImageData ParseChannelImageData(BigEndianReader& reader, std::size_t end, std::int16_t id, std::uint64_t length);
 
     // Planar native samples, RLE when smaller; no samples give just the compression field.
     ChannelImageData EncodeChannel(
-        std::int16_t id, const std::uint8_t* samples, std::size_t width, std::size_t height,
-        std::size_t bytes_per_sample, bool is_psb);
+        std::int16_t id, const std::uint8_t* samples, std::size_t width, std::size_t height, std::size_t bytes_per_sample, bool is_psb);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_LAYER_AND_MASK_CHANNEL_IMAGE_DATA_HPP_

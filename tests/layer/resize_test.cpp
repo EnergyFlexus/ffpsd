@@ -191,8 +191,7 @@ TEST_P(LayerResizeFilterTest, AFlatImageStaysFlatAtAnyScale)
 INSTANTIATE_TEST_SUITE_P(
     FiltersAndDepths, LayerResizeFilterTest,
     testing::Combine(
-        testing::Values(ffpsd::ResampleFilter::kNearest, ffpsd::ResampleFilter::kBicubic),
-        testing::Values<std::uint16_t>(8, 16, 32)));
+        testing::Values(ffpsd::ResampleFilter::kNearest, ffpsd::ResampleFilter::kBicubic), testing::Values<std::uint16_t>(8, 16, 32)));
 
 TEST(LayerResizeTest, NearestDoublesEveryPixel)
 {
@@ -213,8 +212,7 @@ TEST(LayerResizeTest, NearestTakesThePixelUnderEachCenter)
     EXPECT_EQ(Resized(row, 2, 1, ffpsd::ResampleFilter::kNearest).bytes, (std::vector<std::uint8_t>{3, 17}));
     EXPECT_EQ(
         Resized(square, 2, 2, ffpsd::ResampleFilter::kNearest).bytes,
-        (std::vector<std::uint8_t>{
-            square.bytes[1 * 4 + 1], square.bytes[1 * 4 + 3], square.bytes[3 * 4 + 1], square.bytes[3 * 4 + 3]}));
+        (std::vector<std::uint8_t>{square.bytes[1 * 4 + 1], square.bytes[1 * 4 + 3], square.bytes[3 * 4 + 1], square.bytes[3 * 4 + 3]}));
 }
 
 TEST(LayerResizeTest, BicubicKeepsARampStraight)

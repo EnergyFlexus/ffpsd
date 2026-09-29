@@ -141,8 +141,8 @@ namespace ffpsd::detail
         const std::uint32_t count = reader.ReadU32();
         if (count > reader.GetRemaining() / sizeof(std::uint16_t))
             throw std::runtime_error(
-                "ffpsd: unicode string claims " + std::to_string(count) + " characters, only " +
-                std::to_string(reader.GetRemaining()) + " bytes left");
+                "ffpsd: unicode string claims " + std::to_string(count) + " characters, only " + std::to_string(reader.GetRemaining()) +
+                " bytes left");
 
         std::vector<std::uint16_t> units(count);
         if (count != 0)
@@ -160,8 +160,7 @@ namespace ffpsd::detail
                                   units[i + 1] >= kTrailSurrogateFirst && units[i + 1] <= kTrailSurrogateLast;
             if (has_pair)
             {
-                code =
-                    kSupplementaryFirst + ((code - kLeadSurrogateFirst) << 10) + (units[i + 1] - kTrailSurrogateFirst);
+                code = kSupplementaryFirst + ((code - kLeadSurrogateFirst) << 10) + (units[i + 1] - kTrailSurrogateFirst);
                 ++i;
             }
             else if (IsSurrogate(code))

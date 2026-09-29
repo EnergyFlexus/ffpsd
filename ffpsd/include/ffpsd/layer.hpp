@@ -90,8 +90,7 @@ namespace ffpsd
         FFPSD_EXPORT void SetPosition(std::int32_t top, std::int32_t left);
 
         // Resamples the pixels, transparency included, keeping the top left corner.
-        FFPSD_EXPORT void
-        Resize(std::uint32_t width, std::uint32_t height, ResampleFilter filter = ResampleFilter::kBicubic);
+        FFPSD_EXPORT void Resize(std::uint32_t width, std::uint32_t height, ResampleFilter filter = ResampleFilter::kBicubic);
 
 #if defined(FFPSD_HAS_PNG)
         // GetPixels as a PNG, for gray and RGB documents; only with PNG, as png.hpp.

@@ -180,8 +180,8 @@ namespace ffpsd
 
             png_set_write_fn(png, &writer, WriteData, FlushData);
             png_set_IHDR(
-                png, info, image.width, image.height, image.bit_depth, image.color_type, PNG_INTERLACE_NONE,
-                PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
+                png, info, image.width, image.height, image.bit_depth, image.color_type, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT,
+                PNG_FILTER_TYPE_DEFAULT);
             png_write_info(png, info);
 
             if (image.bit_depth == 16 && detail::kNativeLittle)
@@ -249,8 +249,7 @@ namespace ffpsd
         {
             std::uint8_t* plane = image.bytes.data() + channel * pixels * sample;
             for (std::size_t i = 0; i < pixels; ++i)
-                std::memcpy(
-                    plane + i * sample, decoded.bytes.data() + (i * decoded.channels + channel) * sample, sample);
+                std::memcpy(plane + i * sample, decoded.bytes.data() + (i * decoded.channels + channel) * sample, sample);
         }
 
         const bool is_rgb = image.channel_count >= 3;
@@ -272,8 +271,7 @@ namespace ffpsd
         if (image.IsEmpty())
             throw std::invalid_argument("ffpsd: an empty image makes no PNG");
         if (image.channel_count > 4)
-            throw std::invalid_argument(
-                "ffpsd: a PNG holds 1 to 4 channels, not " + std::to_string(image.channel_count));
+            throw std::invalid_argument("ffpsd: a PNG holds 1 to 4 channels, not " + std::to_string(image.channel_count));
         if (image.depth != 8 && image.depth != 16)
             throw std::invalid_argument("ffpsd: a PNG holds 8 or 16 bit, not " + std::to_string(image.depth));
         if (image.width > kMaxSide || image.height > kMaxSide)
@@ -297,9 +295,7 @@ namespace ffpsd
         {
             const std::uint8_t* plane = image.bytes.data() + channel * pixels * sample;
             for (std::size_t i = 0; i < pixels; ++i)
-                std::memcpy(
-                    interleaved.bytes.data() + (i * image.channel_count + channel) * sample, plane + i * sample,
-                    sample);
+                std::memcpy(interleaved.bytes.data() + (i * image.channel_count + channel) * sample, plane + i * sample, sample);
         }
 
         const std::size_t row_bytes = std::size_t{image.width} * image.channel_count * sample;

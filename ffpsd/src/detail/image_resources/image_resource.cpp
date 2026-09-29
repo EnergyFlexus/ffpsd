@@ -31,8 +31,7 @@ namespace ffpsd::detail
             const std::uint32_t signature = reader.ReadU32();
             if (signature != kBlockSignature)
                 throw std::runtime_error(
-                    "ffpsd: expected 8BIM at offset " + std::to_string(block_start) + ", got '" +
-                    FourccString(signature) + "'");
+                    "ffpsd: expected 8BIM at offset " + std::to_string(block_start) + ", got '" + FourccString(signature) + "'");
 
             ImageResource entry;
             entry.id = reader.ReadU16();
@@ -91,8 +90,7 @@ namespace ffpsd::detail
             return *image_resources[found];
 
         const auto at = std::find_if(
-            image_resources.begin(), image_resources.end(),
-            [id](const std::unique_ptr<ImageResource>& entry) { return entry->id > id; });
+            image_resources.begin(), image_resources.end(), [id](const std::unique_ptr<ImageResource>& entry) { return entry->id > id; });
 
         auto created = std::make_unique<ImageResource>();
         created->id = id;

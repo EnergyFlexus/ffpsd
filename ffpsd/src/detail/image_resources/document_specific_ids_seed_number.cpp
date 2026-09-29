@@ -18,7 +18,6 @@ namespace ffpsd::detail
     {
         BigEndianWriter writer(sizeof(std::uint32_t));
         writer.WriteU32(value);
-        FindOrInsertImageResource(image_resources, ImageResourceId::kDocumentSpecificIdsSeedNumber).data =
-            writer.Take();
+        FindOrInsertImageResource(image_resources, ImageResourceId::kDocumentSpecificIdsSeedNumber).data = writer.Take();
     }
 } // namespace ffpsd::detail

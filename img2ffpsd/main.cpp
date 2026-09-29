@@ -235,10 +235,9 @@ namespace
         bool match = true;
         if (bottoms.size() != tops.size())
         {
-            const std::size_t difference =
-                bottoms.size() > tops.size() ? bottoms.size() - tops.size() : tops.size() - bottoms.size();
-            std::cout << kRed << "error: number of files differs: " << bottoms.size() << " vs " << tops.size() << " ("
-                      << difference << ")" << kEnd << "\n";
+            const std::size_t difference = bottoms.size() > tops.size() ? bottoms.size() - tops.size() : tops.size() - bottoms.size();
+            std::cout << kRed << "error: number of files differs: " << bottoms.size() << " vs " << tops.size() << " (" << difference << ")"
+                      << kEnd << "\n";
             match = false;
         }
         match = CheckOnlyIn(options.bottom, bottoms, tops) && match;
@@ -251,8 +250,7 @@ namespace
         }
         if (bottoms.empty())
         {
-            std::cout << kYellow << "warning: no PNG files in " << Utf8(fs::absolute(options.bottom)) << "." << kEnd
-                      << "\n";
+            std::cout << kYellow << "warning: no PNG files in " << Utf8(fs::absolute(options.bottom)) << "." << kEnd << "\n";
             return true;
         }
 
@@ -266,15 +264,14 @@ namespace
             std::cout << kYellow << "warning: possible misses:\n";
             for (const std::string& gap : gaps)
                 std::cout << "    - " << gap << "\n";
-            std::cout << kEnd << "\n"
-                      << kYellow << "Warnings. But if everything is ok, you can continue." << kEnd << "\n";
+            std::cout << kEnd << "\n" << kYellow << "Warnings. But if everything is ok, you can continue." << kEnd << "\n";
             Pause();
         }
 
         if (fs::is_directory(options.output) && !fs::is_empty(options.output))
         {
-            std::cout << kYellow << "warning: " << Utf8(fs::absolute(options.output))
-                      << " is not empty. Are you sure? Data may be lost." << kEnd << "\n";
+            std::cout << kYellow << "warning: " << Utf8(fs::absolute(options.output)) << " is not empty. Are you sure? Data may be lost."
+                      << kEnd << "\n";
             Pause();
         }
 
@@ -377,14 +374,8 @@ namespace
         void Draw() const
         {
             const char* const kFull = "\xE2\x96\x88";
-            const char* const kEighths[] = {"",
-                                            "\xE2\x96\x8F",
-                                            "\xE2\x96\x8E",
-                                            "\xE2\x96\x8D",
-                                            "\xE2\x96\x8C",
-                                            "\xE2\x96\x8B",
-                                            "\xE2\x96\x8A",
-                                            "\xE2\x96\x89"};
+            const char* const kEighths[] = {
+                "", "\xE2\x96\x8F", "\xE2\x96\x8E", "\xE2\x96\x8D", "\xE2\x96\x8C", "\xE2\x96\x8B", "\xE2\x96\x8A", "\xE2\x96\x89"};
 
             const std::size_t eighths = done_ * kWidth * 8 / total_;
             const std::size_t full_cells = eighths / 8;
@@ -445,8 +436,7 @@ namespace
     {
         EnableConsole();
 
-        if (std::find(args.begin(), args.end(), "--help") != args.end() ||
-            std::find(args.begin(), args.end(), "-h") != args.end())
+        if (std::find(args.begin(), args.end(), "--help") != args.end() || std::find(args.begin(), args.end(), "-h") != args.end())
         {
             PrintUsage();
             return 0;
@@ -470,8 +460,8 @@ namespace
         const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
 
         std::cout << "\n\n"
-                  << (failed == 0 ? kGreen : kRed) << files.size() - failed << " of " << files.size()
-                  << " converted in " << std::fixed << std::setprecision(1) << seconds << " s";
+                  << (failed == 0 ? kGreen : kRed) << files.size() - failed << " of " << files.size() << " converted in " << std::fixed
+                  << std::setprecision(1) << seconds << " s";
         if (failed != 0)
             std::cout << ", " << failed << " failed";
         std::cout << kEnd << "\n";

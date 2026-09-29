@@ -14,8 +14,8 @@ namespace ffpsd::detail
 
     // Raw and RLE; no data gives an empty Image.
     Image DecodeImageData(
-        const std::vector<std::uint8_t>& data, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count,
-        std::uint16_t depth, bool is_psb);
+        const std::vector<std::uint8_t>& data, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth,
+        bool is_psb);
 
     // RLE when smaller.
     std::vector<std::uint8_t> EncodeImageData(const Image& image, bool is_psb);

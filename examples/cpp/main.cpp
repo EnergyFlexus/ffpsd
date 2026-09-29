@@ -51,8 +51,8 @@ namespace
 
     void PrintDocument(const ffpsd::Document& doc)
     {
-        std::cout << doc.GetWidth() << " x " << doc.GetHeight() << ", " << ColorName(doc.GetColor()) << ", "
-                  << doc.GetDepth() << " bit" << (doc.IsPsb() ? ", PSB" : "") << "\n";
+        std::cout << doc.GetWidth() << " x " << doc.GetHeight() << ", " << ColorName(doc.GetColor()) << ", " << doc.GetDepth() << " bit"
+                  << (doc.IsPsb() ? ", PSB" : "") << "\n";
 
         const ffpsd::ResolutionInfo resolution = doc.GetResolutionInfo();
         std::cout << "resolution: " << resolution.horizontal << " x " << resolution.vertical << " ppi\n";
@@ -65,9 +65,9 @@ namespace
         {
             const ffpsd::Layer* layer = doc.GetLayerByIndex(i);
             const ffpsd::Rect bounds = layer->GetBounds();
-            std::cout << "  " << i << ": " << layer->GetName() << " (" << KindName(layer->GetKind()) << "), "
-                      << bounds.GetWidth() << " x " << bounds.GetHeight() << " at " << bounds.left << ", " << bounds.top
-                      << (layer->IsVisible() ? "" : ", hidden") << "\n";
+            std::cout << "  " << i << ": " << layer->GetName() << " (" << KindName(layer->GetKind()) << "), " << bounds.GetWidth() << " x "
+                      << bounds.GetHeight() << " at " << bounds.left << ", " << bounds.top << (layer->IsVisible() ? "" : ", hidden")
+                      << "\n";
         }
     }
 } // namespace
@@ -103,8 +103,7 @@ int main(int argc, char** argv)
 
         doc.AddLayer(*top);
         doc.Save(argv[2]);
-        std::cout << "\ncopied " << top->GetName() << " to the top, saved " << doc.GetLayerCount() << " layers to "
-                  << argv[2] << "\n";
+        std::cout << "\ncopied " << top->GetName() << " to the top, saved " << doc.GetLayerCount() << " layers to " << argv[2] << "\n";
     }
     catch (const std::exception& e)
     {

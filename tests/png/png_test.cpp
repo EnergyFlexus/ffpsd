@@ -57,9 +57,8 @@ TEST(PngTest, RgbIntoGrayIsRec709Luma)
     const ffpsd::Image image = ffpsd::LoadPng(kRgbaPng, ffpsd::ColorMode::kGrayscale, 8);
 
     ASSERT_EQ(image.channel_count, 2u);
-    const std::vector<std::uint8_t> expected = {
-        54,  182, 18, 255, 0,   128, // 0.2126, 0.7152 and 0.0722 of 255, rounded
-        255, 128, 0,  255, 255, 64};
+    const std::vector<std::uint8_t> expected = {54,  182, 18, 255, 0,   128, // 0.2126, 0.7152 and 0.0722 of 255, rounded
+                                                255, 128, 0,  255, 255, 64};
     EXPECT_EQ(image.bytes, expected);
 }
 
@@ -113,8 +112,7 @@ TEST(PngTest, LoadingRefusesWhatItCannotDo)
     EXPECT_THROW(ffpsd::LoadPng(cut.data(), cut.size(), ffpsd::ColorMode::kRgb, 8), std::runtime_error);
     EXPECT_THROW(ffpsd::LoadPng(png.data(), png.size(), ffpsd::ColorMode::kCmyk, 8), std::invalid_argument);
     EXPECT_THROW(ffpsd::LoadPng(png.data(), png.size(), ffpsd::ColorMode::kRgb, 32), std::invalid_argument);
-    EXPECT_THROW(
-        ffpsd::LoadPng(DataFile("no_such_file.png"), ffpsd::ColorMode::kRgb, 8), std::filesystem::filesystem_error);
+    EXPECT_THROW(ffpsd::LoadPng(DataFile("no_such_file.png"), ffpsd::ColorMode::kRgb, 8), std::filesystem::filesystem_error);
 }
 
 class PngRoundTripTest : public testing::TestWithParam<std::tuple<std::uint16_t, std::uint16_t>>
@@ -155,15 +153,13 @@ TEST(PngTest, LayersOfBothFilesSaveAsWhatGetPixelsGives)
     const ffpsd::Document rgb = ffpsd::Document::Parse(kRgbPsd);
     const ffpsd::Document gray = ffpsd::Document::Parse(kGrayscalePsd);
 
-    for (const auto& [doc, color] :
-         {std::make_pair(&rgb, ffpsd::ColorMode::kRgb), std::make_pair(&gray, ffpsd::ColorMode::kGrayscale)})
+    for (const auto& [doc, color] : {std::make_pair(&rgb, ffpsd::ColorMode::kRgb), std::make_pair(&gray, ffpsd::ColorMode::kGrayscale)})
     {
         for (std::size_t i = 0; i < doc->GetLayerCount(); ++i)
         {
             const ffpsd::Layer* layer = doc->GetLayerByIndex(i);
             const std::vector<std::uint8_t> png = layer->SaveAsPng();
-            EXPECT_EQ(ffpsd::LoadPng(png.data(), png.size(), color, 8).bytes, layer->GetPixels().bytes)
-                << layer->GetName();
+            EXPECT_EQ(ffpsd::LoadPng(png.data(), png.size(), color, 8).bytes, layer->GetPixels().bytes) << layer->GetName();
         }
     }
 }

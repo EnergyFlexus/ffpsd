@@ -28,13 +28,11 @@ namespace ffpsd::detail
         std::uint32_t layers_key = 0;
     };
 
-    LayerAndMaskInfo
-    ParseLayerAndMaskInfo(BigEndianReader& reader, bool is_psb, std::uint16_t depth, std::vector<LayerRecord>& records);
+    LayerAndMaskInfo ParseLayerAndMaskInfo(BigEndianReader& reader, bool is_psb, std::uint16_t depth, std::vector<LayerRecord>& records);
 
     // A 16 or 32 bit document gets its layers in 'Lr16' or 'Lr32' and an empty layer info.
     void WriteLayerAndMaskInfo(
-        BigEndianWriter& writer, const LayerAndMaskInfo& info, const std::vector<LayerToWrite>& layers, bool is_psb,
-        std::uint16_t depth);
+        BigEndianWriter& writer, const LayerAndMaskInfo& info, const std::vector<LayerToWrite>& layers, bool is_psb, std::uint16_t depth);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_LAYER_AND_MASK_LAYER_AND_MASK_INFO_HPP_

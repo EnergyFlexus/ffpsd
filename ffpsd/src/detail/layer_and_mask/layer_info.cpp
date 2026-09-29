@@ -17,8 +17,7 @@ namespace ffpsd::detail
         const std::uint64_t length = is_psb ? reader.ReadU64() : reader.ReadU32();
         if (length > reader.GetRemaining())
             throw std::runtime_error(
-                "ffpsd: layer info claims " + std::to_string(length) + " bytes, only " +
-                std::to_string(reader.GetRemaining()) + " left");
+                "ffpsd: layer info claims " + std::to_string(length) + " bytes, only " + std::to_string(reader.GetRemaining()) + " left");
 
         // The length counts the padding, which is 4 in practice and 2 by the specification.
         return ParseLayerInfoBody(reader, reader.Tell() + static_cast<std::size_t>(length), is_psb);
@@ -60,8 +59,7 @@ namespace ffpsd::detail
         return info;
     }
 
-    void
-    WriteLayerInfo(BigEndianWriter& writer, bool merged_alpha, const std::vector<LayerToWrite>& layers, bool is_psb)
+    void WriteLayerInfo(BigEndianWriter& writer, bool merged_alpha, const std::vector<LayerToWrite>& layers, bool is_psb)
     {
         const std::size_t length = writer.ReserveLength(is_psb);
         if (!layers.empty())
@@ -72,8 +70,7 @@ namespace ffpsd::detail
         writer.PatchLength(length, is_psb);
     }
 
-    void
-    WriteLayerInfoBody(BigEndianWriter& writer, bool merged_alpha, const std::vector<LayerToWrite>& layers, bool is_psb)
+    void WriteLayerInfoBody(BigEndianWriter& writer, bool merged_alpha, const std::vector<LayerToWrite>& layers, bool is_psb)
     {
         if (layers.size() > kMaxLayers)
             throw std::length_error("ffpsd: " + std::to_string(layers.size()) + " layers, the format holds 32767");

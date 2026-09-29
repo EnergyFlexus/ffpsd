@@ -178,8 +178,7 @@ TEST(CApiTest, ADocumentBuiltInCSavesAndOpensAgain)
     ffpsd_document_destroy(doc);
 
     ffpsd_document_t* back = nullptr;
-    ASSERT_EQ(
-        ffpsd_document_open_memory(ffpsd_buffer_get_data(saved), ffpsd_buffer_get_size(saved), &back), FFPSD_STATUS_OK)
+    ASSERT_EQ(ffpsd_document_open_memory(ffpsd_buffer_get_data(saved), ffpsd_buffer_get_size(saved), &back), FFPSD_STATUS_OK)
         << ffpsd_last_error();
     ffpsd_buffer_destroy(saved);
 
@@ -238,8 +237,7 @@ TEST(CApiTest, ABackgroundThroughC)
     ffpsd_layer_t* background = nullptr;
     ASSERT_EQ(ffpsd_document_add_layer(doc, "top", nullptr, 0, 0, &top), FFPSD_STATUS_OK);
 
-    ASSERT_EQ(ffpsd_document_add_background_layer(doc, "Background", &view, &background), FFPSD_STATUS_OK)
-        << ffpsd_last_error();
+    ASSERT_EQ(ffpsd_document_add_background_layer(doc, "Background", &view, &background), FFPSD_STATUS_OK) << ffpsd_last_error();
 
     EXPECT_EQ(Layer(doc, 0), background);
     EXPECT_EQ(ffpsd_layer_is_background(background), 1);
@@ -390,8 +388,7 @@ TEST(CApiTest, SaveWritesAFile)
     OpenDocument file(kGrayscalePsd);
     const std::string path = testing::TempDir() + "ffpsd_c_api_test.psd";
 
-    ASSERT_EQ(ffpsd_document_save(file.doc, path.c_str(), FFPSD_COMPRESSION_RLE), FFPSD_STATUS_OK)
-        << ffpsd_last_error();
+    ASSERT_EQ(ffpsd_document_save(file.doc, path.c_str(), FFPSD_COMPRESSION_RLE), FFPSD_STATUS_OK) << ffpsd_last_error();
 
     EXPECT_EQ(ReadFile(path), ReadFile(kGrayscalePsd));
     std::remove(path.c_str());
@@ -408,8 +405,7 @@ TEST(CApiTest, PngThroughC)
     ASSERT_EQ(status, FFPSD_STATUS_OK) << ffpsd_last_error();
     ffpsd_image_t* image = nullptr;
     ASSERT_EQ(
-        ffpsd_png_load_memory(ffpsd_buffer_get_data(png), ffpsd_buffer_get_size(png), FFPSD_COLOR_MODE_RGB, 8, &image),
-        FFPSD_STATUS_OK);
+        ffpsd_png_load_memory(ffpsd_buffer_get_data(png), ffpsd_buffer_get_size(png), FFPSD_COLOR_MODE_RGB, 8, &image), FFPSD_STATUS_OK);
     EXPECT_EQ(Bytes(image), Pixels(layer));
     ffpsd_image_destroy(image);
     ffpsd_buffer_destroy(png);

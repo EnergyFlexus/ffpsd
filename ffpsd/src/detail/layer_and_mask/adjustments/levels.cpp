@@ -37,10 +37,9 @@ namespace ffpsd::detail
 
         void CheckRecord(const LevelsInfo::Channel& channel, std::size_t index)
         {
-            const bool valid = channel.input_floor <= 253 && channel.input_ceiling >= 2 &&
-                               channel.input_ceiling <= 255 && channel.input_floor < channel.input_ceiling &&
-                               channel.output_floor <= 255 && channel.output_ceiling <= 255 && channel.gamma >= 0.1 &&
-                               channel.gamma <= 9.99;
+            const bool valid = channel.input_floor <= 253 && channel.input_ceiling >= 2 && channel.input_ceiling <= 255 &&
+                               channel.input_floor < channel.input_ceiling && channel.output_floor <= 255 &&
+                               channel.output_ceiling <= 255 && channel.gamma >= 0.1 && channel.gamma <= 9.99;
             if (!valid)
                 throw std::invalid_argument("ffpsd: Levels record " + std::to_string(index) + " is out of range");
         }
@@ -86,9 +85,7 @@ namespace ffpsd::detail
             CheckRecord(levels.channels[i], i);
 
         const std::size_t total = std::max(kTotalRecords, levels.channels.size());
-        const auto record = [&](std::size_t i) {
-            return i < levels.channels.size() ? levels.channels[i] : LevelsInfo::Channel();
-        };
+        const auto record = [&](std::size_t i) { return i < levels.channels.size() ? levels.channels[i] : LevelsInfo::Channel(); };
 
         BigEndianWriter writer;
         writer.WriteU16(kVersion);
