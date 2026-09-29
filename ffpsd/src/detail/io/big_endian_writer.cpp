@@ -2,6 +2,7 @@
 
 #include <limits>
 #include <string>
+#include <utility>
 
 namespace ffpsd::detail
 {

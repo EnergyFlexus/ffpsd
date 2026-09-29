@@ -2,6 +2,7 @@
 #include "detail/io/byte_order.hpp"
 #include "detail/io/file.hpp"
 
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <ffpsd/layer.hpp>

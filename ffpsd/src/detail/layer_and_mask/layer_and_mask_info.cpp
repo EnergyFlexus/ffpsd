@@ -3,8 +3,10 @@
 #include "detail/io/fourcc.hpp"
 #include "detail/layer_and_mask/layer_info.hpp"
 
+#include <memory>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace ffpsd::detail
 {

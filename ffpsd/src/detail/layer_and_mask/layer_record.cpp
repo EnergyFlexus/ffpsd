@@ -5,6 +5,8 @@
 #include "detail/layer_and_mask/tagged_blocks/layer_name_source_setting.hpp"
 #include "detail/layer_and_mask/tagged_blocks/protected_setting.hpp"
 
+#include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 

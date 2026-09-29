@@ -11,10 +11,12 @@
 #include <ffpsd/document.hpp>
 #include <ffpsd/layer.hpp>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace ffpsd
 {

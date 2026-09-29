@@ -3,6 +3,8 @@
 #include "detail/io/big_endian_writer.hpp"
 #include "detail/io/strings.hpp"
 
+#include <string>
+
 namespace ffpsd::detail
 {
     namespace

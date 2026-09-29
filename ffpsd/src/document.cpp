@@ -19,8 +19,11 @@
 #include "detail/pixel_data.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <deque>
 #include <ffpsd/document.hpp>
+#include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
