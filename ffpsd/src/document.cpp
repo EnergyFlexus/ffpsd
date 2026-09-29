@@ -9,6 +9,7 @@
 #include "detail/io/big_endian_reader.hpp"
 #include "detail/io/big_endian_writer.hpp"
 #include "detail/io/file.hpp"
+#include "detail/io/fourcc.hpp"
 #include "detail/layer_and_mask/adjustments/adjustment_layer.hpp"
 #include "detail/layer_and_mask/adjustments/levels.hpp"
 #include "detail/layer_and_mask/layer_and_mask_info.hpp"
@@ -68,6 +69,39 @@ namespace ffpsd
             return open == 0 ? nullptr : "breaks the group nesting";
         }
 
+        // The channels a new document of this mode has, alpha channels not counted.
+        std::uint16_t ChannelCountOf(ColorMode color_mode)
+        {
+            switch (color_mode)
+            {
+            case ColorMode::kRgb:
+            case ColorMode::kLab:
+                return 3;
+            case ColorMode::kCmyk:
+                return 4;
+            case ColorMode::kMultichannel:
+                throw std::invalid_argument("ffpsd: a multichannel document has no default channel count");
+            default:
+                return 1;
+            }
+        }
+
+        // Layers are packed for the channels, depth and color mode they were added with.
+        void CheckNoLayers(const detail::Layers& layers, const char* what)
+        {
+            if (!layers.empty())
+                throw std::logic_error(std::string("ffpsd: the ") + what + " of a document with layers cannot change");
+        }
+
+        // A record that changes nothing, as LevelsInfo::Channel starts.
+        bool IsIdentity(const LevelsInfo::Channel& channel) noexcept
+        {
+            const LevelsInfo::Channel identity;
+            return channel.input_floor == identity.input_floor && channel.input_ceiling == identity.input_ceiling &&
+                   channel.output_floor == identity.output_floor && channel.output_ceiling == identity.output_ceiling &&
+                   channel.gamma == identity.gamma;
+        }
+
         void CheckLayerIndex(std::size_t index, std::size_t count)
         {
             if (index >= count)
@@ -89,7 +123,7 @@ namespace ffpsd
         std::uint16_t channel_count = 0;
         std::uint16_t depth = 8;
         std::uint16_t version = kVersionPsd;
-        ColorMode color = ColorMode::kRgb;
+        ColorMode color_mode = ColorMode::kRgb;
 
         std::vector<std::uint8_t> color_mode_data;
         detail::ImageResources image_resources;
@@ -106,6 +140,15 @@ namespace ffpsd
     Document::Document()
         : impl_(std::make_unique<Impl>())
     {
+    }
+    Document::Document(std::uint32_t width, std::uint32_t height, ColorMode color_mode, std::uint16_t depth)
+        : Document()
+    {
+        SetColorMode(color_mode);
+        SetChannelCount(ChannelCountOf(color_mode));
+        SetDepth(depth);
+        SetWidth(width);
+        SetHeight(height);
     }
     Document::~Document() = default;
     Document::Document(Document&& other) noexcept
@@ -150,7 +193,7 @@ namespace ffpsd
     }
     ColorMode Document::GetColorMode() const noexcept
     {
-        return impl_->color;
+        return impl_->color_mode;
     }
     bool Document::IsPsb() const noexcept
     {
@@ -191,31 +234,195 @@ namespace ffpsd
         const std::uint32_t max_side = detail::MaxSide(IsPsb());
         if (width < 1 || width > max_side)
             throw std::invalid_argument("ffpsd: width out of range: " + std::to_string(width));
+        if (width == impl_->width)
+            return;
+        if (!impl_->layers.empty() && impl_->layers.front()->IsBackground())
+            throw std::logic_error("ffpsd: the background covers the canvas, so its size cannot change");
+
         impl_->width = width;
+        DropMergedImage();
     }
     void Document::SetHeight(std::uint32_t height)
     {
         const std::uint32_t max_side = detail::MaxSide(IsPsb());
         if (height < 1 || height > max_side)
             throw std::invalid_argument("ffpsd: height out of range: " + std::to_string(height));
+        if (height == impl_->height)
+            return;
+        if (!impl_->layers.empty() && impl_->layers.front()->IsBackground())
+            throw std::logic_error("ffpsd: the background covers the canvas, so its size cannot change");
+
         impl_->height = height;
+        DropMergedImage();
     }
     void Document::SetChannelCount(std::uint16_t channel_count)
     {
         if (channel_count < 1 || channel_count > kMaxChannels)
             throw std::invalid_argument("ffpsd: channel count out of range: " + std::to_string(channel_count));
+        if (channel_count == impl_->channel_count)
+            return;
+        CheckNoLayers(impl_->layers, "channel count");
+
         impl_->channel_count = channel_count;
+        DropMergedImage();
     }
     void Document::SetDepth(std::uint16_t depth)
     {
         if (depth != 1 && depth != 8 && depth != 16 && depth != 32)
             throw std::invalid_argument("ffpsd: unsupported depth: " + std::to_string(depth));
+        if (depth == impl_->depth)
+            return;
+        CheckNoLayers(impl_->layers, "depth");
+
         impl_->depth = depth;
+        DropMergedImage();
     }
-    void Document::SetColorMode(ColorMode color) noexcept
+    void Document::SetColorMode(ColorMode color_mode)
     {
-        impl_->color = color;
+        if (color_mode == impl_->color_mode)
+            return;
+        CheckNoLayers(impl_->layers, "color mode");
+
+        impl_->color_mode = color_mode;
+        DropMergedImage();
     }
+    void Document::ConvertColorMode(ColorMode color_mode)
+    {
+        const ColorMode from = impl_->color_mode;
+        if (color_mode == from)
+            return;
+
+        if (from == ColorMode::kRgb && color_mode == ColorMode::kGrayscale)
+            ConvertRgbToGray();
+        else if (from == ColorMode::kGrayscale && color_mode == ColorMode::kRgb)
+            ConvertGrayToRgb();
+        else
+            throw std::invalid_argument(
+                "ffpsd: converting color mode " + std::to_string(static_cast<int>(from)) + " to " +
+                std::to_string(static_cast<int>(color_mode)) + " is not supported");
+    }
+
+    void Document::ConvertRgbToGray()
+    {
+        const detail::Layers& layers = impl_->layers;
+
+        // Everything that can throw comes first, while the document is still RGB.
+        std::vector<Image> gray_pixels(layers.size());
+        std::vector<std::optional<TaggedBlock>> gray_levels(layers.size());
+        bool has_adjustments = false;
+        for (std::size_t i = 0; i < layers.size(); ++i)
+        {
+            const Layer& layer = *layers[i];
+            const std::uint32_t key = layer.GetAdjustmentKey();
+            if (key == LevelsInfo::kKey)
+            {
+                // RGB's record 0 is every channel at once; gray keeps its one channel in record 1, as Photoshop writes it.
+                LevelsInfo levels = *layer.GetAdjustment<LevelsInfo>();
+                levels.channels = {LevelsInfo::Channel(), levels.channels.at(0)};
+                gray_levels[i] = *layer.GetTaggedBlockByKey(key);
+                gray_levels[i]->data = detail::EncodeAdjustment(levels);
+                has_adjustments = true;
+            }
+            else if (key != 0)
+            {
+                throw std::invalid_argument("ffpsd: the '" + detail::FourccString(key) + "' adjustment cannot be converted to gray");
+            }
+
+            // Groups and adjustments have no pixels, but their empty channels are converted too.
+            const Image pixels = layer.GetPixels();
+            if (!pixels.IsEmpty())
+                gray_pixels[i] = detail::RgbToGray(pixels);
+        }
+
+        // An adjustment is not linear, so gray of the RGB composite is not what the layers give in gray.
+        const bool exact = HasRealMergedData() && !has_adjustments;
+        const Image merged = exact ? GetMergedImage() : Image();
+        const Image merged_gray = merged.IsEmpty() ? Image() : detail::RgbToGray(merged);
+
+        // Directly: SetColorMode refuses a document with layers.
+        impl_->color_mode = ColorMode::kGrayscale;
+        impl_->channel_count = static_cast<std::uint16_t>(impl_->channel_count - 2);
+
+        for (std::size_t i = 0; i < layers.size(); ++i)
+        {
+            layers[i]->SetPixels(gray_pixels[i]);
+            if (gray_levels[i].has_value())
+                layers[i]->SetTaggedBlock(*gray_levels[i]);
+        }
+
+        if (merged_gray.IsEmpty())
+            DropMergedImage();
+        else
+            SetMergedImage(merged_gray);
+        SetHasRealMergedData(!merged_gray.IsEmpty());
+
+        // An RGB profile does not describe gray.
+        RemoveImageResource(1039);
+    }
+
+    void Document::ConvertGrayToRgb()
+    {
+        const detail::Layers& layers = impl_->layers;
+        if (impl_->channel_count + 2 > kMaxChannels)
+            throw std::invalid_argument("ffpsd: in RGB the document would have more than 56 channels");
+
+        // Everything that can throw comes first, while the document is still gray.
+        std::vector<Image> rgb_pixels(layers.size());
+        std::vector<std::optional<TaggedBlock>> rgb_levels(layers.size());
+        for (std::size_t i = 0; i < layers.size(); ++i)
+        {
+            const Layer& layer = *layers[i];
+            const std::uint32_t key = layer.GetAdjustmentKey();
+            if (key == LevelsInfo::kKey)
+            {
+                // Gray keeps its one channel in record 1; as RGB's record 0 it applies to every channel,
+                // unless record 0 holds something too, and then every channel gets record 1 of its own.
+                LevelsInfo levels = *layer.GetAdjustment<LevelsInfo>();
+                const LevelsInfo::Channel all = levels.channels.at(0);
+                const LevelsInfo::Channel gray = levels.channels.at(1);
+                if (IsIdentity(all))
+                    levels.channels = {gray};
+                else
+                    levels.channels = {all, gray, gray, gray};
+                rgb_levels[i] = *layer.GetTaggedBlockByKey(key);
+                rgb_levels[i]->data = detail::EncodeAdjustment(levels);
+            }
+            else if (key != 0)
+            {
+                throw std::invalid_argument("ffpsd: the '" + detail::FourccString(key) + "' adjustment cannot be converted to RGB");
+            }
+
+            // Groups and adjustments have no pixels, but their empty channels are converted too.
+            const Image pixels = layer.GetPixels();
+            if (!pixels.IsEmpty())
+                rgb_pixels[i] = detail::GrayToRgb(pixels);
+        }
+
+        // Three equal channels under the same Levels give what gray gave, so the composite stays exact.
+        const Image merged = HasRealMergedData() ? GetMergedImage() : Image();
+        const Image merged_rgb = merged.IsEmpty() ? Image() : detail::GrayToRgb(merged);
+
+        // Directly: SetColorMode refuses a document with layers.
+        impl_->color_mode = ColorMode::kRgb;
+        impl_->channel_count = static_cast<std::uint16_t>(impl_->channel_count + 2);
+
+        for (std::size_t i = 0; i < layers.size(); ++i)
+        {
+            layers[i]->SetPixels(rgb_pixels[i]);
+            if (rgb_levels[i].has_value())
+                layers[i]->SetTaggedBlock(*rgb_levels[i]);
+        }
+
+        if (merged_rgb.IsEmpty())
+            DropMergedImage();
+        else
+            SetMergedImage(merged_rgb);
+        SetHasRealMergedData(!merged_rgb.IsEmpty());
+
+        // A gray profile does not describe RGB.
+        RemoveImageResource(1039);
+    }
+
     void Document::SetPsb(bool psb)
     {
         if (psb == IsPsb())
@@ -303,7 +510,7 @@ namespace ffpsd
         const std::string& name, const std::uint8_t* data, std::size_t size, std::uint32_t width, std::uint32_t height,
         std::uint16_t channel_count, std::int32_t top, std::int32_t left)
     {
-        const std::size_t color_count = detail::LayerColorCount(impl_->color);
+        const std::size_t color_count = detail::LayerColorCount(impl_->color_mode);
 
         // Keeps the size arithmetic below far from overflow.
         detail::CheckLayerSides(width, height, IsPsb());
@@ -325,7 +532,7 @@ namespace ffpsd
 
     Layer* Document::AddBackgroundLayer(const std::string& name, const Image& image)
     {
-        const std::size_t color_count = detail::LayerColorCount(impl_->color);
+        const std::size_t color_count = detail::LayerColorCount(impl_->color_mode);
         if (image.depth != impl_->depth)
             throw std::invalid_argument(
                 "ffpsd: a " + std::to_string(image.depth) + " bit image in a " + std::to_string(impl_->depth) + " bit document");
@@ -343,7 +550,7 @@ namespace ffpsd
         Image flattened;
         if (image.channel_count > color_count)
         {
-            flattened = detail::MakeWhiteImage(image.width, image.height, impl_->color, color_count, image.depth);
+            flattened = detail::MakeWhiteImage(image.width, image.height, impl_->color_mode, color_count, image.depth);
             detail::BlendNormal(flattened, image, 0, 0, 255, color_count);
         }
         const Image& opaque = flattened.IsEmpty() ? image : flattened;
@@ -371,8 +578,8 @@ namespace ffpsd
         if (detail::HasLayerMask(*layer.record_))
             throw std::invalid_argument("ffpsd: a layer with a mask cannot become the background");
 
-        const std::size_t color_count = detail::LayerColorCount(impl_->color);
-        Image canvas = detail::MakeWhiteImage(impl_->width, impl_->height, impl_->color, color_count, impl_->depth);
+        const std::size_t color_count = detail::LayerColorCount(impl_->color_mode);
+        Image canvas = detail::MakeWhiteImage(impl_->width, impl_->height, impl_->color_mode, color_count, impl_->depth);
         const Rect bounds = layer.GetBounds();
         detail::BlendNormal(canvas, layer.GetPixels(), bounds.top, bounds.left, layer.GetOpacity(), color_count);
 
@@ -401,7 +608,7 @@ namespace ffpsd
 
     template <class T> Layer* Document::AddAdjustmentLayer(const std::string& name, const T& value)
     {
-        const std::size_t color_count = detail::LayerColorCount(impl_->color);
+        const std::size_t color_count = detail::LayerColorCount(impl_->color_mode);
 
         auto settings = std::make_unique<TaggedBlock>();
         settings->key = T::kKey;
@@ -420,7 +627,7 @@ namespace ffpsd
     Layer* Document::AddLayerCopy(const Layer& source)
     {
         const Impl& from = *source.document_->impl_;
-        if (from.depth != impl_->depth || from.color != impl_->color || from.version != impl_->version)
+        if (from.depth != impl_->depth || from.color_mode != impl_->color_mode || from.version != impl_->version)
             throw std::invalid_argument("ffpsd: the source layer comes from a document of another format");
 
         auto record = std::make_unique<detail::LayerRecord>(detail::CopyLayerRecord(*source.record_));
@@ -562,6 +769,15 @@ namespace ffpsd
         SetHasRealMergedData(false);
     }
 
+    void Document::DropMergedImage()
+    {
+        if (impl_->image_data.IsEmpty())
+            return;
+
+        impl_->image_data = detail::PixelData();
+        SetHasRealMergedData(false);
+    }
+
     std::vector<std::uint8_t> Document::Save(Compression compression) const
     {
         if (impl_->width == 0 || impl_->height == 0 || impl_->channel_count == 0)
@@ -573,7 +789,7 @@ namespace ffpsd
         header.height = impl_->height;
         header.width = impl_->width;
         header.depth = impl_->depth;
-        header.color_mode = static_cast<std::uint16_t>(impl_->color);
+        header.color_mode = static_cast<std::uint16_t>(impl_->color_mode);
 
         // Only data in another compression is packed again; a deque keeps the pointers to it valid.
         const auto target = static_cast<std::uint16_t>(compression);

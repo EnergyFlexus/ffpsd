@@ -9,7 +9,7 @@
 namespace ffpsd::detail
 {
     // Paper white: every channel at its maximum, except a and b of Lab, which are neutral in the middle.
-    Image MakeWhiteImage(std::uint32_t width, std::uint32_t height, ColorMode color, std::size_t color_count, std::uint16_t depth);
+    Image MakeWhiteImage(std::uint32_t width, std::uint32_t height, ColorMode color_mode, std::size_t color_count, std::uint16_t depth);
 
     // Normal blending at top, left, cut to target; a plane past color_count is alpha, scaled by opacity.
     void

@@ -169,6 +169,10 @@ extern "C"
 
     /* Paths are passed to the C++ API as they are, in the system's narrow encoding. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_create(ffpsd_document_t** out);
+
+    /* Channels by the mode, as the C++ constructor; a multichannel document is INVALID_ARGUMENT. */
+    FFPSD_EXPORT ffpsd_status_t
+    ffpsd_document_create_with(uint32_t width, uint32_t height, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_document_t** out);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_open(const char* path, ffpsd_document_t** out);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_open_memory(const uint8_t* data, size_t size, ffpsd_document_t** out);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_save(const ffpsd_document_t* doc, const char* path, ffpsd_compression_t compression);
@@ -180,16 +184,20 @@ extern "C"
     FFPSD_EXPORT uint32_t ffpsd_document_get_height(const ffpsd_document_t* doc);
     FFPSD_EXPORT uint16_t ffpsd_document_get_channel_count(const ffpsd_document_t* doc);
     FFPSD_EXPORT uint16_t ffpsd_document_get_depth(const ffpsd_document_t* doc);
-    FFPSD_EXPORT ffpsd_color_mode_t ffpsd_document_get_color(const ffpsd_document_t* doc);
+    FFPSD_EXPORT ffpsd_color_mode_t ffpsd_document_get_color_mode(const ffpsd_document_t* doc);
     FFPSD_EXPORT int ffpsd_document_is_psb(const ffpsd_document_t* doc);
     FFPSD_EXPORT int ffpsd_document_get_has_real_merged_data(const ffpsd_document_t* doc);
 
+    /* INVALID_OPERATION for the size under a background and for the rest once there are layers. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_width(ffpsd_document_t* doc, uint32_t width);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_height(ffpsd_document_t* doc, uint32_t height);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_channel_count(ffpsd_document_t* doc, uint16_t channel_count);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_depth(ffpsd_document_t* doc, uint16_t depth);
-    FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_color(ffpsd_document_t* doc, ffpsd_color_mode_t color);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_color_mode(ffpsd_document_t* doc, ffpsd_color_mode_t color_mode);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_psb(ffpsd_document_t* doc, int psb);
+
+    /* RGB to gray and back; any other pair is INVALID_ARGUMENT. */
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_convert_color_mode(ffpsd_document_t* doc, ffpsd_color_mode_t color_mode);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_has_real_merged_data(ffpsd_document_t* doc, int value);
 
     /* 72 dpi when the file has no resource 1005. */
@@ -289,9 +297,9 @@ extern "C"
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_save_as_png_memory(const ffpsd_layer_t* layer, ffpsd_buffer_t** out);
 
     /* Every PNG call is UNSUPPORTED in a build without PNG. */
-    FFPSD_EXPORT ffpsd_status_t ffpsd_png_load(const char* path, ffpsd_color_mode_t color, uint16_t depth, ffpsd_image_t** out);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_png_load(const char* path, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_image_t** out);
     FFPSD_EXPORT ffpsd_status_t
-    ffpsd_png_load_memory(const uint8_t* data, size_t size, ffpsd_color_mode_t color, uint16_t depth, ffpsd_image_t** out);
+    ffpsd_png_load_memory(const uint8_t* data, size_t size, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_image_t** out);
 
     /* Gray, gray with alpha, RGB or RGBA by the channel count; 8 or 16 bit. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_png_save(const ffpsd_image_view_t* image, const char* path);

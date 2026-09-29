@@ -61,6 +61,80 @@ TEST(DocumentTest, ChannelCountAndDepthTakeOnlyWhatPsdHas)
     EXPECT_EQ(doc.GetDepth(), 32u);
 }
 
+TEST(DocumentTest, ANewOneOfASizeAndModeHasTheModesChannels)
+{
+    const std::pair<ffpsd::ColorMode, std::uint16_t> modes[] = {
+        {ffpsd::ColorMode::kGrayscale, 1}, {ffpsd::ColorMode::kRgb, 3}, {ffpsd::ColorMode::kLab, 3}, {ffpsd::ColorMode::kCmyk, 4}};
+    for (const auto& [mode, channels] : modes)
+    {
+        const ffpsd::Document doc(40, 30, mode, 16);
+        EXPECT_EQ(doc.GetWidth(), 40u);
+        EXPECT_EQ(doc.GetHeight(), 30u);
+        EXPECT_EQ(doc.GetColorMode(), mode);
+        EXPECT_EQ(doc.GetChannelCount(), channels);
+        EXPECT_EQ(doc.GetDepth(), 16u);
+    }
+
+    EXPECT_EQ(ffpsd::Document(4, 3, ffpsd::ColorMode::kRgb).GetDepth(), 8u);
+    EXPECT_THROW(ffpsd::Document(4, 3, ffpsd::ColorMode::kMultichannel), std::invalid_argument);
+    EXPECT_THROW(ffpsd::Document(0, 3, ffpsd::ColorMode::kRgb), std::invalid_argument);
+    EXPECT_THROW(ffpsd::Document(4, 3, ffpsd::ColorMode::kRgb, 12), std::invalid_argument);
+}
+
+TEST(DocumentTest, OnceThereAreLayersChannelsDepthAndModeStay)
+{
+    ffpsd::Document doc = NewDocument();
+    doc.AddLayer("a", Pattern(2, 2, 3));
+
+    EXPECT_THROW(doc.SetDepth(16), std::logic_error);
+    EXPECT_THROW(doc.SetChannelCount(4), std::logic_error);
+    EXPECT_THROW(doc.SetColorMode(ffpsd::ColorMode::kGrayscale), std::logic_error);
+    EXPECT_EQ(doc.GetDepth(), 8u);
+    EXPECT_EQ(doc.GetChannelCount(), 3u);
+    EXPECT_EQ(doc.GetColorMode(), ffpsd::ColorMode::kRgb);
+    EXPECT_EQ(doc.GetLayerByIndex(0)->GetPixels().bytes, Pattern(2, 2, 3).bytes);
+
+    // The same value is no change, and a layer does not tie the canvas size: it may reach past it.
+    doc.SetDepth(8);
+    doc.SetColorMode(ffpsd::ColorMode::kRgb);
+    doc.SetWidth(10);
+    EXPECT_EQ(doc.GetWidth(), 10u);
+}
+
+TEST(DocumentTest, UnderABackgroundTheCanvasSizeStays)
+{
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
+
+    EXPECT_THROW(doc.SetWidth(100), std::logic_error);
+    EXPECT_THROW(doc.SetHeight(100), std::logic_error);
+    EXPECT_EQ(doc.GetWidth(), 1890u);
+    EXPECT_EQ(doc.GetHeight(), 1417u);
+
+    // Once it is an ordinary layer, nothing has to cover the canvas.
+    doc.UnsetBackgroundLayer();
+    doc.SetWidth(100);
+    EXPECT_EQ(doc.GetWidth(), 100u);
+}
+
+TEST(DocumentTest, AHeaderChangeDropsTheComposite)
+{
+    ffpsd::Document doc = NewDocument();
+    doc.SetMergedImage(Pattern(4, 3, 3));
+
+    doc.SetWidth(4);
+    EXPECT_EQ(doc.GetMergedImage().bytes, Pattern(4, 3, 3).bytes);
+
+    doc.SetWidth(8);
+    EXPECT_TRUE(doc.GetMergedImage().bytes.empty());
+    EXPECT_FALSE(doc.HasRealMergedData());
+
+    // Saved, it is a blank composite of the new size.
+    const ffpsd::Image merged = ffpsd::Document::Parse(doc.Save()).GetMergedImage();
+    EXPECT_EQ(merged.width, 8u);
+    EXPECT_EQ(merged.height, 3u);
+    EXPECT_EQ(merged.channel_count, 3u);
+}
+
 TEST(DocumentTest, LayersFollowTheDocumentWhenItMoves)
 {
     ffpsd::Document source = NewDocument();

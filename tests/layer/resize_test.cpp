@@ -17,8 +17,8 @@ namespace
         const ffpsd::Image& image, std::uint32_t width, std::uint32_t height,
         ffpsd::ResampleFilter filter = ffpsd::ResampleFilter::kBicubic)
     {
-        const ffpsd::ColorMode color = image.channel_count < 3 ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb;
-        ffpsd::Document doc = NewDocument(color, image.depth);
+        const ffpsd::ColorMode color_mode = image.channel_count < 3 ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb;
+        ffpsd::Document doc = NewDocument(color_mode, image.depth);
         ffpsd::Layer* layer = doc.AddLayer("layer", image);
         layer->Resize(width, height, filter);
         return layer->GetPixels();

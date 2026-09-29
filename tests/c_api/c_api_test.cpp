@@ -73,10 +73,7 @@ namespace
     ffpsd_document_t* NewRgbDocument()
     {
         ffpsd_document_t* doc = nullptr;
-        EXPECT_EQ(ffpsd_document_create(&doc), FFPSD_STATUS_OK);
-        EXPECT_EQ(ffpsd_document_set_width(doc, 4), FFPSD_STATUS_OK);
-        EXPECT_EQ(ffpsd_document_set_height(doc, 3), FFPSD_STATUS_OK);
-        EXPECT_EQ(ffpsd_document_set_channel_count(doc, 3), FFPSD_STATUS_OK);
+        EXPECT_EQ(ffpsd_document_create_with(4, 3, FFPSD_COLOR_MODE_RGB, 8, &doc), FFPSD_STATUS_OK);
         return doc;
     }
 } // namespace
@@ -102,7 +99,7 @@ TEST(CApiTest, ReadsWhatTheCppApiReads)
     EXPECT_EQ(ffpsd_document_get_height(file.doc), cpp.GetHeight());
     EXPECT_EQ(ffpsd_document_get_channel_count(file.doc), 3u);
     EXPECT_EQ(ffpsd_document_get_depth(file.doc), 8u);
-    EXPECT_EQ(ffpsd_document_get_color(file.doc), FFPSD_COLOR_MODE_RGB);
+    EXPECT_EQ(ffpsd_document_get_color_mode(file.doc), FFPSD_COLOR_MODE_RGB);
     EXPECT_EQ(ffpsd_document_is_psb(file.doc), 0);
     ASSERT_EQ(ffpsd_document_get_layer_count(file.doc), 2u);
 
@@ -256,6 +253,23 @@ TEST(CApiTest, ABackgroundThroughC)
     ffpsd_document_destroy(doc);
 }
 
+TEST(CApiTest, ColorModeConvertsThroughC)
+{
+    ffpsd_document_t* doc = NewRgbDocument();
+    const ffpsd::Image image = Pattern(3, 2, 4);
+    const ffpsd_image_view_t view = View(image);
+    ffpsd_layer_t* layer = nullptr;
+    ASSERT_EQ(ffpsd_document_add_layer(doc, "one", &view, 0, 0, &layer), FFPSD_STATUS_OK);
+
+    EXPECT_EQ(ffpsd_document_convert_color_mode(doc, FFPSD_COLOR_MODE_CMYK), FFPSD_STATUS_INVALID_ARGUMENT);
+    ASSERT_EQ(ffpsd_document_convert_color_mode(doc, FFPSD_COLOR_MODE_GRAYSCALE), FFPSD_STATUS_OK) << ffpsd_last_error();
+
+    EXPECT_EQ(ffpsd_document_get_color_mode(doc), FFPSD_COLOR_MODE_GRAYSCALE);
+    EXPECT_EQ(ffpsd_document_get_channel_count(doc), 1u);
+    EXPECT_EQ(Pixels(layer).size(), std::size_t{3} * 2 * 2);
+    ffpsd_document_destroy(doc);
+}
+
 TEST(CApiTest, ResizeThroughC)
 {
     ffpsd_document_t* doc = NewRgbDocument();
@@ -362,10 +376,19 @@ TEST(CApiTest, EveryFailureIsAStatusWithAMessage)
     EXPECT_EQ(ffpsd_document_get_image_resource_by_id(file.doc, 9999, nullptr), FFPSD_STATUS_INVALID_ARGUMENT);
     EXPECT_EQ(ffpsd_document_set_background_layer(file.doc, 1), FFPSD_STATUS_INVALID_OPERATION);
     EXPECT_EQ(ffpsd_document_set_width(file.doc, 0), FFPSD_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(ffpsd_document_set_width(file.doc, 100), FFPSD_STATUS_INVALID_OPERATION);
+    EXPECT_EQ(ffpsd_document_set_depth(file.doc, 16), FFPSD_STATUS_INVALID_OPERATION);
+    EXPECT_EQ(ffpsd_document_create_with(4, 3, FFPSD_COLOR_MODE_MULTICHANNEL, 8, &doc), FFPSD_STATUS_INVALID_ARGUMENT);
+
+    // An empty document has no size to save.
+    ffpsd_buffer_t* saved = nullptr;
+    ASSERT_EQ(ffpsd_document_create(&doc), FFPSD_STATUS_OK);
+    EXPECT_EQ(ffpsd_document_save_memory(doc, FFPSD_COMPRESSION_RLE, &saved), FFPSD_STATUS_INVALID_OPERATION);
+    ffpsd_document_destroy(doc);
     EXPECT_EQ(ffpsd_layer_set_levels(Layer(file.doc, 0), nullptr), FFPSD_STATUS_INVALID_ARGUMENT);
 
     // A call that succeeds leaves no message behind.
-    EXPECT_EQ(ffpsd_document_set_width(file.doc, 100), FFPSD_STATUS_OK);
+    EXPECT_EQ(ffpsd_layer_set_opacity(Layer(file.doc, 1), 128), FFPSD_STATUS_OK);
     EXPECT_STREQ(ffpsd_last_error(), "");
 }
 

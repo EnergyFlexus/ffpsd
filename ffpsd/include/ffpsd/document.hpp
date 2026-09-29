@@ -44,7 +44,11 @@ namespace ffpsd
         FFPSD_EXPORT void Save(const std::string& path, Compression compression = Compression::kRle) const;
         FFPSD_EXPORT std::vector<std::uint8_t> Save(Compression compression = Compression::kRle) const;
 
+        // No size and no channels yet: set them before adding layers.
         FFPSD_EXPORT Document();
+
+        // Channels by the mode: 1 for gray, 3 for RGB and Lab, 4 for CMYK; multichannel has no default.
+        FFPSD_EXPORT Document(std::uint32_t width, std::uint32_t height, ColorMode color_mode, std::uint16_t depth = 8);
         FFPSD_EXPORT ~Document();
         FFPSD_EXPORT Document(Document&& other) noexcept;
         FFPSD_EXPORT Document& operator=(Document&& other) noexcept;
@@ -70,11 +74,17 @@ namespace ffpsd
         // 72 dpi when the file omits resource 1005.
         FFPSD_EXPORT ResolutionInfo GetResolutionInfo() const noexcept;
 
+        // Throw std::logic_error under a background, which covers the canvas; a new size drops the composite.
         FFPSD_EXPORT void SetWidth(std::uint32_t width);
         FFPSD_EXPORT void SetHeight(std::uint32_t height);
+
+        // Throw std::logic_error once there are layers, packed for what they were added with; a change drops the composite.
         FFPSD_EXPORT void SetChannelCount(std::uint16_t channel_count);
         FFPSD_EXPORT void SetDepth(std::uint16_t depth);
-        FFPSD_EXPORT void SetColorMode(ColorMode color) noexcept;
+        FFPSD_EXPORT void SetColorMode(ColorMode color_mode);
+
+        // Every layer and the composite, RGB to gray and back; any other pair throws std::invalid_argument.
+        FFPSD_EXPORT void ConvertColorMode(ColorMode color_mode);
 
         // Rewrites the RLE row counts for the other format; throws std::logic_error for an RLE layer mask.
         FFPSD_EXPORT void SetPsb(bool psb);
@@ -153,6 +163,13 @@ namespace ffpsd
         void RebindLayers() noexcept;
 
         void MarkStackChanged();
+
+        // The composite no longer fits a changed header; Save writes a blank one instead.
+        void DropMergedImage();
+
+        // The two conversions ConvertColorMode takes, called in the mode they convert from.
+        void ConvertRgbToGray();
+        void ConvertGrayToRgb();
 
         // The next id after resource 1044 and every layer's, written to both.
         void AssignLayerId(detail::LayerRecord& record);

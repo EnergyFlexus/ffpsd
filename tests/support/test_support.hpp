@@ -22,6 +22,7 @@ namespace ffpsd_test
     inline const std::string kGrayscalePsd = DataFile("photoshop/grayscale_two_layers.psd");
     inline const std::string kRgbPsd = DataFile("photoshop/rgb_two_layers.psd");
     inline const std::string kRgbLevelsPsd = DataFile("photoshop/rgb_levels.psd");
+    inline const std::string kGrayscaleLevelsPsd = DataFile("photoshop/grayscale_two_layers_levels.psd");
 
     // Layer names in those files, UTF-8: "Fon", "Zalivka tsvetom 1", "Fon kopiya", "Urovni 1".
     inline const std::string kBackgroundName = "\xD0\xA4\xD0\xBE\xD0\xBD";
@@ -111,17 +112,11 @@ namespace ffpsd_test
         return image;
     }
 
-    // A small document with no layers; the size and channels a new one lacks.
-    inline ffpsd::Document
-    NewDocument(ffpsd::ColorMode color = ffpsd::ColorMode::kRgb, std::uint16_t depth = 8, std::uint32_t width = 4, std::uint32_t height = 3)
+    // A small document with no layers.
+    inline ffpsd::Document NewDocument(
+        ffpsd::ColorMode color_mode = ffpsd::ColorMode::kRgb, std::uint16_t depth = 8, std::uint32_t width = 4, std::uint32_t height = 3)
     {
-        ffpsd::Document doc;
-        doc.SetColorMode(color);
-        doc.SetDepth(depth);
-        doc.SetWidth(width);
-        doc.SetHeight(height);
-        doc.SetChannelCount(color == ffpsd::ColorMode::kGrayscale ? 1 : 3);
-        return doc;
+        return ffpsd::Document(width, height, color_mode, depth);
     }
 
     inline std::uint32_t LayerId(const ffpsd::Layer& layer)
