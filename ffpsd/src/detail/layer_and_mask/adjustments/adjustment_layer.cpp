@@ -19,8 +19,6 @@ namespace ffpsd::detail
                                                      Fourcc('t', 'h', 'r', 's'), Fourcc('p', 'o', 's', 't'), Fourcc('n', 'v', 'r', 't'),
                                                      Fourcc('b', 'l', 'w', 'h'), Fourcc('c', 'l', 'r', 'L')};
 
-        constexpr std::int16_t kLayerMaskId = -2;
-
         // Bit 3 as on every layer, bit 4: the pixels do not affect the appearance.
         constexpr std::uint8_t kAdjustmentFlags = 0x18;
 

@@ -2,24 +2,30 @@
 #define FFPSD_DETAIL_LAYER_AND_MASK_CHANNEL_IMAGE_DATA_HPP_
 
 #include "detail/io/big_endian_reader.hpp"
+#include "detail/pixel_data.hpp"
 
 #include <cstddef>
 #include <cstdint>
-#include <vector>
+#include <ffpsd/types.hpp>
 
 namespace ffpsd::detail
 {
+    // 0 and up are color; below the transparency are the masks, -2 the layer mask and -3 the real user mask.
+    constexpr std::int16_t kTransparencyId = -1;
+    constexpr std::int16_t kLayerMaskId = -2;
+
     struct ChannelImageData
     {
-        // 0 and up color, -1 transparency, -2 layer mask, -3 real user mask.
         std::int16_t id = 0;
 
-        // Compression field, RLE counts and rows, kept whole: reordering needs no decoding.
-        std::vector<std::uint8_t> raw;
+        // Kept as stored: reordering needs no decoding.
+        PixelData data;
     };
 
-    // Pass two of the layer info: the blob a record declared, with the id it gave, not past end.
-    ChannelImageData ParseChannelImageData(BigEndianReader& reader, std::size_t end, std::int16_t id, std::uint64_t length);
+    // Pass two of the layer info: the bytes a record declared, not past end. Color and transparency
+    // cover the layer's bounds; a mask has its own rectangle, not read yet, so its size is unknown.
+    ChannelImageData ParseChannelImageData(
+        BigEndianReader& reader, std::size_t end, std::int16_t id, std::uint64_t length, const Rect& bounds, std::uint16_t depth);
 
     // Planar native samples, RLE when smaller; no samples give just the compression field.
     ChannelImageData EncodeChannel(

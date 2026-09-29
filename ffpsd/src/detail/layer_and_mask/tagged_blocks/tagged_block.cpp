@@ -1,4 +1,4 @@
-#include "detail/layer_and_mask/tagged_block.hpp"
+#include "detail/layer_and_mask/tagged_blocks/tagged_block.hpp"
 
 #include "detail/io/fourcc.hpp"
 
@@ -177,5 +177,20 @@ namespace ffpsd::detail
 
         blocks.erase(at);
         return true;
+    }
+
+    std::optional<std::uint32_t> ParseU32Block(const std::vector<std::uint8_t>& data)
+    {
+        if (data.size() < sizeof(std::uint32_t))
+            return std::nullopt;
+        BigEndianReader reader(data);
+        return reader.ReadU32();
+    }
+
+    std::vector<std::uint8_t> EncodeU32Block(std::uint32_t value)
+    {
+        BigEndianWriter writer(sizeof(std::uint32_t));
+        writer.WriteU32(value);
+        return writer.Take();
     }
 } // namespace ffpsd::detail

@@ -35,7 +35,7 @@ namespace ffpsd::detail
         if (length == 0)
             return info;
 
-        LayerInfo layers = ParseLayerInfo(reader, is_psb);
+        LayerInfo layers = ParseLayerInfo(reader, is_psb, depth);
         if (reader.Tell() > end)
             throw std::runtime_error("ffpsd: the layer info runs past the layer and mask information");
 
@@ -51,7 +51,7 @@ namespace ffpsd::detail
             if (const TaggedBlock* block = GetTaggedBlockByKey(info.blocks, deep_key))
             {
                 BigEndianReader body(block->data);
-                layers = ParseLayerInfoBody(body, block->data.size(), is_psb);
+                layers = ParseLayerInfoBody(body, block->data.size(), is_psb, depth);
                 info.layers_key = deep_key;
             }
         }

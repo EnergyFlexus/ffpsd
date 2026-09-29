@@ -76,7 +76,7 @@ namespace ffpsd
         FFPSD_EXPORT void SetDepth(std::uint16_t depth);
         FFPSD_EXPORT void SetColor(ColorMode color) noexcept;
 
-        // Packs RLE data again for the other format; throws std::logic_error for an RLE layer mask.
+        // Rewrites the RLE row counts for the other format; throws std::logic_error for an RLE layer mask.
         FFPSD_EXPORT void SetPsb(bool psb);
 
         // Patches one byte of resource 1057, keeping its names; creates the block if missing.

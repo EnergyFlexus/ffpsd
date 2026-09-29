@@ -1,26 +1,24 @@
 #include "detail/color.hpp"
-#include "detail/io/big_endian_reader.hpp"
-#include "detail/io/fourcc.hpp"
-#include "detail/io/strings.hpp"
 #include "detail/layer_and_mask/adjustments/adjustment_layer.hpp"
 #include "detail/layer_and_mask/adjustments/levels.hpp"
 #include "detail/layer_and_mask/layer_record.hpp"
+#include "detail/layer_and_mask/tagged_blocks/section_divider_setting.hpp"
+#include "detail/layer_and_mask/tagged_blocks/unicode_layer_name.hpp"
 #include "detail/resample.hpp"
 
 #include <cstdint>
 #include <ffpsd/document.hpp>
 #include <ffpsd/layer.hpp>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace ffpsd
 {
     namespace
     {
-        constexpr std::uint32_t kSectionDividerKey = detail::Fourcc('l', 's', 'c', 't');
-        constexpr std::uint32_t kUnicodeNameKey = detail::Fourcc('l', 'u', 'n', 'i');
-
         constexpr std::uint8_t kHiddenFlag = 0x02;
     } // namespace
 
@@ -33,18 +31,15 @@ namespace ffpsd
 
     LayerKind Layer::GetKind() const noexcept
     {
-        const TaggedBlock* block = GetTaggedBlockByKey(kSectionDividerKey);
-        if (block == nullptr || block->data.size() < sizeof(std::uint32_t))
-            return GetAdjustmentKey() != 0 ? LayerKind::kAdjustment : LayerKind::kRaster;
-
-        detail::BigEndianReader reader(block->data);
-        switch (reader.ReadU32())
+        using detail::SectionDividerSetting;
+        const std::optional<SectionDividerSetting> divider = detail::GetTaggedBlock<SectionDividerSetting>(record_->blocks);
+        switch (divider.has_value() ? divider->type : SectionDividerSetting::kAnyOtherLayer)
         {
-        case 1:
+        case SectionDividerSetting::kOpenFolder:
             return LayerKind::kGroupOpen;
-        case 2:
+        case SectionDividerSetting::kClosedFolder:
             return LayerKind::kGroupClosed;
-        case 3:
+        case SectionDividerSetting::kBoundingSectionDivider:
             return LayerKind::kGroupEnd;
         default:
             return GetAdjustmentKey() != 0 ? LayerKind::kAdjustment : LayerKind::kRaster;
@@ -58,17 +53,8 @@ namespace ffpsd
 
     std::string Layer::GetName() const
     {
-        const TaggedBlock* block = GetTaggedBlockByKey(kUnicodeNameKey);
-        if (block == nullptr)
-            return record_->name;
-
-        // A count the block cannot hold: fall back to the legacy name.
-        detail::BigEndianReader reader(block->data);
-        if (reader.GetRemaining() < sizeof(std::uint32_t) ||
-            reader.PeekU32() > (reader.GetRemaining() - sizeof(std::uint32_t)) / sizeof(std::uint16_t))
-            return record_->name;
-
-        return detail::ReadUnicodeString(reader);
+        std::optional<detail::UnicodeLayerName> name = detail::GetTaggedBlock<detail::UnicodeLayerName>(record_->blocks);
+        return name.has_value() ? std::move(name->name) : record_->name;
     }
 
     std::uint8_t Layer::GetOpacity() const noexcept

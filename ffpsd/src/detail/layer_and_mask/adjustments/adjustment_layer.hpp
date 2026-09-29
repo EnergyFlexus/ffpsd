@@ -2,7 +2,7 @@
 #define FFPSD_DETAIL_LAYER_AND_MASK_ADJUSTMENTS_ADJUSTMENT_LAYER_HPP_
 
 #include "detail/layer_and_mask/layer_record.hpp"
-#include "detail/layer_and_mask/tagged_block.hpp"
+#include "detail/layer_and_mask/tagged_blocks/tagged_block.hpp"
 
 #include <cstddef>
 #include <cstdint>

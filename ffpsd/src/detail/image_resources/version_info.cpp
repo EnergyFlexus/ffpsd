@@ -41,15 +41,13 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    VersionInfo GetVersionInfo(const ImageResources& image_resources)
+    template <> std::optional<VersionInfo> ParseImageResource<VersionInfo>(const std::vector<std::uint8_t>& data)
     {
+        if (data.size() <= kFlagOffset)
+            return std::nullopt;
+
         VersionInfo info;
-
-        const std::size_t at = FindImageResourceIndex(image_resources, ImageResourceId::kVersionInfo);
-        if (at == kNoImageResource || image_resources[at]->data.size() <= kFlagOffset)
-            return info;
-
-        BigEndianReader reader(image_resources[at]->data);
+        BigEndianReader reader(data);
         info.version = reader.ReadU32();
 
         // The offsets below are known for version 1 only.
@@ -66,7 +64,7 @@ namespace ffpsd::detail
         return info;
     }
 
-    void SetVersionInfo(ImageResources& image_resources, const VersionInfo& info)
+    template <> std::vector<std::uint8_t> EncodeImageResource<VersionInfo>(const VersionInfo& info)
     {
         BigEndianWriter writer(kBlockReserve);
         writer.WriteU32(info.version);
@@ -75,13 +73,13 @@ namespace ffpsd::detail
         WriteUnicodeString(writer, info.reader_name);
         writer.WriteU32(info.file_version);
 
-        FindOrInsertImageResource(image_resources, ImageResourceId::kVersionInfo).data = writer.Take();
+        return writer.Take();
     }
 
     bool GetHasRealMergedData(const ImageResources& image_resources)
     {
         // Reads the flag byte directly, without allocating for the names.
-        const std::size_t at = FindImageResourceIndex(image_resources, ImageResourceId::kVersionInfo);
+        const std::size_t at = FindImageResourceIndex(image_resources, VersionInfo::kId);
         if (at == kNoImageResource || image_resources[at]->data.size() <= kFlagOffset)
             return true;
 
@@ -93,7 +91,7 @@ namespace ffpsd::detail
 
     void SetHasRealMergedData(ImageResources& image_resources, bool value)
     {
-        const std::size_t at = FindImageResourceIndex(image_resources, ImageResourceId::kVersionInfo);
+        const std::size_t at = FindImageResourceIndex(image_resources, VersionInfo::kId);
         if (at != kNoImageResource && image_resources[at]->data.size() > kFlagOffset &&
             BlockVersion(image_resources[at]->data) == kBlockVersion)
         {
@@ -107,6 +105,6 @@ namespace ffpsd::detail
         info.has_real_merged_data = value;
         info.writer_name = kProducerName;
         info.reader_name = kProducerName;
-        SetVersionInfo(image_resources, info);
+        SetImageResource(image_resources, info);
     }
 } // namespace ffpsd::detail

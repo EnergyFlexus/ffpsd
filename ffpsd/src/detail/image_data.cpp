@@ -2,30 +2,26 @@
 
 #include "detail/io/big_endian_writer.hpp"
 #include "detail/io/compression.hpp"
-#include "detail/pixel_data.hpp"
 
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace ffpsd::detail
 {
-    namespace
+    PixelData
+    ParseImageData(BigEndianReader& reader, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth)
     {
-    } // namespace
-
-    std::vector<std::uint8_t> ParseImageData(BigEndianReader& reader)
-    {
-        std::vector<std::uint8_t> data(reader.GetRemaining());
-        if (!data.empty())
-            reader.ReadU8Array(data.data(), data.size());
-        return data;
+        std::vector<std::uint8_t> bytes(reader.GetRemaining());
+        if (!bytes.empty())
+            reader.ReadU8Array(bytes.data(), bytes.size());
+        return PixelData(std::move(bytes), std::size_t{height} * channel_count, RowBytes(width, depth));
     }
 
     Image DecodeImageData(
-        const std::vector<std::uint8_t>& data, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth,
-        bool is_psb)
+        const PixelData& data, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, bool is_psb)
     {
-        if (data.empty())
+        if (data.IsEmpty())
             return Image();
         if (depth != 8 && depth != 16 && depth != 32)
             throw std::runtime_error("ffpsd: a " + std::to_string(depth) + " bit merged image is not supported");
@@ -36,17 +32,13 @@ namespace ffpsd::detail
         image.channel_count = channel_count;
         image.depth = depth;
         image.bytes.resize(image.GetSizeBytes());
-
-        // Every channel's rows in one run, as if the whole section were one tall channel.
-        const std::size_t row_bytes = std::size_t{width} * image.GetBytesPerSample();
-        const std::size_t rows = std::size_t{height} * channel_count;
-        DecodePixelData(data.data(), data.size(), rows, row_bytes, is_psb, image.bytes.data());
+        data.Decode(is_psb, image.bytes.data());
 
         SwapSampleBytes(image.bytes, image.GetBytesPerSample());
         return image;
     }
 
-    std::vector<std::uint8_t> EncodeImageData(const Image& image, bool is_psb)
+    PixelData EncodeImageData(const Image& image, bool is_psb)
     {
         if (image.bytes.size() != image.GetSizeBytes())
             throw std::invalid_argument(
@@ -56,22 +48,17 @@ namespace ffpsd::detail
         std::vector<std::uint8_t> samples = image.bytes;
         SwapSampleBytes(samples, image.GetBytesPerSample());
 
-        // Every channel's rows in one run.
-        const std::size_t row_bytes = std::size_t{image.width} * image.GetBytesPerSample();
         const std::size_t rows = std::size_t{image.height} * image.channel_count;
-        return EncodePixelData(samples.data(), rows, row_bytes, is_psb, kCompressionRle);
+        return PixelData::Encode(samples.data(), rows, RowBytes(image.width, image.depth), is_psb, kCompressionRle);
     }
 
-    std::vector<std::uint8_t> EncodeBlankImageData(
+    PixelData EncodeBlankImageData(
         std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, bool is_psb, std::uint16_t compression)
     {
-        const std::size_t row_bytes = depth == 1 ? (std::size_t{width} + 7) / 8 : std::size_t{width} * (depth / 8u);
+        const std::size_t row_bytes = RowBytes(width, depth);
         const std::size_t rows = std::size_t{height} * channel_count;
         if (compression == kCompressionRaw)
-        {
-            std::vector<std::uint8_t> raw(sizeof(std::uint16_t) + rows * row_bytes, 0);
-            return raw;
-        }
+            return PixelData(std::vector<std::uint8_t>(sizeof(std::uint16_t) + rows * row_bytes, 0), rows, row_bytes);
 
         std::vector<std::uint8_t> packed;
         const std::vector<std::uint8_t> zeros(row_bytes, 0);
@@ -88,6 +75,6 @@ namespace ffpsd::detail
         }
         for (std::size_t i = 0; i < rows; ++i)
             writer.WriteU8Array(packed.data(), packed.size());
-        return writer.Take();
+        return PixelData(writer.Take(), rows, row_bytes);
     }
 } // namespace ffpsd::detail

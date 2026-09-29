@@ -10,15 +10,13 @@ namespace ffpsd::detail
         constexpr std::size_t kBlockSize = 16;
     } // namespace
 
-    ResolutionInfo GetResolutionInfo(const ImageResources& image_resources)
+    template <> std::optional<ResolutionInfo> ParseImageResource<ResolutionInfo>(const std::vector<std::uint8_t>& data)
     {
+        if (data.size() < kBlockSize)
+            return std::nullopt;
+
         ResolutionInfo value;
-
-        const std::size_t at = FindImageResourceIndex(image_resources, ImageResourceId::kResolutionInfo);
-        if (at == kNoImageResource || image_resources[at]->data.size() < kBlockSize)
-            return value;
-
-        BigEndianReader reader(image_resources[at]->data);
+        BigEndianReader reader(data);
         value.horizontal = FixedToDouble(reader.ReadU32());
         value.horizontal_unit = reader.ReadI16();
         value.width_unit = reader.ReadI16();
@@ -29,7 +27,7 @@ namespace ffpsd::detail
         return value;
     }
 
-    void SetResolutionInfo(ImageResources& image_resources, ResolutionInfo value)
+    template <> std::vector<std::uint8_t> EncodeImageResource<ResolutionInfo>(const ResolutionInfo& value)
     {
         BigEndianWriter writer(kBlockSize);
         writer.WriteU32(DoubleToFixed(value.horizontal));
@@ -39,6 +37,6 @@ namespace ffpsd::detail
         writer.WriteI16(value.vertical_unit);
         writer.WriteI16(value.height_unit);
 
-        FindOrInsertImageResource(image_resources, ImageResourceId::kResolutionInfo).data = writer.Take();
+        return writer.Take();
     }
 } // namespace ffpsd::detail

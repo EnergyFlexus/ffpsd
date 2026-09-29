@@ -48,8 +48,18 @@ target_sources(ffpsd
         src/detail/layer_and_mask/adjustments/levels.cpp
         src/detail/layer_and_mask/adjustments/levels.hpp
         src/detail/layer_and_mask/layer_record.hpp
-        src/detail/layer_and_mask/tagged_block.cpp
-        src/detail/layer_and_mask/tagged_block.hpp
+        src/detail/layer_and_mask/tagged_blocks/layer_id.cpp
+        src/detail/layer_and_mask/tagged_blocks/layer_id.hpp
+        src/detail/layer_and_mask/tagged_blocks/layer_name_source_setting.cpp
+        src/detail/layer_and_mask/tagged_blocks/layer_name_source_setting.hpp
+        src/detail/layer_and_mask/tagged_blocks/protected_setting.cpp
+        src/detail/layer_and_mask/tagged_blocks/protected_setting.hpp
+        src/detail/layer_and_mask/tagged_blocks/section_divider_setting.cpp
+        src/detail/layer_and_mask/tagged_blocks/section_divider_setting.hpp
+        src/detail/layer_and_mask/tagged_blocks/tagged_block.cpp
+        src/detail/layer_and_mask/tagged_blocks/tagged_block.hpp
+        src/detail/layer_and_mask/tagged_blocks/unicode_layer_name.cpp
+        src/detail/layer_and_mask/tagged_blocks/unicode_layer_name.hpp
         src/detail/image_resources/document_specific_ids_seed_number.cpp
         src/detail/image_resources/document_specific_ids_seed_number.hpp
         src/detail/image_resources/image_resource.cpp

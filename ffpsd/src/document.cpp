@@ -5,7 +5,6 @@
 #include "detail/image_data.hpp"
 #include "detail/image_resources/document_specific_ids_seed_number.hpp"
 #include "detail/image_resources/image_resource.hpp"
-#include "detail/image_resources/resolution_info.hpp"
 #include "detail/image_resources/version_info.hpp"
 #include "detail/io/big_endian_reader.hpp"
 #include "detail/io/big_endian_writer.hpp"
@@ -15,6 +14,7 @@
 #include "detail/layer_and_mask/layer_and_mask_info.hpp"
 #include "detail/layer_and_mask/layer_info.hpp"
 #include "detail/layer_and_mask/layer_record.hpp"
+#include "detail/layer_and_mask/tagged_blocks/layer_id.hpp"
 #include "detail/pixel_data.hpp"
 
 #include <algorithm>
@@ -103,8 +103,8 @@ namespace ffpsd
         // The rest of section 4, kept to write it back.
         detail::LayerAndMaskInfo layer_and_mask;
 
-        // Section 5 as stored, compression field first.
-        std::vector<std::uint8_t> image_data;
+        // Section 5 as stored; empty when the file has none.
+        detail::PixelData image_data;
     };
 
     Document::Document()
@@ -166,11 +166,11 @@ namespace ffpsd
     }
     VersionInfo Document::GetVersionInfo() const
     {
-        return detail::GetVersionInfo(impl_->image_resources);
+        return detail::GetImageResource<VersionInfo>(impl_->image_resources).value_or(VersionInfo());
     }
     ResolutionInfo Document::GetResolutionInfo() const noexcept
     {
-        return detail::GetResolutionInfo(impl_->image_resources);
+        return detail::GetImageResource<ResolutionInfo>(impl_->image_resources).value_or(ResolutionInfo());
     }
 
     std::size_t Document::GetImageResourceCount() const noexcept
@@ -226,38 +226,21 @@ namespace ffpsd
         if (psb == IsPsb())
             return;
 
-        // RLE row counts differ in width, so RLE is packed again; all first, so a failure changes nothing.
+        // Only RLE depends on the format; all is converted first, so a failure changes nothing.
         const bool from_psb = IsPsb();
-        const std::size_t sample = impl_->depth / 8u;
-        std::vector<std::pair<std::vector<std::uint8_t>*, std::vector<std::uint8_t>>> repacked;
-
+        std::vector<std::pair<detail::PixelData*, detail::PixelData>> converted;
+        const auto convert = [&](detail::PixelData& data) {
+            if (data.NeedsConversion(from_psb, psb, data.GetCompression()))
+                converted.emplace_back(&data, data.Converted(from_psb, psb, data.GetCompression()));
+        };
         for (const std::unique_ptr<Layer>& layer : impl_->layers)
         {
-            const Rect bounds = layer->record_->bounds;
             for (detail::ChannelImageData& channel : layer->record_->channels)
-            {
-                if (!detail::IsRlePixelData(channel.raw))
-                    continue;
-                // A mask has its own rectangle, not read yet.
-                if (channel.id < -1)
-                    throw std::logic_error("ffpsd: switching between PSD and PSB with an RLE mask is not supported yet");
-
-                const auto rows = static_cast<std::size_t>(bounds.GetHeight());
-                const std::size_t row_bytes = static_cast<std::size_t>(bounds.GetWidth()) * sample;
-                repacked.emplace_back(
-                    &channel.raw, detail::ConvertPixelData(channel.raw, rows, row_bytes, from_psb, psb, detail::kCompressionRle));
-            }
+                convert(channel.data);
         }
+        convert(impl_->image_data);
 
-        if (detail::IsRlePixelData(impl_->image_data))
-        {
-            const std::size_t rows = std::size_t{impl_->height} * impl_->channel_count;
-            const std::size_t row_bytes = impl_->depth == 1 ? (std::size_t{impl_->width} + 7) / 8 : std::size_t{impl_->width} * sample;
-            repacked.emplace_back(
-                &impl_->image_data, detail::ConvertPixelData(impl_->image_data, rows, row_bytes, from_psb, psb, detail::kCompressionRle));
-        }
-
-        for (auto& [target, data] : repacked)
+        for (auto& [target, data] : converted)
             *target = std::move(data);
         impl_->version = psb ? kVersionPsb : kVersionPsd;
     }
@@ -269,7 +252,7 @@ namespace ffpsd
     }
     void Document::SetVersionInfo(VersionInfo value)
     {
-        detail::SetVersionInfo(impl_->image_resources, value);
+        detail::SetImageResource(impl_->image_resources, value);
     }
     void Document::SetResolutionInfo(ResolutionInfo value)
     {
@@ -277,7 +260,7 @@ namespace ffpsd
         ValidateResolution(value.horizontal);
         ValidateResolution(value.vertical);
 
-        detail::SetResolutionInfo(impl_->image_resources, value);
+        detail::SetImageResource(impl_->image_resources, value);
     }
 
     void Document::SetImageResource(const ImageResource& resource)
@@ -557,12 +540,18 @@ namespace ffpsd
 
     void Document::AssignLayerId(detail::LayerRecord& record)
     {
-        std::uint32_t last = detail::GetDocumentSpecificIdsSeedNumber(impl_->image_resources);
+        using detail::DocumentSpecificIdsSeedNumber;
+        const std::optional<DocumentSpecificIdsSeedNumber> seed =
+            detail::GetImageResource<DocumentSpecificIdsSeedNumber>(impl_->image_resources);
+        std::uint32_t last = seed.has_value() ? seed->value : 0;
         for (const std::unique_ptr<Layer>& layer : impl_->layers)
-            last = std::max(last, detail::GetLayerId(*layer->record_));
+        {
+            if (const std::optional<detail::LayerId> id = detail::GetTaggedBlock<detail::LayerId>(layer->record_->blocks))
+                last = std::max(last, id->id);
+        }
 
-        detail::SetLayerId(record, last + 1);
-        detail::SetDocumentSpecificIdsSeedNumber(impl_->image_resources, last + 1);
+        detail::SetTaggedBlock(record.blocks, detail::LayerId{last + 1});
+        detail::SetImageResource(impl_->image_resources, DocumentSpecificIdsSeedNumber{last + 1});
     }
 
     // 1024 holds a layer index and 1026 and 1072 one entry per layer; stale ones are worse than none.
@@ -594,59 +583,39 @@ namespace ffpsd
         header.depth = impl_->depth;
         header.color_mode = static_cast<std::uint16_t>(impl_->color);
 
-        // Only data in the other compression is packed again; a deque keeps the pointers to it valid.
+        // Only data in another compression is packed again; a deque keeps the pointers to it valid.
         const auto target = static_cast<std::uint16_t>(compression);
-        const std::size_t sample = impl_->depth / 8u;
-        std::deque<std::vector<std::uint8_t>> repacked;
-        const auto choose = [&](const std::vector<std::uint8_t>& data, std::size_t rows, std::size_t row_bytes) {
-            const std::uint16_t current = detail::GetPixelCompression(data);
-            const bool known = current == detail::kCompressionRaw || current == detail::kCompressionRle;
-            if (!known || current == target || rows * row_bytes == 0)
+        std::deque<detail::PixelData> repacked;
+        const auto choose = [&](const detail::PixelData& data) {
+            if (!data.NeedsConversion(IsPsb(), IsPsb(), target))
                 return &data;
-            repacked.push_back(detail::ConvertPixelData(data, rows, row_bytes, IsPsb(), IsPsb(), target));
-            return static_cast<const std::vector<std::uint8_t>*>(&repacked.back());
+            return static_cast<const detail::PixelData*>(&repacked.emplace_back(data.Converted(IsPsb(), IsPsb(), target)));
         };
 
         std::vector<detail::LayerToWrite> layers;
         layers.reserve(impl_->layers.size());
         for (const std::unique_ptr<Layer>& layer : impl_->layers)
         {
-            const detail::LayerRecord& record = *layer->record_;
-            const auto rows = static_cast<std::size_t>(std::max(record.bounds.GetHeight(), 0));
-            const std::size_t row_bytes = static_cast<std::size_t>(std::max(record.bounds.GetWidth(), 0)) * sample;
-
             detail::LayerToWrite entry;
-            entry.record = &record;
-            for (const detail::ChannelImageData& channel : record.channels)
-            {
-                // A mask has its own rectangle, so its rows are not the layer's.
-                const bool mask = channel.id < -1;
-                entry.channels.push_back(mask ? &channel.raw : choose(channel.raw, rows, row_bytes));
-            }
+            entry.record = layer->record_.get();
+            for (const detail::ChannelImageData& channel : entry.record->channels)
+                entry.channels.push_back(choose(channel.data));
             layers.push_back(std::move(entry));
         }
 
-        const std::size_t composite_rows = std::size_t{impl_->height} * impl_->channel_count;
-        const std::size_t composite_row_bytes =
-            impl_->depth == 1 ? (std::size_t{impl_->width} + 7) / 8 : std::size_t{impl_->width} * sample;
-        const std::vector<std::uint8_t>* composite = &impl_->image_data;
-        std::vector<std::uint8_t> blank;
-        if (impl_->image_data.empty())
-        {
+        detail::PixelData blank;
+        const detail::PixelData* composite = &blank;
+        if (impl_->image_data.IsEmpty())
             blank = detail::EncodeBlankImageData(impl_->width, impl_->height, impl_->channel_count, impl_->depth, IsPsb(), target);
-            composite = &blank;
-        }
         else
-        {
-            composite = choose(impl_->image_data, composite_rows, composite_row_bytes);
-        }
+            composite = choose(impl_->image_data);
 
         detail::BigEndianWriter writer;
         detail::WriteFileHeader(writer, header);
         detail::WriteColorModeData(writer, impl_->color_mode_data);
         detail::WriteImageResources(writer, impl_->image_resources);
         detail::WriteLayerAndMaskInfo(writer, impl_->layer_and_mask, layers, IsPsb(), impl_->depth);
-        writer.WriteU8Array(composite->data(), composite->size());
+        writer.WriteU8Array(composite->GetBytes().data(), composite->GetBytes().size());
         return writer.Take();
     }
 
@@ -692,7 +661,7 @@ namespace ffpsd
         for (detail::LayerRecord& record : records)
             doc.impl_->layers.push_back(std::unique_ptr<Layer>(new Layer(std::make_unique<detail::LayerRecord>(std::move(record)), &doc)));
 
-        doc.impl_->image_data = detail::ParseImageData(reader);
+        doc.impl_->image_data = detail::ParseImageData(reader, header.width, header.height, header.channel_count, header.depth);
         return doc;
     }
 } // namespace ffpsd
