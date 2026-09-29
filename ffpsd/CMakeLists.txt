@@ -44,6 +44,8 @@ target_sources(ffpsd
         src/detail/layer_and_mask/layer_and_mask_info.hpp
         src/detail/layer_and_mask/layer_info.cpp
         src/detail/layer_and_mask/layer_info.hpp
+        src/detail/layer_and_mask/layer_pixels.cpp
+        src/detail/layer_and_mask/layer_pixels.hpp
         src/detail/layer_and_mask/layer_record.cpp
         src/detail/layer_and_mask/adjustments/levels.cpp
         src/detail/layer_and_mask/adjustments/levels.hpp

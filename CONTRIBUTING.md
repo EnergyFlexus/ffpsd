@@ -54,6 +54,21 @@ Two exceptions:
   official one would make `ParseAdditionalLayerInformation`;
 * `Image` in `ImageResource` means the document, not pixels.
 
+### Verbs
+
+A function's first word says what it does:
+
+| Verb | Does | Example |
+|------|------|---------|
+| `Parse` / `Write` | a structure of the file, from a `BigEndianReader` / into a `BigEndianWriter` | `ParseLayerRecord` |
+| `Read` / `Write` | a number or a string at the stream's position | `ReadPascalString` |
+| `Decode` / `Encode` | bytes in memory to a value and back, no stream | `DecodeTaggedBlock<T>` |
+| `Find` | a lookup: a pointer, or null; never throws | `FindTaggedBlock` |
+| `Get` / `Set` | a value out of a container, found and decoded, or encoded and stored | `GetTaggedBlock<T>` |
+| `Check` | throws when an argument is wrong, returns nothing | `CheckLayerSides` |
+| `Is` / `Has` | a bool | `HasLayerMask` |
+| `Make` / `Create` | a new value | `CreateLayerRecord` |
+
 ### Files and directories
 
 Lowercase with underscores, named after what they hold: `BigEndianReader` lives
@@ -100,13 +115,13 @@ detail/resample.*          resizing layers: nearest and bicubic
   subdirectory.
 * A newly interpreted resource is a struct with its `kId` in a file of
   `detail/image_resources/`, named as Adobe names it (`resolution_info` for
-  1005), specializing `ParseImageResource` and `EncodeImageResource`; it is read
+  1005), specializing `DecodeImageResource` and `EncodeImageResource`; it is read
   and written with `GetImageResource<T>` and `SetImageResource`.
 * A layer block is the same with `kKey` in `detail/layer_and_mask/tagged_blocks/`
-  (`layer_id` for `lyid`): `ParseTaggedBlock`, `EncodeTaggedBlock`,
+  (`layer_id` for `lyid`): `DecodeTaggedBlock`, `EncodeTaggedBlock`,
   `GetTaggedBlock<T>` and `SetTaggedBlock`.
 * An adjustment is a struct with its `kKey` in `adjustments.hpp`, a file in
-  `detail/layer_and_mask/adjustments/` specializing `ParseAdjustment` and
+  `detail/layer_and_mask/adjustments/` specializing `DecodeAdjustment` and
   `EncodeAdjustment` (`levels` for `levl`), and a line in the instantiation
   lists of `layer.cpp` and `document.cpp`.
 * Parsing a structure and writing it back live in the same file, so offsets,
@@ -163,7 +178,7 @@ namespace ffpsd::detail
 * `By` + the key when a value is reached more than one way:
   `GetImageResourceByIndex()`, `GetImageResourceById()`.
 * A flag the format names keeps its name: `hasRealMergedData` becomes
-  `GetHasRealMergedData()`.
+  `HasRealMergedData()`.
 * A `Document` method and the `detail` function behind it may share a name.
 * `k` is for constants fixed for the whole program, `constexpr` or `const` at
   namespace or class scope; a local `const` is an ordinary `snake_case` variable.

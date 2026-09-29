@@ -6,7 +6,7 @@
 namespace ffpsd::detail
 {
     template <>
-    std::optional<DocumentSpecificIdsSeedNumber> ParseImageResource<DocumentSpecificIdsSeedNumber>(const std::vector<std::uint8_t>& data)
+    std::optional<DocumentSpecificIdsSeedNumber> DecodeImageResource<DocumentSpecificIdsSeedNumber>(const std::vector<std::uint8_t>& data)
     {
         if (data.size() < sizeof(std::uint32_t))
             return std::nullopt;

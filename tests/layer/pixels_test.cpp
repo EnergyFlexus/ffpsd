@@ -89,7 +89,7 @@ TEST(LayerPixelsTest, AddLayerRefusesImagesThatDoNotFit)
 TEST(LayerPixelsTest, SomeColorModesHaveNoLayers)
 {
     ffpsd::Document doc = NewDocument();
-    doc.SetColor(ffpsd::ColorMode::kIndexed);
+    doc.SetColorMode(ffpsd::ColorMode::kIndexed);
 
     EXPECT_THROW(doc.AddLayer("indexed"), std::invalid_argument);
     EXPECT_THROW(doc.AddAdjustmentLayer<ffpsd::LevelsInfo>("indexed"), std::invalid_argument);
@@ -107,7 +107,7 @@ TEST(LayerPixelsTest, SetWhatGetGaveKeepsEverySample)
     EXPECT_EQ(layer->GetPixels().bytes, before.bytes);
     EXPECT_EQ(layer->GetBounds().right, bounds.right);
     EXPECT_EQ(layer->GetBounds().bottom, bounds.bottom);
-    EXPECT_FALSE(doc.GetHasRealMergedData());
+    EXPECT_FALSE(doc.HasRealMergedData());
 }
 
 TEST(LayerPixelsTest, ANewSizeKeepsTheTopLeftCorner)
@@ -138,7 +138,7 @@ TEST(LayerPixelsTest, SetPositionMovesThePixelsAsTheyAre)
     EXPECT_EQ(bounds.bottom, -2);
     EXPECT_EQ(bounds.right, 10);
     EXPECT_EQ(layer->GetPixels().bytes, Pattern(3, 2, 4).bytes);
-    EXPECT_FALSE(doc.GetHasRealMergedData());
+    EXPECT_FALSE(doc.HasRealMergedData());
 }
 
 TEST(LayerPixelsTest, SetPositionRefusesBoundsPastThirtyTwoBits)

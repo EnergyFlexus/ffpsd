@@ -7,8 +7,8 @@
 
 namespace ffpsd::detail
 {
-    // Color channels of a layer in this mode; zero for the modes Photoshop keeps no layers in.
-    std::size_t LayerColorChannels(ColorMode color) noexcept;
+    // Color channels of a layer in this mode; throws std::invalid_argument for the modes that keep no layers.
+    std::size_t LayerColorCount(ColorMode color);
 
     // Rec. 709 luma of the encoded samples, no color profiles; alpha kept last.
     Image RgbToGray(const Image& rgb);

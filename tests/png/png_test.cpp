@@ -158,7 +158,7 @@ TEST(PngTest, LayersOfBothFilesSaveAsWhatGetPixelsGives)
         for (std::size_t i = 0; i < doc->GetLayerCount(); ++i)
         {
             const ffpsd::Layer* layer = doc->GetLayerByIndex(i);
-            const std::vector<std::uint8_t> png = layer->SaveAsPng();
+            const std::vector<std::uint8_t> png = layer->EncodePng();
             EXPECT_EQ(ffpsd::LoadPng(png.data(), png.size(), color, 8).bytes, layer->GetPixels().bytes) << layer->GetName();
         }
     }
@@ -169,20 +169,20 @@ TEST(PngTest, ASixteenBitLayerSavesSixteenBit)
     ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kRgb, 16);
     const ffpsd::Layer* layer = doc.AddLayer("deep", Pattern(3, 2, 4, 16));
 
-    const std::vector<std::uint8_t> png = layer->SaveAsPng();
+    const std::vector<std::uint8_t> png = layer->EncodePng();
 
     EXPECT_EQ(std::get<2>(Header(png)), 16);
     EXPECT_EQ(ffpsd::LoadPng(png.data(), png.size(), ffpsd::ColorMode::kRgb, 16).bytes, Pattern(3, 2, 4, 16).bytes);
 }
 
-TEST(PngTest, SaveAsPngWritesTheSameBytesToAFile)
+TEST(PngTest, SavePngWritesWhatEncodePngGives)
 {
     const ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
     const std::filesystem::path path = std::filesystem::path(testing::TempDir()) / "ffpsd_layer.png";
 
-    doc.GetLayerByIndex(1)->SaveAsPng(path.string());
+    doc.GetLayerByIndex(1)->SavePng(path.string());
 
-    EXPECT_EQ(ReadFile(path.string()), doc.GetLayerByIndex(1)->SaveAsPng());
+    EXPECT_EQ(ReadFile(path.string()), doc.GetLayerByIndex(1)->EncodePng());
     std::filesystem::remove(path);
 }
 
@@ -192,6 +192,6 @@ TEST(PngTest, OnlyAGrayOrRgbLayerWithPixelsSaves)
     ffpsd::Document cmyk = NewDocument(ffpsd::ColorMode::kCmyk);
     const ffpsd::Layer* cmyk_layer = cmyk.AddLayer("cmyk", Pattern(2, 2, 4));
 
-    EXPECT_THROW(levels.GetLayerByIndex(1)->SaveAsPng(), std::invalid_argument);
-    EXPECT_THROW(cmyk_layer->SaveAsPng(), std::invalid_argument);
+    EXPECT_THROW(levels.GetLayerByIndex(1)->EncodePng(), std::invalid_argument);
+    EXPECT_THROW(cmyk_layer->EncodePng(), std::invalid_argument);
 }

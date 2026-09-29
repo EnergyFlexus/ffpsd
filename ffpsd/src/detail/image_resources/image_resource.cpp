@@ -73,21 +73,25 @@ namespace ffpsd::detail
         writer.PatchLength(section_length, false);
     }
 
-    std::size_t FindImageResourceIndex(const ImageResources& image_resources, std::uint16_t id)
+    const ImageResource* FindImageResource(const ImageResources& image_resources, std::uint16_t id) noexcept
     {
-        for (std::size_t i = 0; i < image_resources.size(); ++i)
+        for (const std::unique_ptr<ImageResource>& resource : image_resources)
         {
-            if (image_resources[i]->id == id)
-                return i;
+            if (resource->id == id)
+                return resource.get();
         }
-        return kNoImageResource;
+        return nullptr;
+    }
+    ImageResource* FindImageResource(ImageResources& image_resources, std::uint16_t id) noexcept
+    {
+        const ImageResources& found_in = image_resources;
+        return const_cast<ImageResource*>(FindImageResource(found_in, id));
     }
 
     ImageResource& FindOrInsertImageResource(ImageResources& image_resources, std::uint16_t id)
     {
-        const std::size_t found = FindImageResourceIndex(image_resources, id);
-        if (found != kNoImageResource)
-            return *image_resources[found];
+        if (ImageResource* found = FindImageResource(image_resources, id))
+            return *found;
 
         const auto at = std::find_if(
             image_resources.begin(), image_resources.end(), [id](const std::unique_ptr<ImageResource>& entry) { return entry->id > id; });

@@ -48,7 +48,7 @@ namespace ffpsd::detail
         const std::uint32_t deep_key = DeepLayersKey(depth);
         if (layers.records.empty() && deep_key != 0)
         {
-            if (const TaggedBlock* block = GetTaggedBlockByKey(info.blocks, deep_key))
+            if (const TaggedBlock* block = FindTaggedBlock(info.blocks, deep_key))
             {
                 BigEndianReader body(block->data);
                 layers = ParseLayerInfoBody(body, block->data.size(), is_psb, depth);
@@ -82,19 +82,19 @@ namespace ffpsd::detail
 
         // In place of the old block, or first when there was none.
         bool deep_written = deep.data.empty();
-        if (!deep_written && GetTaggedBlockByKey(info.blocks, deep_key) == nullptr)
+        if (!deep_written && FindTaggedBlock(info.blocks, deep_key) == nullptr)
         {
-            WriteTaggedBlock(writer, deep, is_psb);
+            WriteSectionTaggedBlock(writer, deep, is_psb);
             deep_written = true;
         }
         for (const std::unique_ptr<TaggedBlock>& block : info.blocks)
         {
             if (deep_key == 0 || block->key != deep_key)
-                WriteTaggedBlock(writer, *block, is_psb);
+                WriteSectionTaggedBlock(writer, *block, is_psb);
             else if (!deep_written)
             {
                 deep.signature = block->signature;
-                WriteTaggedBlock(writer, deep, is_psb);
+                WriteSectionTaggedBlock(writer, deep, is_psb);
                 deep_written = true;
             }
         }

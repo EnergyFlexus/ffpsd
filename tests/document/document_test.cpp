@@ -17,13 +17,13 @@ TEST(DocumentTest, ANewOneIsAnEmptyEightBitRgbPsd)
     EXPECT_EQ(doc.GetHeight(), 0u);
     EXPECT_EQ(doc.GetChannelCount(), 0u);
     EXPECT_EQ(doc.GetDepth(), 8u);
-    EXPECT_EQ(doc.GetColor(), ffpsd::ColorMode::kRgb);
+    EXPECT_EQ(doc.GetColorMode(), ffpsd::ColorMode::kRgb);
     EXPECT_FALSE(doc.IsPsb());
     EXPECT_EQ(doc.GetLayerCount(), 0u);
     EXPECT_EQ(doc.GetImageResourceCount(), 0u);
     EXPECT_EQ(doc.GetTaggedBlockCount(), 0u);
     EXPECT_TRUE(doc.GetMergedImage().bytes.empty());
-    EXPECT_TRUE(doc.GetHasRealMergedData());
+    EXPECT_TRUE(doc.HasRealMergedData());
     EXPECT_DOUBLE_EQ(doc.GetResolutionInfo().horizontal, 72.0);
 }
 
@@ -71,7 +71,7 @@ TEST(DocumentTest, LayersFollowTheDocumentWhenItMoves)
     layer->SetPixels(Pattern(1, 1, 3));
 
     // SetPixels reaches the document it now belongs to, not the emptied one.
-    EXPECT_FALSE(moved.GetHasRealMergedData());
+    EXPECT_FALSE(moved.HasRealMergedData());
     EXPECT_EQ(moved.GetLayerByIndex(0)->GetPixels().bytes, Pattern(1, 1, 3).bytes);
 }
 
@@ -105,12 +105,5 @@ TEST(DocumentTest, TheCompositeMustMatchTheDocument)
 
     doc.SetMergedImage(Pattern(4, 3, 3));
     EXPECT_EQ(doc.GetMergedImage().bytes, Pattern(4, 3, 3).bytes);
-    EXPECT_TRUE(doc.GetHasRealMergedData());
-}
-
-TEST(DocumentTest, RenderingTheCompositeIsNotThereYet)
-{
-    const ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
-
-    EXPECT_THROW(doc.RenderMergedImage(), std::logic_error);
+    EXPECT_TRUE(doc.HasRealMergedData());
 }

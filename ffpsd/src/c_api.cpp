@@ -226,11 +226,11 @@ namespace
 
     std::vector<std::uint8_t> LayerPng(const ffpsd::Layer& layer)
     {
-        return layer.SaveAsPng();
+        return layer.EncodePng();
     }
     void SaveLayerPng(const ffpsd::Layer& layer, const std::string& path)
     {
-        layer.SaveAsPng(path);
+        layer.SavePng(path);
     }
 #else
     // Never reached: RequirePng throws first. They keep the PNG entry points below compiling.
@@ -453,7 +453,7 @@ extern "C"
     }
     ffpsd_color_mode_t ffpsd_document_get_color(const ffpsd_document_t* doc)
     {
-        return doc == nullptr ? FFPSD_COLOR_MODE_BITMAP : static_cast<ffpsd_color_mode_t>(doc->value.GetColor());
+        return doc == nullptr ? FFPSD_COLOR_MODE_BITMAP : static_cast<ffpsd_color_mode_t>(doc->value.GetColorMode());
     }
     int ffpsd_document_is_psb(const ffpsd_document_t* doc)
     {
@@ -461,7 +461,7 @@ extern "C"
     }
     int ffpsd_document_get_has_real_merged_data(const ffpsd_document_t* doc)
     {
-        return doc != nullptr && doc->value.GetHasRealMergedData() ? 1 : 0;
+        return doc != nullptr && doc->value.HasRealMergedData() ? 1 : 0;
     }
 
     ffpsd_status_t ffpsd_document_set_width(ffpsd_document_t* doc, uint32_t width)
@@ -482,7 +482,7 @@ extern "C"
     }
     ffpsd_status_t ffpsd_document_set_color(ffpsd_document_t* doc, ffpsd_color_mode_t color)
     {
-        return Guard([&] { Need(doc, "doc").value.SetColor(static_cast<ffpsd::ColorMode>(color)); });
+        return Guard([&] { Need(doc, "doc").value.SetColorMode(static_cast<ffpsd::ColorMode>(color)); });
     }
     ffpsd_status_t ffpsd_document_set_psb(ffpsd_document_t* doc, int psb)
     {
@@ -642,7 +642,7 @@ extern "C"
     {
         return Guard([&] {
             ffpsd_layer_t*& target = NeedOut(out);
-            target = ToHandle(Need(doc, "doc").value.AddLayer(ToLayer(source)));
+            target = ToHandle(Need(doc, "doc").value.AddLayerCopy(ToLayer(source)));
         });
     }
     ffpsd_status_t ffpsd_document_remove_layer(ffpsd_document_t* doc, size_t index)

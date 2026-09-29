@@ -81,7 +81,7 @@ TEST(DocumentResourcesTest, VersionInfoRoundTrips)
     EXPECT_EQ(back.writer_name, "ffpsd");
     EXPECT_EQ(back.reader_name, kBackgroundName);
     EXPECT_EQ(back.file_version, 7u);
-    EXPECT_FALSE(doc.GetHasRealMergedData());
+    EXPECT_FALSE(doc.HasRealMergedData());
 }
 
 TEST(DocumentResourcesTest, ANewResourceIsInsertedInIdOrder)

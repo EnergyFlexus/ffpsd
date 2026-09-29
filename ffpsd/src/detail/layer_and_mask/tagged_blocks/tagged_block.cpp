@@ -114,7 +114,7 @@ namespace ffpsd::detail
         return blocks;
     }
 
-    void WriteTaggedBlock(BigEndianWriter& writer, const TaggedBlock& block, bool is_psb)
+    void WriteSectionTaggedBlock(BigEndianWriter& writer, const TaggedBlock& block, bool is_psb)
     {
         WriteBlock(writer, block, is_psb, false);
     }
@@ -125,7 +125,7 @@ namespace ffpsd::detail
             WriteBlock(writer, *block, is_psb, true);
     }
 
-    TaggedBlocks CloneTaggedBlocks(const TaggedBlocks& blocks)
+    TaggedBlocks CopyTaggedBlocks(const TaggedBlocks& blocks)
     {
         TaggedBlocks copy;
         copy.reserve(blocks.size());
@@ -134,7 +134,7 @@ namespace ffpsd::detail
         return copy;
     }
 
-    const TaggedBlock* GetTaggedBlockByIndex(const TaggedBlocks& blocks, std::size_t index)
+    const TaggedBlock* TaggedBlockAt(const TaggedBlocks& blocks, std::size_t index)
     {
         if (index >= blocks.size())
             throw std::out_of_range("ffpsd: tagged block index " + std::to_string(index) + " of " + std::to_string(blocks.size()));
@@ -142,7 +142,7 @@ namespace ffpsd::detail
         return blocks[index].get();
     }
 
-    const TaggedBlock* GetTaggedBlockByKey(const TaggedBlocks& blocks, std::uint32_t key) noexcept
+    const TaggedBlock* FindTaggedBlock(const TaggedBlocks& blocks, std::uint32_t key) noexcept
     {
         for (const std::unique_ptr<TaggedBlock>& block : blocks)
         {
@@ -177,7 +177,7 @@ namespace ffpsd::detail
         return true;
     }
 
-    std::optional<std::uint32_t> ParseU32Block(const std::vector<std::uint8_t>& data)
+    std::optional<std::uint32_t> DecodeU32(const std::vector<std::uint8_t>& data)
     {
         if (data.size() < sizeof(std::uint32_t))
             return std::nullopt;
@@ -185,7 +185,7 @@ namespace ffpsd::detail
         return reader.ReadU32();
     }
 
-    std::vector<std::uint8_t> EncodeU32Block(std::uint32_t value)
+    std::vector<std::uint8_t> EncodeU32(std::uint32_t value)
     {
         BigEndianWriter writer(sizeof(std::uint32_t));
         writer.WriteU32(value);

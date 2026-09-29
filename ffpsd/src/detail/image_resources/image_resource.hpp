@@ -4,7 +4,6 @@
 #include "detail/io/big_endian_reader.hpp"
 #include "detail/io/big_endian_writer.hpp"
 
-#include <cstddef>
 #include <cstdint>
 #include <ffpsd/image_resources.hpp>
 #include <memory>
@@ -28,25 +27,24 @@ namespace ffpsd::detail
     ImageResources ParseImageResources(BigEndianReader& reader);
     void WriteImageResources(BigEndianWriter& writer, const ImageResources& image_resources);
 
-    constexpr std::size_t kNoImageResource = static_cast<std::size_t>(-1);
-
-    // A linear scan: a file holds a few dozen blocks.
-    std::size_t FindImageResourceIndex(const ImageResources& image_resources, std::uint16_t id);
+    // The first resource with this id, or null; a linear scan, as a file holds a few dozen.
+    const ImageResource* FindImageResource(const ImageResources& image_resources, std::uint16_t id) noexcept;
+    ImageResource* FindImageResource(ImageResources& image_resources, std::uint16_t id) noexcept;
 
     // A missing id is inserted in ascending order, as Photoshop keeps them.
     ImageResource& FindOrInsertImageResource(ImageResources& image_resources, std::uint16_t id);
 
     // Specialized by each resource ffpsd interprets, for its struct with kId; empty when the data cannot be read.
-    template <class T> std::optional<T> ParseImageResource(const std::vector<std::uint8_t>& data);
+    template <class T> std::optional<T> DecodeImageResource(const std::vector<std::uint8_t>& data);
     template <class T> std::vector<std::uint8_t> EncodeImageResource(const T& value);
 
     // The resource with T's id, read; empty when there is none or it cannot be read.
     template <class T> std::optional<T> GetImageResource(const ImageResources& image_resources)
     {
-        const std::size_t at = FindImageResourceIndex(image_resources, T::kId);
-        if (at == kNoImageResource)
+        const ImageResource* resource = FindImageResource(image_resources, T::kId);
+        if (resource == nullptr)
             return std::nullopt;
-        return ParseImageResource<T>(image_resources[at]->data);
+        return DecodeImageResource<T>(resource->data);
     }
 
     // Assigns in place to the resource with T's id, otherwise inserts one.

@@ -6,7 +6,7 @@
 
 namespace ffpsd::detail
 {
-    template <> std::optional<UnicodeLayerName> ParseTaggedBlock<UnicodeLayerName>(const std::vector<std::uint8_t>& data)
+    template <> std::optional<UnicodeLayerName> DecodeTaggedBlock<UnicodeLayerName>(const std::vector<std::uint8_t>& data)
     {
         BigEndianReader reader(data);
         if (reader.GetRemaining() < sizeof(std::uint32_t) ||

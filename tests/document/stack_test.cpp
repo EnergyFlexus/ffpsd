@@ -31,7 +31,7 @@ TEST(DocumentStackTest, AStackChangeDropsWhatIndexesLayers)
     EXPECT_EQ(doc.GetImageResourceById(1024), nullptr);
     EXPECT_EQ(doc.GetImageResourceById(1026), nullptr);
     EXPECT_EQ(doc.GetImageResourceById(1072), nullptr);
-    EXPECT_FALSE(doc.GetHasRealMergedData());
+    EXPECT_FALSE(doc.HasRealMergedData());
 }
 
 TEST(DocumentStackTest, MoveLayerKeepsEveryPointer)
@@ -76,7 +76,7 @@ TEST(DocumentStackTest, ACopyGetsItsOwnIdAndLeavesTheSourceAlone)
     const ffpsd::Layer* source = doc.GetLayerByIndex(1);
     const std::uint32_t source_id = LayerId(*source);
 
-    const ffpsd::Layer* copy = doc.AddLayer(*source);
+    const ffpsd::Layer* copy = doc.AddLayerCopy(*source);
 
     EXPECT_EQ(copy->GetName(), source->GetName());
     EXPECT_EQ(copy->GetPixels().bytes, source->GetPixels().bytes);
@@ -90,10 +90,10 @@ TEST(DocumentStackTest, ACopyGoesAcrossDocumentsOfOneFormatOnly)
     const ffpsd::Document gray = ffpsd::Document::Parse(kGrayscalePsd);
     ffpsd::Document target = NewDocument();
 
-    const ffpsd::Layer* copy = target.AddLayer(*rgb.GetLayerByIndex(0));
+    const ffpsd::Layer* copy = target.AddLayerCopy(*rgb.GetLayerByIndex(0));
     EXPECT_EQ(copy->GetName(), kBackgroundName);
 
-    EXPECT_THROW(target.AddLayer(*gray.GetLayerByIndex(0)), std::invalid_argument);
+    EXPECT_THROW(target.AddLayerCopy(*gray.GetLayerByIndex(0)), std::invalid_argument);
     EXPECT_EQ(target.GetLayerCount(), 1u);
 }
 
@@ -110,7 +110,7 @@ TEST(DocumentStackTest, AStackChangeThatBreaksAGroupIsRolledBack)
 
     EXPECT_THROW(doc.MoveLayer(2, 0), std::invalid_argument);
     EXPECT_THROW(doc.RemoveLayer(0), std::invalid_argument);
-    EXPECT_THROW(doc.AddLayer(*header), std::invalid_argument);
+    EXPECT_THROW(doc.AddLayerCopy(*header), std::invalid_argument);
 
     ASSERT_EQ(doc.GetLayerCount(), 3u);
     EXPECT_EQ(doc.GetLayerByIndex(0), end);
@@ -149,5 +149,5 @@ TEST(DocumentStackTest, EditsSurviveSaving)
     EXPECT_EQ(added->GetBounds().top, 1);
     EXPECT_EQ(added->GetBounds().left, 2);
     EXPECT_EQ(added->GetPixels().bytes, Pattern(2, 2, 4).bytes);
-    EXPECT_FALSE(back.GetHasRealMergedData());
+    EXPECT_FALSE(back.HasRealMergedData());
 }
