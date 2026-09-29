@@ -14,6 +14,7 @@ layer/         layer.hpp: properties, name, kind and blocks, pixels and position
                the background, resizing
 adjustments/   adjustments.hpp: Levels
 png/           png.hpp; only with FFPSD_WITH_PNG
+jpeg/          jpeg.hpp; only with FFPSD_WITH_JPEG
 c_api/         c_api.h alone; c_header_check.c compiles it as C
 support/       test_support.hpp: the data files, their layer names, small builders
 data/          photoshop/: written by Photoshop; generated/: written by scripts/
@@ -33,8 +34,16 @@ together with what it leaves behind.
 | `generated/rgba_8bit.png` | 3 x 2 RGBA with known colors and alpha |
 | `generated/gray_16bit.png` | 2 x 2 16 bit gray |
 | `generated/palette_transparent.png` | 2 x 1 palette, one entry fully transparent |
+| `generated/rgb_quadrants.jpg` | 32 x 16 RGB: red, green, blue and white quarters |
+| `generated/rgb_quadrants_progressive.jpg` | the same, progressive |
+| `generated/orientation_<1-8>.jpg` | the same pixels with each EXIF orientation |
+| `generated/orientation_6_big_endian.jpg` | orientation 6 in big endian EXIF |
+| `generated/orientation_broken.jpg` | EXIF that ends inside its first entry |
+| `generated/gray.jpg` | 16 x 8 gray: 64 on the left, 192 on the right |
+| `generated/cmyk.jpg` | 16 x 8 Adobe CMYK: cyan on the left, half black on the right |
 
 `photoshop/` is from Photoshop 2026, in Git LFS, and is never edited: it is what
 the library is checked against. `generated/` is written by
 `scripts/make_png_files.py` with zlib alone, so libpng is checked against
-another encoder; run it again after changing it.
+another encoder, and by `scripts/make_jpeg_files.py` with Pillow
+(`pip install -r scripts/requirements.txt`); run them again after changing them.

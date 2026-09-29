@@ -14,6 +14,10 @@
 #include <ffpsd/png.hpp>
 #endif
 
+#if defined(FFPSD_HAS_JPEG)
+#include <ffpsd/jpeg.hpp>
+#endif
+
 namespace ffpsd
 {
     // Library version as "MAJOR.MINOR.PATCH".

@@ -12,6 +12,7 @@ endif()
 
 option(FFPSD_BUILD_TOOLS "Build command line tools (img2ffpsd)" ON)
 option(FFPSD_WITH_PNG "Build PNG loading, with libpng and zlib-ng from vendor/" ON)
+option(FFPSD_WITH_JPEG "Build JPEG loading, with libjpeg-turbo from vendor/" ON)
 option(FFPSD_BUILD_TESTS "Build the unit tests, with GoogleTest from vendor/" OFF)
 option(FFPSD_BUILD_BENCHMARKS "Build the benchmarks, with Google Benchmark from vendor/" OFF)
 option(FFPSD_BUILD_EXAMPLES "Build the C and C++ examples in examples/" OFF)
@@ -47,6 +48,9 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(ffpsd_vendored)
 if(FFPSD_WITH_PNG)
     list(APPEND ffpsd_vendored libpng zlib-ng)
+endif()
+if(FFPSD_WITH_JPEG)
+    list(APPEND ffpsd_vendored libjpeg-turbo)
 endif()
 if(FFPSD_BUILD_TESTS)
     list(APPEND ffpsd_vendored googletest)
@@ -90,7 +94,7 @@ include(GNUInstallDirs)
 
 add_subdirectory(ffpsd)
 
-# img2ffpsd reads PNG files, so it needs the PNG support.
+# img2ffpsd reads PNG files, and JPEG ones too when there is JPEG support.
 if(FFPSD_BUILD_TOOLS AND FFPSD_WITH_PNG)
     add_subdirectory(img2ffpsd)
 elseif(FFPSD_BUILD_TOOLS)

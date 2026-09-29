@@ -98,6 +98,12 @@ namespace ffpsd
         FFPSD_EXPORT void SavePng(const std::string& path) const;
 #endif
 
+#if defined(FFPSD_HAS_JPEG)
+        // GetPixels as a JPEG without transparency, for gray and RGB documents; declared only in a build with JPEG.
+        FFPSD_EXPORT std::vector<std::uint8_t> EncodeJpeg(int quality = 90) const;
+        FFPSD_EXPORT void SaveJpeg(const std::string& path, int quality = 90) const;
+#endif
+
         // Raw door to this layer's blocks, unchecked; pointers live until the block is removed.
         FFPSD_EXPORT std::size_t GetTaggedBlockCount() const noexcept;
         FFPSD_EXPORT const TaggedBlock* GetTaggedBlockByIndex(std::size_t index) const;

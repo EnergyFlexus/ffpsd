@@ -24,7 +24,8 @@ from typing import NoReturn
 ROOT = Path(__file__).resolve().parent
 OUT_DIR = ROOT / "ffpsd-out"
 MIN_CMAKE = (3, 23)
-VENDORED = ("libpng", "zlib-ng")
+PNG_VENDORED = ("libpng", "zlib-ng")
+JPEG_VENDORED = ("libjpeg-turbo",)
 
 IS_WINDOWS = platform.system() == "Windows"
 IS_MACOS = platform.system() == "Darwin"
@@ -166,14 +167,14 @@ def smoke_test(directory, env):
     run([tool, "--help"], env)
 
 
-def check_vendor():
-    """PNG support builds libpng and zlib-ng from the submodules under vendor/."""
-    missing = [name for name in VENDORED if not (ROOT / "vendor" / name / "CMakeLists.txt").is_file()]
+def check_vendor(names=PNG_VENDORED + JPEG_VENDORED):
+    """PNG and JPEG support build libpng, zlib-ng and libjpeg-turbo from the submodules under vendor/."""
+    missing = [name for name in names if not (ROOT / "vendor" / name / "CMakeLists.txt").is_file()]
     if not missing:
         return
     if not (ROOT / ".git").exists():
         fail("vendor/ is missing " + ", ".join(missing),
-             "download them, or build without PNG support: --no-png")
+             "download them, or build without them: --no-png, --no-jpeg")
     run(["git", "submodule", "update", "--init", "--recursive"])
 
 
@@ -186,6 +187,8 @@ def main():
                         help="skip the img2ffpsd command line tool")
     parser.add_argument("--no-png", action="store_true",
                         help="build without PNG loading and saving, so without libpng and zlib-ng")
+    parser.add_argument("--no-jpeg", action="store_true",
+                        help="build without JPEG loading and saving, so without libjpeg-turbo")
     parser.add_argument("--crt", choices=("static", "dynamic"),
                         help="MSVC: the C runtime, /MT or /MD (default: static for "
                              "--static, dynamic for a shared library)")
@@ -203,8 +206,7 @@ def main():
     print(f"== ffpsd release build: {kind}{crt_note}, {platform.system()} {platform.machine()}")
 
     cmake = check_cmake()
-    if not args.no_png:
-        check_vendor()
+    check_vendor((() if args.no_png else PNG_VENDORED) + (() if args.no_jpeg else JPEG_VENDORED))
     generator = pick_generator()
     env = build_env()
 
@@ -220,6 +222,7 @@ def main():
          f"-DBUILD_SHARED_LIBS={'OFF' if args.static else 'ON'}",
          f"-DFFPSD_BUILD_TOOLS={'OFF' if args.no_tools else 'ON'}",
          f"-DFFPSD_WITH_PNG={'OFF' if args.no_png else 'ON'}",
+         f"-DFFPSD_WITH_JPEG={'OFF' if args.no_jpeg else 'ON'}",
          f"-DFFPSD_MSVC_STATIC_RUNTIME={'ON' if crt == 'static' else 'OFF'}",
          f"-DCMAKE_INSTALL_PREFIX={out_dir}"], env)
     run([cmake, "--build", build_dir, "--config", "Release", "--parallel", args.jobs], env)

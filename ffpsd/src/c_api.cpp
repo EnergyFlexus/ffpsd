@@ -6,6 +6,10 @@
 #include <ffpsd/png.hpp>
 #endif
 
+#if defined(FFPSD_HAS_JPEG)
+#include <ffpsd/jpeg.hpp>
+#endif
+
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -256,6 +260,52 @@ namespace
         return {};
     }
     void SavePng(const ffpsd::Image&, const std::string&)
+    {
+    }
+#endif
+
+    void RequireJpeg()
+    {
+#if !defined(FFPSD_HAS_JPEG)
+        throw Unsupported("ffpsd: built without JPEG support");
+#endif
+    }
+
+#if defined(FFPSD_HAS_JPEG)
+    using ffpsd::EncodeJpeg;
+    using ffpsd::LoadJpeg;
+    using ffpsd::SaveJpeg;
+
+    std::vector<std::uint8_t> LayerJpeg(const ffpsd::Layer& layer, int quality)
+    {
+        return layer.EncodeJpeg(quality);
+    }
+    void SaveLayerJpeg(const ffpsd::Layer& layer, const std::string& path, int quality)
+    {
+        layer.SaveJpeg(path, quality);
+    }
+#else
+    // Never reached: RequireJpeg throws first. They keep the JPEG entry points below compiling.
+    std::vector<std::uint8_t> LayerJpeg(const ffpsd::Layer&, int)
+    {
+        return {};
+    }
+    void SaveLayerJpeg(const ffpsd::Layer&, const std::string&, int)
+    {
+    }
+    ffpsd::Image LoadJpeg(const std::string&, ffpsd::ColorMode, std::uint16_t, bool)
+    {
+        return ffpsd::Image();
+    }
+    ffpsd::Image LoadJpeg(const std::uint8_t*, std::size_t, ffpsd::ColorMode, std::uint16_t, bool)
+    {
+        return ffpsd::Image();
+    }
+    std::vector<std::uint8_t> EncodeJpeg(const ffpsd::Image&, int)
+    {
+        return {};
+    }
+    void SaveJpeg(const ffpsd::Image&, const std::string&, int)
     {
     }
 #endif
@@ -893,6 +943,59 @@ extern "C"
             ffpsd_buffer_t*& target = NeedOut(out);
             RequirePng();
             target = new ffpsd_buffer_t{EncodePng(ToImage(Need(image, "image")))};
+        });
+    }
+
+    // Checked first, so a build without JPEG reports UNSUPPORTED whatever the arguments.
+    ffpsd_status_t ffpsd_layer_save_as_jpeg(const ffpsd_layer_t* layer, const char* path, int quality)
+    {
+        return Guard([&] {
+            RequireJpeg();
+            SaveLayerJpeg(ToLayer(layer), std::string(&Need(path, "path")), quality);
+        });
+    }
+    ffpsd_status_t ffpsd_layer_save_as_jpeg_memory(const ffpsd_layer_t* layer, int quality, ffpsd_buffer_t** out)
+    {
+        return Guard([&] {
+            ffpsd_buffer_t*& target = NeedOut(out);
+            RequireJpeg();
+            target = new ffpsd_buffer_t{LayerJpeg(ToLayer(layer), quality)};
+        });
+    }
+
+    ffpsd_status_t
+    ffpsd_jpeg_load(const char* path, ffpsd_color_mode_t color_mode, uint16_t depth, int apply_orientation, ffpsd_image_t** out)
+    {
+        return Guard([&] {
+            ffpsd_image_t*& target = NeedOut(out);
+            RequireJpeg();
+            const std::string file(&Need(path, "path"));
+            target = NewImage(LoadJpeg(file, static_cast<ffpsd::ColorMode>(color_mode), depth, apply_orientation != 0));
+        });
+    }
+    ffpsd_status_t ffpsd_jpeg_load_memory(
+        const uint8_t* data, size_t size, ffpsd_color_mode_t color_mode, uint16_t depth, int apply_orientation, ffpsd_image_t** out)
+    {
+        return Guard([&] {
+            ffpsd_image_t*& target = NeedOut(out);
+            RequireJpeg();
+            target =
+                NewImage(LoadJpeg(NeedBytes(data, size), size, static_cast<ffpsd::ColorMode>(color_mode), depth, apply_orientation != 0));
+        });
+    }
+    ffpsd_status_t ffpsd_jpeg_save(const ffpsd_image_view_t* image, const char* path, int quality)
+    {
+        return Guard([&] {
+            RequireJpeg();
+            SaveJpeg(ToImage(Need(image, "image")), std::string(&Need(path, "path")), quality);
+        });
+    }
+    ffpsd_status_t ffpsd_jpeg_save_memory(const ffpsd_image_view_t* image, int quality, ffpsd_buffer_t** out)
+    {
+        return Guard([&] {
+            ffpsd_buffer_t*& target = NeedOut(out);
+            RequireJpeg();
+            target = new ffpsd_buffer_t{EncodeJpeg(ToImage(Need(image, "image")), quality)};
         });
     }
 } // extern "C"

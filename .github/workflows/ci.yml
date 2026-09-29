@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          submodules: recursive # libpng, zlib-ng and googletest under vendor/
+          submodules: recursive # libpng, zlib-ng, libjpeg-turbo and googletest under vendor/
           lfs: true # the PSD files the smoke tests read
 
       - name: Ninja (Linux)
