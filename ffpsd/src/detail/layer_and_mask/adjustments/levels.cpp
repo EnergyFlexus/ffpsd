@@ -98,7 +98,7 @@ namespace ffpsd::detail
         for (std::size_t i = kLegacyRecords; i < total; ++i)
             WriteRecord(writer, record(i));
 
-        // Inside the declared length, unlike the padding of the block itself.
+        // Counted in the declared length.
         writer.PadFrom(0, kAlignment);
         return writer.Take();
     }

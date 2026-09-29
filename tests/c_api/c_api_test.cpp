@@ -377,7 +377,7 @@ TEST(CApiTest, NullHandlesGiveZeroes)
     EXPECT_EQ(ffpsd_buffer_get_data(nullptr), nullptr);
     EXPECT_EQ(ffpsd_version_info_get_writer_name(nullptr), nullptr);
 
-    // Destroying nothing is allowed, as free(NULL) is.
+    // Destroying NULL is allowed.
     ffpsd_document_destroy(nullptr);
     ffpsd_image_destroy(nullptr);
     ffpsd_buffer_destroy(nullptr);

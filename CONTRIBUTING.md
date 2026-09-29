@@ -264,8 +264,8 @@ Tests, `tests/README.md` has the folders:
 * Expected values come from an independent source - a dump of the file, an
   encoder of our own, arithmetic by hand - never from ffpsd.
 * Shared helpers go into `tests/support/test_support.hpp`.
-* `<subject>_test.cpp`; `TEST(Suite, Name)` reads as a sentence:
-  `ReadPsdTest.LayersOfAGrayscaleFile`.
+* `<folder>/<part>_test.cpp` with the suite `<Folder><Part>Test`; the name reads
+  as a sentence: `DocumentStackTest.MoveLayerKeepsEveryPointer`.
 * New `.psd` and `.psb` files go to Git LFS by themselves.
 * A `detail` function links only in the static build: a DLL does not export it.
 

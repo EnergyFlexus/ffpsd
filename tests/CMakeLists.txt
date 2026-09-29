@@ -6,13 +6,19 @@ add_executable(ffpsd_tests
     adjustments/levels_test.cpp
     c_api/c_api_test.cpp
     c_api/c_header_check.c
+    document/compression_test.cpp
     document/document_test.cpp
+    document/format_test.cpp
+    document/parse_test.cpp
+    document/resources_test.cpp
     document/save_test.cpp
+    document/stack_test.cpp
     layer/background_test.cpp
     layer/layer_test.cpp
     layer/pixels_test.cpp
     layer/resize_test.cpp
     smoke/read_psd_test.cpp
+    smoke/rgb_levels_test.cpp
     support/test_support.hpp)
 
 if(FFPSD_WITH_PNG)

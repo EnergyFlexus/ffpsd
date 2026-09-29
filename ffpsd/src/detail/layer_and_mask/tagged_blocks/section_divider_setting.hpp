@@ -21,7 +21,7 @@ namespace ffpsd::detail
         std::uint32_t type = kAnyOtherLayer;
     };
 
-    // Read only: the blend mode and sub type after the type would be lost, and ffpsd makes no groups yet.
+    // Read only: writing the type alone would lose the blend mode and sub type after it.
     template <> std::optional<SectionDividerSetting> ParseTaggedBlock<SectionDividerSetting>(const std::vector<std::uint8_t>& data);
 } // namespace ffpsd::detail
 

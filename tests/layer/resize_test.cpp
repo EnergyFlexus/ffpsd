@@ -4,7 +4,6 @@
 #include <cstring>
 #include <ffpsd/ffpsd.hpp>
 #include <gtest/gtest.h>
-#include <limits>
 #include <stdexcept>
 #include <tuple>
 #include <vector>
@@ -35,32 +34,6 @@ namespace
         return image;
     }
 } // namespace
-
-TEST(LayerResizeTest, SetPositionMovesThePixelsAsTheyAre)
-{
-    ffpsd::Document doc = NewDocument();
-    ffpsd::Layer* layer = doc.AddLayer("moved", Pattern(3, 2, 4), 1, 1);
-    doc.SetHasRealMergedData(true);
-
-    layer->SetPosition(-4, 7);
-
-    const ffpsd::Rect bounds = layer->GetBounds();
-    EXPECT_EQ(bounds.top, -4);
-    EXPECT_EQ(bounds.left, 7);
-    EXPECT_EQ(bounds.bottom, -2);
-    EXPECT_EQ(bounds.right, 10);
-    EXPECT_EQ(layer->GetPixels().bytes, Pattern(3, 2, 4).bytes);
-    EXPECT_FALSE(doc.GetHasRealMergedData());
-}
-
-TEST(LayerResizeTest, SetPositionRefusesBoundsPastThirtyTwoBits)
-{
-    ffpsd::Document doc = NewDocument();
-    ffpsd::Layer* layer = doc.AddLayer("moved", Pattern(3, 2, 4));
-
-    EXPECT_THROW(layer->SetPosition(0, std::numeric_limits<std::int32_t>::max() - 1), std::invalid_argument);
-    EXPECT_EQ(layer->GetBounds().left, 0);
-}
 
 TEST(LayerResizeTest, ResizeKeepsTheTopLeftCorner)
 {

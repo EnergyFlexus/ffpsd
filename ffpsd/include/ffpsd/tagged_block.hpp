@@ -12,7 +12,7 @@ namespace ffpsd
         // '8BIM', or '8B64' for a block a PSB wrote with a 64 bit length.
         std::uint32_t signature = 0x3842494D;
 
-        // Raw, not an enum: unknown keys are common and must survive a rewrite.
+        // Unknown keys are common and must survive a rewrite.
         std::uint32_t key = 0;
 
         std::vector<std::uint8_t> data;

@@ -4,21 +4,9 @@
 #include <ffpsd/ffpsd.hpp>
 #include <gtest/gtest.h>
 #include <stdexcept>
-#include <utility>
 #include <vector>
 
 using namespace ffpsd_test;
-
-namespace
-{
-    ffpsd::TaggedBlock Block(const char (&key)[5], std::vector<std::uint8_t> data)
-    {
-        ffpsd::TaggedBlock block;
-        block.key = Fourcc(key);
-        block.data = std::move(data);
-        return block;
-    }
-} // namespace
 
 TEST(LayerTest, ANewLayerIsVisibleOpaqueAndNormal)
 {

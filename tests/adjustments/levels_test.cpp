@@ -22,7 +22,7 @@ namespace
     }
 } // namespace
 
-TEST(LevelsTest, SetWhatGetGaveWritesPhotoshopsBytes)
+TEST(AdjustmentLevelsTest, SetWhatGetGaveWritesPhotoshopsBytes)
 {
     ffpsd::Document doc = ffpsd::Document::Parse(kRgbLevelsPsd);
     ffpsd::Layer* levels = doc.GetLayerByIndex(1);
@@ -33,7 +33,7 @@ TEST(LevelsTest, SetWhatGetGaveWritesPhotoshopsBytes)
     EXPECT_EQ(levels->GetTaggedBlockByKey(kLevelsKey)->data, before);
 }
 
-TEST(LevelsTest, AChangeReadsBackAndStalesTheComposite)
+TEST(AdjustmentLevelsTest, AChangeReadsBackAndStalesTheComposite)
 {
     ffpsd::Document doc = ffpsd::Document::Parse(kRgbLevelsPsd);
     ffpsd::Layer* levels = doc.GetLayerByIndex(1);
@@ -50,7 +50,7 @@ TEST(LevelsTest, AChangeReadsBackAndStalesTheComposite)
     EXPECT_FALSE(doc.GetHasRealMergedData());
 }
 
-TEST(LevelsTest, AGrayscaleDocumentHasTwoRecords)
+TEST(AdjustmentLevelsTest, AGrayscaleDocumentHasTwoRecords)
 {
     ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kGrayscale);
 
@@ -59,7 +59,7 @@ TEST(LevelsTest, AGrayscaleDocumentHasTwoRecords)
     EXPECT_EQ(info.channels.size(), 2u);
 }
 
-TEST(LevelsTest, OnlyALevelsLayerTakesLevels)
+TEST(AdjustmentLevelsTest, OnlyALevelsLayerTakesLevels)
 {
     ffpsd::Document doc = ffpsd::Document::Parse(kRgbLevelsPsd);
     ffpsd::Layer* background = doc.GetLayerByIndex(0);
@@ -69,7 +69,7 @@ TEST(LevelsTest, OnlyALevelsLayerTakesLevels)
     EXPECT_EQ(background->GetTaggedBlockByKey(kLevelsKey), nullptr);
 }
 
-TEST(LevelsTest, RecordsAreCheckedAgainstPhotoshopsRanges)
+TEST(AdjustmentLevelsTest, RecordsAreCheckedAgainstPhotoshopsRanges)
 {
     ffpsd::Document doc = ffpsd::Document::Parse(kRgbLevelsPsd);
     ffpsd::Layer* levels = doc.GetLayerByIndex(1);
@@ -107,7 +107,7 @@ TEST(LevelsTest, RecordsAreCheckedAgainstPhotoshopsRanges)
     }));
 }
 
-TEST(LevelsTest, NoRecordsMeanNothingChanges)
+TEST(AdjustmentLevelsTest, NoRecordsMeanNothingChanges)
 {
     ffpsd::Document doc = ffpsd::Document::Parse(kRgbLevelsPsd);
     ffpsd::Layer* levels = doc.GetLayerByIndex(1);
@@ -120,7 +120,7 @@ TEST(LevelsTest, NoRecordsMeanNothingChanges)
         ExpectIdentity(channel);
 }
 
-TEST(LevelsTest, ANewLayerIsWhatPhotoshopWrites)
+TEST(AdjustmentLevelsTest, ANewLayerIsWhatPhotoshopWrites)
 {
     ffpsd::Document doc = ffpsd::Document::Parse(kRgbLevelsPsd);
     const ffpsd::Layer* photoshops = doc.GetLayerByIndex(1);
@@ -137,7 +137,7 @@ TEST(LevelsTest, ANewLayerIsWhatPhotoshopWrites)
     EXPECT_NE(LayerId(*added), 0u);
 }
 
-TEST(LevelsTest, ANewLayerWithoutRecordsChangesNothing)
+TEST(AdjustmentLevelsTest, ANewLayerWithoutRecordsChangesNothing)
 {
     ffpsd::Document doc = NewDocument();
 
@@ -148,7 +148,7 @@ TEST(LevelsTest, ANewLayerWithoutRecordsChangesNothing)
         ExpectIdentity(channel);
 }
 
-TEST(LevelsTest, ANewLayerSurvivesSaving)
+TEST(AdjustmentLevelsTest, ANewLayerSurvivesSaving)
 {
     ffpsd::Document doc = NewDocument();
     doc.AddLayer("under", Pattern(4, 3, 3));

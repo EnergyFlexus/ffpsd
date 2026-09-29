@@ -102,9 +102,7 @@ namespace ffpsd::detail
             if (!block->data.empty())
                 reader.ReadU8Array(block->data.data(), block->data.size());
 
-            // Padding to 4 after the length, unless the next block starts right here: a writer that
-            // follows the specification pads to 2 inside the length. Clamped, as a section's last
-            // block may lack it.
+            // Padding to 4 unless a block starts here (then it was 2, inside the length); the last may lack it.
             const std::size_t pad = (kAlignment - block->data.size() % kAlignment) % kAlignment;
             if (pad != 0 && !StartsBlock(reader, end))
                 reader.Skip(std::min(pad, end - reader.Tell()));
