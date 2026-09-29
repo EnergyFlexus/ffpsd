@@ -1,21 +1,17 @@
 # Examples
 
-One program in three languages: it opens a PSD, prints its size, color mode,
-resolution, writer and layers, puts a copy of the top layer on top and saves.
+One program in three languages: it opens a PSD, prints its size and layers,
+puts a copy of the top layer on top and saves the result.
 
 ```sh
 ffpsd_example_cpp tests/data/photoshop/rgb_levels.psd out.psd
 ```
 
 ```
-1890 x 1417, RGB, 8 bit
-resolution: 300 x 300 ppi
-written by: Adobe Photoshop, for Adobe Photoshop 2026
-layers, bottom to top: 2
-  0: <name> (raster), 1890 x 1417 at 0, 0
-  1: <name> (adjustment), 0 x 0 at 0, 0
-
-copied <name> to the top, saved 3 layers to out.psd
+1890 x 1417, 8 bit, 2 layers
+  0: <name>, 1890 x 1417
+  1: <name>, 0 x 0
+saved 3 layers to out.psd
 ```
 
 | Folder | API | Build |
