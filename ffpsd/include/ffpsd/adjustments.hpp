@@ -6,9 +6,13 @@
 
 namespace ffpsd
 {
-    // The Levels adjustment, block 'levl'.
+    // The settings of adjustment layers, a struct per kind; kKey is the block holding them.
+
+    // Records not given are the identity, so they leave their channel untouched.
     struct LevelsInfo
     {
+        static constexpr std::uint32_t kKey = 0x6C65766C; // 'levl'
+
         struct Channel
         {
             std::uint16_t input_floor = 0;      // 0 to 253

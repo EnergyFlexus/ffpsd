@@ -91,7 +91,7 @@ TEST(LayerPixelsTest, SomeColorModesHaveNoLayers)
     doc.SetColor(ffpsd::ColorMode::kIndexed);
 
     EXPECT_THROW(doc.AddLayer("indexed"), std::invalid_argument);
-    EXPECT_THROW(doc.AddLevelsLayer("indexed"), std::invalid_argument);
+    EXPECT_THROW(doc.AddAdjustmentLayer<ffpsd::LevelsInfo>("indexed"), std::invalid_argument);
 }
 
 TEST(LayerPixelsTest, SetWhatGetGaveKeepsEverySample)

@@ -643,7 +643,7 @@ extern "C"
         return Guard([&] {
             ffpsd_layer_t*& target = NeedOut(out);
             const ffpsd::LevelsInfo info = levels == nullptr ? ffpsd::LevelsInfo() : levels->value;
-            target = ToHandle(Need(doc, "doc").value.AddLevelsLayer(std::string(&Need(name, "name")), info));
+            target = ToHandle(Need(doc, "doc").value.AddAdjustmentLayer(std::string(&Need(name, "name")), info));
         });
     }
     ffpsd_status_t
@@ -779,7 +779,7 @@ extern "C"
     {
         return Guard([&] {
             ffpsd_levels_t*& target = NeedOut(out);
-            std::optional<ffpsd::LevelsInfo> levels = ToLayer(layer).GetLevels();
+            std::optional<ffpsd::LevelsInfo> levels = ToLayer(layer).GetAdjustment<ffpsd::LevelsInfo>();
             if (!levels.has_value())
                 throw NotFound("ffpsd: the layer is not a Levels layer");
             target = new ffpsd_levels_t{std::move(*levels)};
@@ -787,7 +787,7 @@ extern "C"
     }
     ffpsd_status_t ffpsd_layer_set_levels(ffpsd_layer_t* layer, const ffpsd_levels_t* levels)
     {
-        return Guard([&] { ToLayer(layer).SetLevels(Need(levels, "levels").value); });
+        return Guard([&] { ToLayer(layer).SetAdjustment(Need(levels, "levels").value); });
     }
 
     ffpsd_status_t ffpsd_layer_set_position(ffpsd_layer_t* layer, int32_t top, int32_t left)

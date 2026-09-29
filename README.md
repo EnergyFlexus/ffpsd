@@ -92,7 +92,7 @@ By hand: `cmake --preset static-debug`, `cmake --build --preset static-debug`,
 
 ## Benchmarks
 
-Reading and writing the files in `tests/data/`. The debug presets only build
+Reading and writing the files in `tests/data/photoshop/`. The debug presets only build
 them; numbers come from `bench-release`:
 
 ```sh

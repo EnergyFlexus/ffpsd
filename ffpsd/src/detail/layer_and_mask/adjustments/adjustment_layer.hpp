@@ -8,9 +8,14 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace ffpsd::detail
 {
+    // Specialized by each adjustment for its struct; channel_count is the document's.
+    template <class T> T ParseAdjustment(const std::vector<std::uint8_t>& data, std::size_t channel_count);
+    template <class T> std::vector<std::uint8_t> EncodeAdjustment(const T& value);
+
     // The key of the block that makes the layer an adjustment, such as 'levl', or 0.
     std::uint32_t FindAdjustmentKey(const TaggedBlocks& blocks) noexcept;
 

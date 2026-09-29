@@ -121,8 +121,8 @@ namespace ffpsd
         // Makes the background an ordinary layer where it is, unlocked; false when there is none.
         FFPSD_EXPORT bool UnsetBackgroundLayer();
 
-        // A Levels adjustment layer on top; records not given leave their channel untouched.
-        FFPSD_EXPORT Layer* AddLevelsLayer(const std::string& name, const LevelsInfo& levels = LevelsInfo());
+        // An adjustment layer on top; T is a struct from adjustments.hpp.
+        template <class T> FFPSD_EXPORT Layer* AddAdjustmentLayer(const std::string& name, const T& value = T());
 
         // A copy on top, from a document of the same format; a copy of the background is an ordinary layer.
         FFPSD_EXPORT Layer* AddLayer(const Layer& source);

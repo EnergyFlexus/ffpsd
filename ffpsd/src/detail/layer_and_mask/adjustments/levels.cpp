@@ -2,6 +2,7 @@
 
 #include "detail/io/big_endian_reader.hpp"
 #include "detail/io/big_endian_writer.hpp"
+#include "detail/io/fourcc.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -54,8 +55,9 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    LevelsInfo ParseLevels(const std::vector<std::uint8_t>& data, std::size_t record_count)
+    template <> LevelsInfo ParseAdjustment<LevelsInfo>(const std::vector<std::uint8_t>& data, std::size_t channel_count)
     {
+        const std::size_t record_count = channel_count + 1;
         BigEndianReader reader(data);
         const std::uint16_t version = reader.ReadU16();
         if (version != kVersion)
@@ -78,7 +80,7 @@ namespace ffpsd::detail
         return levels;
     }
 
-    std::vector<std::uint8_t> EncodeLevels(const LevelsInfo& levels)
+    template <> std::vector<std::uint8_t> EncodeAdjustment<LevelsInfo>(const LevelsInfo& levels)
     {
         for (std::size_t i = 0; i < levels.channels.size(); ++i)
             CheckRecord(levels.channels[i], i);

@@ -1,17 +1,16 @@
-# One folder per part of the project; smoke/ reads real files end to end.
+# A folder per public header, and smoke/ for real files end to end.
 # c_header_check.c is compiled as C, which is how the C header is proven to be C.
 enable_language(C)
 
 add_executable(ffpsd_tests
+    adjustments/levels_test.cpp
     c_api/c_api_test.cpp
     c_api/c_header_check.c
     document/document_test.cpp
     document/save_test.cpp
     layer/background_test.cpp
     layer/layer_test.cpp
-    layer/levels_test.cpp
     layer/pixels_test.cpp
-    layer/resample_test.cpp
     layer/resize_test.cpp
     smoke/read_psd_test.cpp
     support/test_support.hpp)

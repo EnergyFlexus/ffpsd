@@ -18,9 +18,9 @@ namespace ffpsd_test
     }
 
     // Photoshop 2026 files; see tests/README.md for what each holds.
-    inline const std::string kGrayscalePsd = DataFile("grayscale_two_layers.psd");
-    inline const std::string kRgbPsd = DataFile("rgb_two_layers.psd");
-    inline const std::string kRgbLevelsPsd = DataFile("rgb_levels.psd");
+    inline const std::string kGrayscalePsd = DataFile("photoshop/grayscale_two_layers.psd");
+    inline const std::string kRgbPsd = DataFile("photoshop/rgb_two_layers.psd");
+    inline const std::string kRgbLevelsPsd = DataFile("photoshop/rgb_levels.psd");
 
     // Layer names in those files, UTF-8: "Fon", "Zalivka tsvetom 1", "Fon kopiya", "Urovni 1".
     inline const std::string kBackgroundName = "\xD0\xA4\xD0\xBE\xD0\xBD";

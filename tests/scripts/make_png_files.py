@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Writes the PNG test files into tests/data/ with zlib alone, so libpng is checked against an
+"""Writes the PNG test files into tests/data/generated/ with zlib alone, so libpng is checked against an
 independent encoder. The pixel values here are the ones tests/png/ expects."""
 
 import struct
 import zlib
 from pathlib import Path
 
-DATA = Path(__file__).resolve().parent.parent / 'data'
+DATA = Path(__file__).resolve().parent.parent / 'data' / 'generated'
 
 
 def chunk(kind: bytes, data: bytes) -> bytes:
