@@ -18,7 +18,7 @@ namespace
         const std::string path = TestFile(name);
         for (auto _ : state)
         {
-            ffpsd::Document doc = ffpsd::Document::Parse(path);
+            ffpsd::Document doc = ffpsd::Document::Open(path);
             benchmark::DoNotOptimize(doc);
         }
         state.SetBytesProcessed(state.iterations() * static_cast<std::int64_t>(std::filesystem::file_size(path)));
@@ -27,7 +27,7 @@ namespace
     // A parsed Document back to bytes in memory; the disk stays out.
     void Write(benchmark::State& state, const char* name)
     {
-        const ffpsd::Document doc = ffpsd::Document::Parse(TestFile(name));
+        const ffpsd::Document doc = ffpsd::Document::Open(TestFile(name));
         std::int64_t size = 0;
         for (auto _ : state)
         {

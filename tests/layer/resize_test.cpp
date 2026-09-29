@@ -53,7 +53,7 @@ TEST(LayerResizeTest, ResizeKeepsTheTopLeftCorner)
 
 TEST(LayerResizeTest, NearestDoublesAPhotoshopLayer)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kGrayscalePsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kGrayscalePsd);
     ffpsd::Layer* fill = doc.GetLayerByIndex(1);
     const ffpsd::Image before = fill->GetPixels();
 
@@ -80,13 +80,13 @@ TEST(LayerResizeTest, AResizedLayerSurvivesSaving)
 
 TEST(LayerResizeTest, WhatCannotMoveOrResizeIsRefused)
 {
-    ffpsd::Document rgb = ffpsd::Document::Parse(kRgbPsd);
+    ffpsd::Document rgb = ffpsd::Document::Open(kRgbPsd);
     ffpsd::Layer* background = rgb.GetLayerByIndex(0);
     EXPECT_THROW(background->SetPosition(1, 0), std::invalid_argument);
     EXPECT_THROW(background->Resize(10, 10), std::invalid_argument);
     background->SetPosition(0, 0); // where it is already
 
-    ffpsd::Document levels = ffpsd::Document::Parse(kRgbLevelsPsd);
+    ffpsd::Document levels = ffpsd::Document::Open(kRgbLevelsPsd);
     EXPECT_THROW(levels.GetLayerByIndex(1)->Resize(10, 10), std::invalid_argument);
     EXPECT_THROW(levels.GetLayerByIndex(1)->SetPosition(3, 3), std::invalid_argument);
 

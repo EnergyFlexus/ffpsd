@@ -24,8 +24,8 @@ TEST(DocumentFormatTest, APsbRoundTrips)
 TEST(DocumentFormatTest, SwitchingTheFormatKeepsEveryPixel)
 {
     // Photoshop's RLE, with 2 byte row counts, through a PSB with 4 byte ones and back.
-    const ffpsd::Document original = ffpsd::Document::Parse(kRgbPsd);
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    const ffpsd::Document original = ffpsd::Document::Open(kRgbPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
 
     doc.SetPsb(true);
     const ffpsd::Document psb = ffpsd::Document::Parse(doc.Save());
@@ -47,8 +47,8 @@ TEST(DocumentFormatTest, SwitchingTheFormatAndBackGivesTheSameFile)
     // Only the width of the row counts changes, so Photoshop's packed rows come back byte for byte.
     for (const std::string& path : {kRgbPsd, kGrayscalePsd, kRgbLevelsPsd})
     {
-        const std::vector<std::uint8_t> original = ffpsd::Document::Parse(path).Save();
-        ffpsd::Document doc = ffpsd::Document::Parse(path);
+        const std::vector<std::uint8_t> original = ffpsd::Document::Open(path).Save();
+        ffpsd::Document doc = ffpsd::Document::Open(path);
 
         doc.SetPsb(true);
         doc.SetPsb(false);

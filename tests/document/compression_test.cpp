@@ -10,7 +10,7 @@ using namespace ffpsd_test;
 
 TEST(DocumentCompressionTest, RawAsksForUnpackedPixels)
 {
-    const ffpsd::Document original = ffpsd::Document::Parse(kRgbPsd);
+    const ffpsd::Document original = ffpsd::Document::Open(kRgbPsd);
 
     const std::vector<std::uint8_t> raw = original.Save(ffpsd::Compression::kRaw);
 
@@ -28,7 +28,7 @@ TEST(DocumentCompressionTest, RawAsksForUnpackedPixels)
 
 TEST(DocumentCompressionTest, RawAndRleGoBothWays)
 {
-    const ffpsd::Document original = ffpsd::Document::Parse(kRgbPsd);
+    const ffpsd::Document original = ffpsd::Document::Open(kRgbPsd);
     const std::vector<std::uint8_t> raw = original.Save(ffpsd::Compression::kRaw);
 
     const std::vector<std::uint8_t> rle = ffpsd::Document::Parse(raw).Save();

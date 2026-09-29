@@ -613,7 +613,7 @@ namespace ffpsd
         detail::WriteFile(path, Save(compression));
     }
 
-    Document Document::Parse(const std::string& path)
+    Document Document::Open(const std::string& path)
     {
         return Parse(detail::ReadFile(path));
     }

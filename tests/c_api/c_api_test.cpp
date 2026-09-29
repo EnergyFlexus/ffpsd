@@ -96,7 +96,7 @@ TEST(CApiTest, VersionIsThreeNumbers)
 TEST(CApiTest, ReadsWhatTheCppApiReads)
 {
     OpenDocument file(kRgbLevelsPsd);
-    const ffpsd::Document cpp = ffpsd::Document::Parse(kRgbLevelsPsd);
+    const ffpsd::Document cpp = ffpsd::Document::Open(kRgbLevelsPsd);
 
     EXPECT_EQ(ffpsd_document_get_width(file.doc), cpp.GetWidth());
     EXPECT_EQ(ffpsd_document_get_height(file.doc), cpp.GetHeight());

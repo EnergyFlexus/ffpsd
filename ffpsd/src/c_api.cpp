@@ -409,7 +409,7 @@ extern "C"
     {
         return Guard([&] {
             ffpsd_document_t*& target = NeedOut(out);
-            target = new ffpsd_document_t{ffpsd::Document::Parse(std::string(&Need(path, "path")))};
+            target = new ffpsd_document_t{ffpsd::Document::Open(std::string(&Need(path, "path")))};
         });
     }
     ffpsd_status_t ffpsd_document_open_memory(const uint8_t* data, size_t size, ffpsd_document_t** out)
