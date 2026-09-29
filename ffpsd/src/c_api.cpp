@@ -376,8 +376,7 @@ extern "C"
             const std::vector<ffpsd::LevelsInfo::Channel>& channels = Need(levels, "levels").value.channels;
             ffpsd_levels_channel_t& channel = Need(out, "out");
             if (index >= channels.size())
-                throw std::out_of_range(
-                    "ffpsd: Levels record " + std::to_string(index) + " of " + std::to_string(channels.size()));
+                throw std::out_of_range("ffpsd: Levels record " + std::to_string(index) + " of " + std::to_string(channels.size()));
 
             channel.input_floor = channels[index].input_floor;
             channel.input_ceiling = channels[index].input_ceiling;
@@ -422,12 +421,9 @@ extern "C"
     }
     ffpsd_status_t ffpsd_document_save(const ffpsd_document_t* doc, const char* path, ffpsd_compression_t compression)
     {
-        return Guard([&] {
-            Need(doc, "doc").value.Save(std::string(&Need(path, "path")), static_cast<ffpsd::Compression>(compression));
-        });
+        return Guard([&] { Need(doc, "doc").value.Save(std::string(&Need(path, "path")), static_cast<ffpsd::Compression>(compression)); });
     }
-    ffpsd_status_t
-    ffpsd_document_save_memory(const ffpsd_document_t* doc, ffpsd_compression_t compression, ffpsd_buffer_t** out)
+    ffpsd_status_t ffpsd_document_save_memory(const ffpsd_document_t* doc, ffpsd_compression_t compression, ffpsd_buffer_t** out)
     {
         return Guard([&] {
             ffpsd_buffer_t*& target = NeedOut(out);
@@ -541,8 +537,7 @@ extern "C"
     {
         return doc == nullptr ? 0 : doc->value.GetImageResourceCount();
     }
-    ffpsd_status_t
-    ffpsd_document_get_image_resource_by_index(const ffpsd_document_t* doc, size_t index, ffpsd_image_resource_t* out)
+    ffpsd_status_t ffpsd_document_get_image_resource_by_index(const ffpsd_document_t* doc, size_t index, ffpsd_image_resource_t* out)
     {
         return Guard([&] {
             ffpsd_image_resource_t& target = Need(out, "out");
@@ -550,8 +545,7 @@ extern "C"
             Fill(*resource, target);
         });
     }
-    ffpsd_status_t
-    ffpsd_document_get_image_resource_by_id(const ffpsd_document_t* doc, uint16_t id, ffpsd_image_resource_t* out)
+    ffpsd_status_t ffpsd_document_get_image_resource_by_id(const ffpsd_document_t* doc, uint16_t id, ffpsd_image_resource_t* out)
     {
         return Guard([&] {
             ffpsd_image_resource_t& target = Need(out, "out");
@@ -593,8 +587,7 @@ extern "C"
         });
     }
     ffpsd_status_t ffpsd_document_add_layer(
-        ffpsd_document_t* doc, const char* name, const ffpsd_image_view_t* image, int32_t top, int32_t left,
-        ffpsd_layer_t** out)
+        ffpsd_document_t* doc, const char* name, const ffpsd_image_view_t* image, int32_t top, int32_t left, ffpsd_layer_t** out)
     {
         return Guard([&] {
             ffpsd_layer_t*& target = NeedOut(out);
@@ -609,15 +602,14 @@ extern "C"
             // The planar overload borrows the samples, so there is no copy.
             if (image->depth != value.GetDepth())
                 throw std::invalid_argument(
-                    "ffpsd: a " + std::to_string(image->depth) + " bit image in a " + std::to_string(value.GetDepth()) +
-                    " bit document");
+                    "ffpsd: a " + std::to_string(image->depth) + " bit image in a " + std::to_string(value.GetDepth()) + " bit document");
             target = ToHandle(value.AddLayer(
-                layer_name, NeedBytes(image->data, image->size), image->size, image->width, image->height,
-                image->channel_count, top, left));
+                layer_name, NeedBytes(image->data, image->size), image->size, image->width, image->height, image->channel_count, top,
+                left));
         });
     }
-    ffpsd_status_t ffpsd_document_add_background_layer(
-        ffpsd_document_t* doc, const char* name, const ffpsd_image_view_t* image, ffpsd_layer_t** out)
+    ffpsd_status_t
+    ffpsd_document_add_background_layer(ffpsd_document_t* doc, const char* name, const ffpsd_image_view_t* image, ffpsd_layer_t** out)
     {
         return Guard([&] {
             ffpsd_layer_t*& target = NeedOut(out);
@@ -637,8 +629,8 @@ extern "C"
                 throw NotFound("ffpsd: the document has no background");
         });
     }
-    ffpsd_status_t ffpsd_document_add_levels_layer(
-        ffpsd_document_t* doc, const char* name, const ffpsd_levels_t* levels, ffpsd_layer_t** out)
+    ffpsd_status_t
+    ffpsd_document_add_levels_layer(ffpsd_document_t* doc, const char* name, const ffpsd_levels_t* levels, ffpsd_layer_t** out)
     {
         return Guard([&] {
             ffpsd_layer_t*& target = NeedOut(out);
@@ -646,8 +638,7 @@ extern "C"
             target = ToHandle(Need(doc, "doc").value.AddAdjustmentLayer(std::string(&Need(name, "name")), info));
         });
     }
-    ffpsd_status_t
-    ffpsd_document_add_layer_copy(ffpsd_document_t* doc, const ffpsd_layer_t* source, ffpsd_layer_t** out)
+    ffpsd_status_t ffpsd_document_add_layer_copy(ffpsd_document_t* doc, const ffpsd_layer_t* source, ffpsd_layer_t** out)
     {
         return Guard([&] {
             ffpsd_layer_t*& target = NeedOut(out);
@@ -667,16 +658,14 @@ extern "C"
     {
         return doc == nullptr ? 0 : doc->value.GetTaggedBlockCount();
     }
-    ffpsd_status_t
-    ffpsd_document_get_tagged_block_by_index(const ffpsd_document_t* doc, size_t index, ffpsd_tagged_block_t* out)
+    ffpsd_status_t ffpsd_document_get_tagged_block_by_index(const ffpsd_document_t* doc, size_t index, ffpsd_tagged_block_t* out)
     {
         return Guard([&] {
             ffpsd_tagged_block_t& target = Need(out, "out");
             Fill(*Need(doc, "doc").value.GetTaggedBlockByIndex(index), target);
         });
     }
-    ffpsd_status_t
-    ffpsd_document_get_tagged_block_by_key(const ffpsd_document_t* doc, uint32_t key, ffpsd_tagged_block_t* out)
+    ffpsd_status_t ffpsd_document_get_tagged_block_by_key(const ffpsd_document_t* doc, uint32_t key, ffpsd_tagged_block_t* out)
     {
         return Guard([&] {
             ffpsd_tagged_block_t& target = Need(out, "out");
@@ -794,8 +783,7 @@ extern "C"
     {
         return Guard([&] { ToLayer(layer).SetPosition(top, left); });
     }
-    ffpsd_status_t
-    ffpsd_layer_resize(ffpsd_layer_t* layer, uint32_t width, uint32_t height, ffpsd_resample_filter_t filter)
+    ffpsd_status_t ffpsd_layer_resize(ffpsd_layer_t* layer, uint32_t width, uint32_t height, ffpsd_resample_filter_t filter)
     {
         return Guard([&] { ToLayer(layer).Resize(width, height, static_cast<ffpsd::ResampleFilter>(filter)); });
     }
@@ -816,16 +804,14 @@ extern "C"
     {
         return layer == nullptr ? 0 : reinterpret_cast<const ffpsd::Layer*>(layer)->GetTaggedBlockCount();
     }
-    ffpsd_status_t
-    ffpsd_layer_get_tagged_block_by_index(const ffpsd_layer_t* layer, size_t index, ffpsd_tagged_block_t* out)
+    ffpsd_status_t ffpsd_layer_get_tagged_block_by_index(const ffpsd_layer_t* layer, size_t index, ffpsd_tagged_block_t* out)
     {
         return Guard([&] {
             ffpsd_tagged_block_t& target = Need(out, "out");
             Fill(*ToLayer(layer).GetTaggedBlockByIndex(index), target);
         });
     }
-    ffpsd_status_t
-    ffpsd_layer_get_tagged_block_by_key(const ffpsd_layer_t* layer, uint32_t key, ffpsd_tagged_block_t* out)
+    ffpsd_status_t ffpsd_layer_get_tagged_block_by_key(const ffpsd_layer_t* layer, uint32_t key, ffpsd_tagged_block_t* out)
     {
         return Guard([&] {
             ffpsd_tagged_block_t& target = Need(out, "out");
@@ -871,8 +857,7 @@ extern "C"
             target = NewImage(LoadPng(file, static_cast<ffpsd::ColorMode>(color), depth));
         });
     }
-    ffpsd_status_t ffpsd_png_load_memory(
-        const uint8_t* data, size_t size, ffpsd_color_mode_t color, uint16_t depth, ffpsd_image_t** out)
+    ffpsd_status_t ffpsd_png_load_memory(const uint8_t* data, size_t size, ffpsd_color_mode_t color, uint16_t depth, ffpsd_image_t** out)
     {
         return Guard([&] {
             ffpsd_image_t*& target = NeedOut(out);

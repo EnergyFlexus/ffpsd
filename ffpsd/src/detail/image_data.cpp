@@ -22,8 +22,8 @@ namespace ffpsd::detail
     }
 
     Image DecodeImageData(
-        const std::vector<std::uint8_t>& data, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count,
-        std::uint16_t depth, bool is_psb)
+        const std::vector<std::uint8_t>& data, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth,
+        bool is_psb)
     {
         if (data.empty())
             return Image();
@@ -63,8 +63,7 @@ namespace ffpsd::detail
     }
 
     std::vector<std::uint8_t> EncodeBlankImageData(
-        std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, bool is_psb,
-        std::uint16_t compression)
+        std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, bool is_psb, std::uint16_t compression)
     {
         const std::size_t row_bytes = depth == 1 ? (std::size_t{width} + 7) / 8 : std::size_t{width} * (depth / 8u);
         const std::size_t rows = std::size_t{height} * channel_count;

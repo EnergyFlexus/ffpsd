@@ -34,8 +34,7 @@ namespace ffpsd::detail
                 return 0.2126f * red + 0.7152f * green + 0.0722f * blue;
             else
                 return static_cast<T>(
-                    (kRedWeight * red + kGreenWeight * green + kBlueWeight * blue + (1u << (kWeightShift - 1))) >>
-                    kWeightShift);
+                    (kRedWeight * red + kGreenWeight * green + kBlueWeight * blue + (1u << (kWeightShift - 1))) >> kWeightShift);
         }
 
         template <typename T> void LumaPlane(const std::uint8_t* rgb, std::uint8_t* gray, std::size_t pixels)
@@ -54,8 +53,8 @@ namespace ffpsd::detail
         {
             if (image.channel_count != first && image.channel_count != second)
                 throw std::invalid_argument(
-                    std::string("ffpsd: ") + what + " takes " + std::to_string(first) + " or " +
-                    std::to_string(second) + " channels, not " + std::to_string(image.channel_count));
+                    std::string("ffpsd: ") + what + " takes " + std::to_string(first) + " or " + std::to_string(second) +
+                    " channels, not " + std::to_string(image.channel_count));
             if (image.depth != 8 && image.depth != 16 && image.depth != 32)
                 throw std::invalid_argument("ffpsd: unsupported depth: " + std::to_string(image.depth));
             if (image.bytes.size() != image.GetSizeBytes())

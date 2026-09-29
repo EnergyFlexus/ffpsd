@@ -19,12 +19,11 @@ namespace ffpsd::detail
         constexpr std::size_t kAlignment = 4;
 
         // In a PSB these keys have an 8 byte length; nothing but this list says so.
-        constexpr std::uint32_t kLongLengthKeys[] = {
-            Fourcc('L', 'M', 's', 'k'), Fourcc('L', 'r', '1', '6'), Fourcc('L', 'r', '3', '2'),
-            Fourcc('L', 'a', 'y', 'r'), Fourcc('M', 't', '1', '6'), Fourcc('M', 't', '3', '2'),
-            Fourcc('M', 't', 'r', 'n'), Fourcc('A', 'l', 'p', 'h'), Fourcc('F', 'M', 's', 'k'),
-            Fourcc('l', 'n', 'k', '2'), Fourcc('F', 'E', 'i', 'd'), Fourcc('F', 'X', 'i', 'd'),
-            Fourcc('P', 'x', 'S', 'D')};
+        constexpr std::uint32_t kLongLengthKeys[] = {Fourcc('L', 'M', 's', 'k'), Fourcc('L', 'r', '1', '6'), Fourcc('L', 'r', '3', '2'),
+                                                     Fourcc('L', 'a', 'y', 'r'), Fourcc('M', 't', '1', '6'), Fourcc('M', 't', '3', '2'),
+                                                     Fourcc('M', 't', 'r', 'n'), Fourcc('A', 'l', 'p', 'h'), Fourcc('F', 'M', 's', 'k'),
+                                                     Fourcc('l', 'n', 'k', '2'), Fourcc('F', 'E', 'i', 'd'), Fourcc('F', 'X', 'i', 'd'),
+                                                     Fourcc('P', 'x', 'S', 'D')};
 
         bool StartsBlock(const BigEndianReader& reader, std::size_t end)
         {
@@ -80,8 +79,8 @@ namespace ffpsd::detail
             block->signature = reader.ReadU32();
             if (block->signature != kSignature && block->signature != kSignature64)
                 throw std::runtime_error(
-                    "ffpsd: expected 8BIM or 8B64 at offset " + std::to_string(block_start) + ", got '" +
-                    FourccString(block->signature) + "'");
+                    "ffpsd: expected 8BIM or 8B64 at offset " + std::to_string(block_start) + ", got '" + FourccString(block->signature) +
+                    "'");
 
             block->key = reader.ReadU32();
 
@@ -96,9 +95,8 @@ namespace ffpsd::detail
             const std::size_t left = end - reader.Tell();
             if (length > left)
                 throw std::runtime_error(
-                    "ffpsd: tagged block '" + FourccString(block->key) + "' at offset " + std::to_string(block_start) +
-                    " claims " + std::to_string(length) + " bytes, only " + std::to_string(left) +
-                    " left in the section");
+                    "ffpsd: tagged block '" + FourccString(block->key) + "' at offset " + std::to_string(block_start) + " claims " +
+                    std::to_string(length) + " bytes, only " + std::to_string(left) + " left in the section");
 
             block->data.resize(static_cast<std::size_t>(length));
             if (!block->data.empty())
@@ -141,8 +139,7 @@ namespace ffpsd::detail
     const TaggedBlock* GetTaggedBlockByIndex(const TaggedBlocks& blocks, std::size_t index)
     {
         if (index >= blocks.size())
-            throw std::out_of_range(
-                "ffpsd: tagged block index " + std::to_string(index) + " of " + std::to_string(blocks.size()));
+            throw std::out_of_range("ffpsd: tagged block index " + std::to_string(index) + " of " + std::to_string(blocks.size()));
 
         return blocks[index].get();
     }
@@ -173,9 +170,8 @@ namespace ffpsd::detail
 
     bool RemoveTaggedBlock(TaggedBlocks& blocks, std::uint32_t key)
     {
-        const auto at = std::find_if(blocks.begin(), blocks.end(), [key](const std::unique_ptr<TaggedBlock>& block) {
-            return block->key == key;
-        });
+        const auto at =
+            std::find_if(blocks.begin(), blocks.end(), [key](const std::unique_ptr<TaggedBlock>& block) { return block->key == key; });
         if (at == blocks.end())
             return false;
 

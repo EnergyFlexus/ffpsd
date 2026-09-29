@@ -25,9 +25,8 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    void DecodePixelData(
-        const std::uint8_t* data, std::size_t size, std::size_t rows, std::size_t row_bytes, bool is_psb,
-        std::uint8_t* out)
+    void
+    DecodePixelData(const std::uint8_t* data, std::size_t size, std::size_t rows, std::size_t row_bytes, bool is_psb, std::uint8_t* out)
     {
         BigEndianReader reader(data, size);
         const std::uint16_t compression = reader.ReadU16();
@@ -37,16 +36,14 @@ namespace ffpsd::detail
         {
             if (reader.GetRemaining() < total)
                 throw std::runtime_error(
-                    "ffpsd: raw pixel data holds " + std::to_string(reader.GetRemaining()) + " bytes, needs " +
-                    std::to_string(total));
+                    "ffpsd: raw pixel data holds " + std::to_string(reader.GetRemaining()) + " bytes, needs " + std::to_string(total));
             if (total != 0)
                 reader.ReadU8Array(out, total);
             return;
         }
 
         if (compression != kCompressionRle)
-            throw std::runtime_error(
-                "ffpsd: pixel compression " + std::to_string(compression) + " is not supported yet");
+            throw std::runtime_error("ffpsd: pixel compression " + std::to_string(compression) + " is not supported yet");
 
         // One byte count per row, all of them before any row.
         std::vector<std::size_t> counts(rows);
@@ -57,21 +54,20 @@ namespace ffpsd::detail
         {
             if (counts[row] > reader.GetRemaining())
                 throw std::runtime_error(
-                    "ffpsd: pixel row " + std::to_string(row) + " claims " + std::to_string(counts[row]) +
-                    " bytes, only " + std::to_string(reader.GetRemaining()) + " left");
+                    "ffpsd: pixel row " + std::to_string(row) + " claims " + std::to_string(counts[row]) + " bytes, only " +
+                    std::to_string(reader.GetRemaining()) + " left");
 
             UnpackBits(data + reader.Tell(), counts[row], out + row * row_bytes, row_bytes);
             reader.Skip(counts[row]);
         }
     }
 
-    std::vector<std::uint8_t> EncodePixelData(
-        const std::uint8_t* data, std::size_t rows, std::size_t row_bytes, bool is_psb, std::uint16_t compression)
+    std::vector<std::uint8_t>
+    EncodePixelData(const std::uint8_t* data, std::size_t rows, std::size_t row_bytes, bool is_psb, std::uint16_t compression)
     {
         const std::size_t total = rows * row_bytes;
         const std::size_t count_size = is_psb ? sizeof(std::uint32_t) : sizeof(std::uint16_t);
-        const std::size_t count_max =
-            is_psb ? std::numeric_limits<std::uint32_t>::max() : std::numeric_limits<std::uint16_t>::max();
+        const std::size_t count_max = is_psb ? std::numeric_limits<std::uint32_t>::max() : std::numeric_limits<std::uint16_t>::max();
         const std::size_t header = sizeof(std::uint16_t);
         const std::size_t table = rows * count_size;
 

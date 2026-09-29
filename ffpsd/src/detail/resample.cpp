@@ -107,8 +107,8 @@ namespace ffpsd::detail
 
         // One plane through both passes: along the rows into scratch, then down the columns.
         void CubicPlane(
-            const float* in, std::size_t in_width, std::size_t in_height, const Taps& across, const Taps& down,
-            std::vector<float>& scratch, float* out)
+            const float* in, std::size_t in_width, std::size_t in_height, const Taps& across, const Taps& down, std::vector<float>& scratch,
+            float* out)
         {
             const std::size_t out_width = across.first.size();
             const std::size_t out_height = down.first.size();
@@ -166,9 +166,7 @@ namespace ffpsd::detail
             std::vector<float> out(out_plane * image.channel_count);
             std::vector<float> scratch;
             for (std::size_t c = 0; c < image.channel_count; ++c)
-                CubicPlane(
-                    in.data() + c * in_plane, image.width, image.height, across, down, scratch,
-                    out.data() + c * out_plane);
+                CubicPlane(in.data() + c * in_plane, image.width, image.height, across, down, scratch, out.data() + c * out_plane);
 
             if (has_alpha)
             {
@@ -188,8 +186,7 @@ namespace ffpsd::detail
         // The source pixel whose center is nearest; integer arithmetic, so it never drifts.
         std::size_t NearestSource(std::size_t out_index, std::size_t in, std::size_t out) noexcept
         {
-            return std::min(
-                static_cast<std::size_t>((std::uint64_t{2} * out_index + 1) * in / (std::uint64_t{2} * out)), in - 1);
+            return std::min(static_cast<std::size_t>((std::uint64_t{2} * out_index + 1) * in / (std::uint64_t{2} * out)), in - 1);
         }
 
         void NearestImage(const Image& image, Image& result)
@@ -216,8 +213,7 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    Image Resample(
-        const Image& image, std::uint32_t width, std::uint32_t height, std::size_t color_count, ResampleFilter filter)
+    Image Resample(const Image& image, std::uint32_t width, std::uint32_t height, std::size_t color_count, ResampleFilter filter)
     {
         if (image.width == width && image.height == height)
             return image;

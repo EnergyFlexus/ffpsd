@@ -12,13 +12,12 @@ namespace ffpsd::detail
     namespace
     {
         // Every adjustment the specification lists, interpreted or not.
-        constexpr std::uint32_t kAdjustmentKeys[] = {
-            Fourcc('l', 'e', 'v', 'l'), Fourcc('c', 'u', 'r', 'v'), Fourcc('b', 'r', 'i', 't'),
-            Fourcc('b', 'l', 'n', 'c'), Fourcc('h', 'u', 'e', '2'), Fourcc('h', 'u', 'e', ' '),
-            Fourcc('s', 'e', 'l', 'c'), Fourcc('m', 'i', 'x', 'r'), Fourcc('g', 'r', 'd', 'm'),
-            Fourcc('p', 'h', 'f', 'l'), Fourcc('e', 'x', 'p', 'A'), Fourcc('v', 'i', 'b', 'A'),
-            Fourcc('t', 'h', 'r', 's'), Fourcc('p', 'o', 's', 't'), Fourcc('n', 'v', 'r', 't'),
-            Fourcc('b', 'l', 'w', 'h'), Fourcc('c', 'l', 'r', 'L')};
+        constexpr std::uint32_t kAdjustmentKeys[] = {Fourcc('l', 'e', 'v', 'l'), Fourcc('c', 'u', 'r', 'v'), Fourcc('b', 'r', 'i', 't'),
+                                                     Fourcc('b', 'l', 'n', 'c'), Fourcc('h', 'u', 'e', '2'), Fourcc('h', 'u', 'e', ' '),
+                                                     Fourcc('s', 'e', 'l', 'c'), Fourcc('m', 'i', 'x', 'r'), Fourcc('g', 'r', 'd', 'm'),
+                                                     Fourcc('p', 'h', 'f', 'l'), Fourcc('e', 'x', 'p', 'A'), Fourcc('v', 'i', 'b', 'A'),
+                                                     Fourcc('t', 'h', 'r', 's'), Fourcc('p', 'o', 's', 't'), Fourcc('n', 'v', 'r', 't'),
+                                                     Fourcc('b', 'l', 'w', 'h'), Fourcc('c', 'l', 'r', 'L')};
 
         constexpr std::int16_t kLayerMaskId = -2;
 
@@ -41,15 +40,13 @@ namespace ffpsd::detail
     {
         for (const std::unique_ptr<TaggedBlock>& block : blocks)
         {
-            if (std::find(std::begin(kAdjustmentKeys), std::end(kAdjustmentKeys), block->key) !=
-                std::end(kAdjustmentKeys))
+            if (std::find(std::begin(kAdjustmentKeys), std::end(kAdjustmentKeys), block->key) != std::end(kAdjustmentKeys))
                 return block->key;
         }
         return 0;
     }
 
-    LayerRecord
-    CreateAdjustmentLayerRecord(const std::string& name, std::unique_ptr<TaggedBlock> settings, std::size_t color_count)
+    LayerRecord CreateAdjustmentLayerRecord(const std::string& name, std::unique_ptr<TaggedBlock> settings, std::size_t color_count)
     {
         // No pixels: each channel is just its compression field, the same in PSD and PSB.
         LayerRecord record = CreateLayerRecord(name, SamplesView(), 0, 0, color_count, false);

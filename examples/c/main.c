@@ -55,8 +55,7 @@ static int print_document(ffpsd_document_t* doc)
 
     printf(
         "%u x %u, %s, %u bit%s\n", (unsigned)ffpsd_document_get_width(doc), (unsigned)ffpsd_document_get_height(doc),
-        color_name(ffpsd_document_get_color(doc)), (unsigned)ffpsd_document_get_depth(doc),
-        ffpsd_document_is_psb(doc) ? ", PSB" : "");
+        color_name(ffpsd_document_get_color(doc)), (unsigned)ffpsd_document_get_depth(doc), ffpsd_document_is_psb(doc) ? ", PSB" : "");
 
     if (failed(ffpsd_document_get_resolution_info(doc, &resolution), "resolution"))
         return 0;
@@ -64,9 +63,7 @@ static int print_document(ffpsd_document_t* doc)
 
     if (failed(ffpsd_document_get_version_info(doc, &version), "version info"))
         return 0;
-    printf(
-        "written by: %s, for %s\n", ffpsd_version_info_get_writer_name(version),
-        ffpsd_version_info_get_reader_name(version));
+    printf("written by: %s, for %s\n", ffpsd_version_info_get_writer_name(version), ffpsd_version_info_get_reader_name(version));
     ffpsd_version_info_destroy(version);
 
     printf("layers, bottom to top: %u\n", (unsigned)ffpsd_document_get_layer_count(doc));
@@ -83,9 +80,8 @@ static int print_document(ffpsd_document_t* doc)
             return 0;
 
         printf(
-            "  %u: %s (%s), %d x %d at %d, %d%s\n", (unsigned)i, name, kind_name(ffpsd_layer_get_kind(layer)),
-            bounds.right - bounds.left, bounds.bottom - bounds.top, bounds.left, bounds.top,
-            ffpsd_layer_is_visible(layer) ? "" : ", hidden");
+            "  %u: %s (%s), %d x %d at %d, %d%s\n", (unsigned)i, name, kind_name(ffpsd_layer_get_kind(layer)), bounds.right - bounds.left,
+            bounds.bottom - bounds.top, bounds.left, bounds.top, ffpsd_layer_is_visible(layer) ? "" : ", hidden");
     }
     return 1;
 }
@@ -135,9 +131,7 @@ int main(int argc, char** argv)
             !failed(ffpsd_document_add_layer_copy(doc, top, &copy), "copy") &&
             !failed(ffpsd_document_save(doc, argv[2], FFPSD_COMPRESSION_RLE), argv[2]))
         {
-            printf(
-                "\ncopied the top layer, saved %u layers to %s\n", (unsigned)ffpsd_document_get_layer_count(doc),
-                argv[2]);
+            printf("\ncopied the top layer, saved %u layers to %s\n", (unsigned)ffpsd_document_get_layer_count(doc), argv[2]);
             ok = 1;
         }
     }

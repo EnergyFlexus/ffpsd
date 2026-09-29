@@ -20,8 +20,7 @@ namespace ffpsd::detail
     std::uint32_t FindAdjustmentKey(const TaggedBlocks& blocks) noexcept;
 
     // No pixels, empty channels and a white mask, as Photoshop writes it; settings is the adjustment block.
-    LayerRecord CreateAdjustmentLayerRecord(
-        const std::string& name, std::unique_ptr<TaggedBlock> settings, std::size_t color_count);
+    LayerRecord CreateAdjustmentLayerRecord(const std::string& name, std::unique_ptr<TaggedBlock> settings, std::size_t color_count);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_LAYER_AND_MASK_ADJUSTMENTS_ADJUSTMENT_LAYER_HPP_

@@ -130,9 +130,8 @@ TEST(ReadPsdTest, SectionBlocksOfAnRgbFile)
     const ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
 
     // The blocks after the layers, in file order; three of them had padding to skip.
-    const std::vector<std::pair<std::uint32_t, std::size_t>> expected = {{Fourcc("Patt"), 0},   {Fourcc("CAI "), 77},
-                                                                         {Fourcc("OCIO"), 172}, {Fourcc("GenI"), 84},
-                                                                         {Fourcc("FMsk"), 12},  {Fourcc("cinf"), 410}};
+    const std::vector<std::pair<std::uint32_t, std::size_t>> expected = {{Fourcc("Patt"), 0},  {Fourcc("CAI "), 77}, {Fourcc("OCIO"), 172},
+                                                                         {Fourcc("GenI"), 84}, {Fourcc("FMsk"), 12}, {Fourcc("cinf"), 410}};
     ASSERT_EQ(doc.GetTaggedBlockCount(), expected.size());
     for (std::size_t i = 0; i < expected.size(); ++i)
     {

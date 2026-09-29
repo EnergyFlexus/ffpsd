@@ -19,8 +19,7 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    LayerAndMaskInfo
-    ParseLayerAndMaskInfo(BigEndianReader& reader, bool is_psb, std::uint16_t depth, std::vector<LayerRecord>& records)
+    LayerAndMaskInfo ParseLayerAndMaskInfo(BigEndianReader& reader, bool is_psb, std::uint16_t depth, std::vector<LayerRecord>& records)
     {
         records.clear();
 
@@ -63,8 +62,7 @@ namespace ffpsd::detail
     }
 
     void WriteLayerAndMaskInfo(
-        BigEndianWriter& writer, const LayerAndMaskInfo& info, const std::vector<LayerToWrite>& layers, bool is_psb,
-        std::uint16_t depth)
+        BigEndianWriter& writer, const LayerAndMaskInfo& info, const std::vector<LayerToWrite>& layers, bool is_psb, std::uint16_t depth)
     {
         const std::uint32_t deep_key = DeepLayersKey(depth);
 

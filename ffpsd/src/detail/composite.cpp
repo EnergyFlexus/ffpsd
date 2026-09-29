@@ -41,8 +41,7 @@ namespace ffpsd::detail
             else
             {
                 const std::uint64_t full = Full<T>();
-                return static_cast<T>(
-                    (std::uint64_t{source} * alpha + std::uint64_t{target} * (full - alpha) + full / 2) / full);
+                return static_cast<T>((std::uint64_t{source} * alpha + std::uint64_t{target} * (full - alpha) + full / 2) / full);
             }
         }
 
@@ -79,9 +78,8 @@ namespace ffpsd::detail
         }
 
         template <typename T>
-        void Composite(
-            Image& target, const Image& source, std::int32_t top, std::int32_t left, std::uint8_t opacity,
-            std::size_t color_count)
+        void
+        Composite(Image& target, const Image& source, std::int32_t top, std::int32_t left, std::uint8_t opacity, std::size_t color_count)
         {
             const bool has_alpha = source.channel_count > color_count;
             const std::size_t source_plane = std::size_t{source.width} * source.height;
@@ -101,8 +99,7 @@ namespace ffpsd::detail
                     const auto at_source = static_cast<std::size_t>((y - top) * source.width + (x - left));
                     const auto at_target = static_cast<std::size_t>(y * target.width + x);
 
-                    const T alpha =
-                        has_alpha ? Load<T>(from + (color_count * source_plane + at_source) * sizeof(T)) : Full<T>();
+                    const T alpha = has_alpha ? Load<T>(from + (color_count * source_plane + at_source) * sizeof(T)) : Full<T>();
                     const T coverage = ScaleByOpacity(alpha, opacity);
                     for (std::size_t c = 0; c < color_count; ++c)
                     {
@@ -115,8 +112,7 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    Image
-    WhiteImage(std::uint32_t width, std::uint32_t height, ColorMode color, std::size_t color_count, std::uint16_t depth)
+    Image WhiteImage(std::uint32_t width, std::uint32_t height, ColorMode color, std::size_t color_count, std::uint16_t depth)
     {
         Image image;
         image.width = width;
@@ -142,9 +138,8 @@ namespace ffpsd::detail
         return image;
     }
 
-    void CompositeNormal(
-        Image& target, const Image& source, std::int32_t top, std::int32_t left, std::uint8_t opacity,
-        std::size_t color_count)
+    void
+    CompositeNormal(Image& target, const Image& source, std::int32_t top, std::int32_t left, std::uint8_t opacity, std::size_t color_count)
     {
         // An empty layer has nothing to lay down and says nothing about its channels.
         if (source.IsEmpty())

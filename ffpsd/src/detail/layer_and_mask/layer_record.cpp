@@ -53,8 +53,7 @@ namespace ffpsd::detail
             const std::uint32_t length = reader.ReadU32();
             if (reader.Tell() > end || length > end - reader.Tell())
                 throw std::runtime_error(
-                    std::string("ffpsd: layer ") + what + " claims " + std::to_string(length) +
-                    " bytes, more than the extra data holds");
+                    std::string("ffpsd: layer ") + what + " claims " + std::to_string(length) + " bytes, more than the extra data holds");
 
             std::vector<std::uint8_t> field(length);
             if (length != 0)
@@ -103,8 +102,7 @@ namespace ffpsd::detail
         const std::uint16_t channel_count = reader.ReadU16();
         if (channel_count > kMaxChannels)
             throw std::runtime_error(
-                "ffpsd: layer at offset " + std::to_string(record_start) + " claims " + std::to_string(channel_count) +
-                " channels");
+                "ffpsd: layer at offset " + std::to_string(record_start) + " claims " + std::to_string(channel_count) + " channels");
 
         record.channels.resize(channel_count);
         channel_lengths.clear();
@@ -117,8 +115,8 @@ namespace ffpsd::detail
         record.blend_signature = reader.ReadU32();
         if (record.blend_signature != kBlockSignature)
             throw std::runtime_error(
-                "ffpsd: expected 8BIM before the blend mode of the layer at offset " + std::to_string(record_start) +
-                ", got '" + FourccString(record.blend_signature) + "'");
+                "ffpsd: expected 8BIM before the blend mode of the layer at offset " + std::to_string(record_start) + ", got '" +
+                FourccString(record.blend_signature) + "'");
 
         record.blend_key = reader.ReadU32();
         record.opacity = reader.ReadU8();
@@ -129,8 +127,8 @@ namespace ffpsd::detail
         const std::uint32_t extra_length = reader.ReadU32();
         if (extra_length > reader.GetRemaining())
             throw std::runtime_error(
-                "ffpsd: layer extra data claims " + std::to_string(extra_length) + " bytes, only " +
-                std::to_string(reader.GetRemaining()) + " left");
+                "ffpsd: layer extra data claims " + std::to_string(extra_length) + " bytes, only " + std::to_string(reader.GetRemaining()) +
+                " left");
         const std::size_t extra_end = reader.Tell() + extra_length;
 
         record.mask_data = ReadExtraField(reader, extra_end, "mask data");
@@ -145,8 +143,7 @@ namespace ffpsd::detail
     }
 
     void WriteLayerRecord(
-        BigEndianWriter& writer, const LayerRecord& record,
-        const std::vector<const std::vector<std::uint8_t>*>& channels, bool is_psb)
+        BigEndianWriter& writer, const LayerRecord& record, const std::vector<const std::vector<std::uint8_t>*>& channels, bool is_psb)
     {
         writer.WriteI32(record.bounds.top);
         writer.WriteI32(record.bounds.left);
@@ -266,8 +263,8 @@ namespace ffpsd::detail
         const std::uint32_t max_side = MaxSide(is_psb);
         if (width > max_side || height > max_side)
             throw std::invalid_argument(
-                "ffpsd: a " + std::to_string(width) + " x " + std::to_string(height) + " layer exceeds " +
-                std::to_string(max_side) + " pixels a side");
+                "ffpsd: a " + std::to_string(width) + " x " + std::to_string(height) + " layer exceeds " + std::to_string(max_side) +
+                " pixels a side");
     }
 
     std::vector<ChannelImageData> EncodeLayerChannels(const SamplesView& samples, std::size_t color_count, bool is_psb)
@@ -294,18 +291,15 @@ namespace ffpsd::detail
         const std::size_t needed = plane_samples * samples.channel_count * sample_size;
         if (samples.data == nullptr || samples.size != needed)
             throw std::invalid_argument(
-                "ffpsd: samples hold " + std::to_string(samples.size) + " bytes, the geometry needs " +
-                std::to_string(needed));
+                "ffpsd: samples hold " + std::to_string(samples.size) + " bytes, the geometry needs " + std::to_string(needed));
 
         const auto plane = [&](std::size_t index) { return samples.data + index * plane_samples * sample_size; };
 
         // Transparency is declared first, as Photoshop writes it.
         if (samples.channel_count > color_count)
-            channels.push_back(
-                EncodeChannel(kTransparencyId, plane(color_count), samples.width, samples.height, sample_size, is_psb));
+            channels.push_back(EncodeChannel(kTransparencyId, plane(color_count), samples.width, samples.height, sample_size, is_psb));
         for (std::size_t i = 0; i < color_count; ++i)
-            channels.push_back(EncodeChannel(
-                static_cast<std::int16_t>(i), plane(i), samples.width, samples.height, sample_size, is_psb));
+            channels.push_back(EncodeChannel(static_cast<std::int16_t>(i), plane(i), samples.width, samples.height, sample_size, is_psb));
         return channels;
     }
 
@@ -358,9 +352,7 @@ namespace ffpsd::detail
         const std::size_t row_bytes = std::size_t{image.width} * image.GetBytesPerSample();
         const std::size_t plane = row_bytes * image.height;
         for (std::size_t i = 0; i < colors.size(); ++i)
-            DecodePixelData(
-                colors[i]->raw.data(), colors[i]->raw.size(), image.height, row_bytes, is_psb,
-                image.bytes.data() + i * plane);
+            DecodePixelData(colors[i]->raw.data(), colors[i]->raw.size(), image.height, row_bytes, is_psb, image.bytes.data() + i * plane);
 
         SwapSampleBytes(image.bytes, image.GetBytesPerSample());
         return image;
@@ -382,8 +374,7 @@ namespace ffpsd::detail
     }
 
     LayerRecord CreateLayerRecord(
-        const std::string& name, const SamplesView& samples, std::int32_t top, std::int32_t left,
-        std::size_t color_count, bool is_psb)
+        const std::string& name, const SamplesView& samples, std::int32_t top, std::int32_t left, std::size_t color_count, bool is_psb)
     {
         LayerRecord record;
         record.name = name;

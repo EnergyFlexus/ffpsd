@@ -95,8 +95,7 @@ namespace ffpsd
     void Layer::SetVisible(bool visible) noexcept
     {
         std::uint8_t& flags = record_->flags;
-        flags =
-            visible ? static_cast<std::uint8_t>(flags & ~kHiddenFlag) : static_cast<std::uint8_t>(flags | kHiddenFlag);
+        flags = visible ? static_cast<std::uint8_t>(flags & ~kHiddenFlag) : static_cast<std::uint8_t>(flags | kHiddenFlag);
     }
     void Layer::SetBlendKey(std::uint32_t blend_key) noexcept
     {
@@ -142,15 +141,13 @@ namespace ffpsd
         const std::uint16_t depth = document_->GetDepth();
         if (!image.IsEmpty() && image.depth != depth)
             throw std::invalid_argument(
-                "ffpsd: a " + std::to_string(image.depth) + " bit image in a " + std::to_string(depth) +
-                " bit document");
+                "ffpsd: a " + std::to_string(image.depth) + " bit image in a " + std::to_string(depth) + " bit document");
         detail::CheckLayerSides(image.width, image.height, document_->IsPsb());
 
         detail::SamplesView samples = detail::ViewOf(image);
         samples.depth = depth; // an empty image says nothing about its depth
 
-        detail::ReplaceLayerPixels(
-            *record_, samples, detail::LayerColorChannels(document_->GetColor()), document_->IsPsb());
+        detail::ReplaceLayerPixels(*record_, samples, detail::LayerColorChannels(document_->GetColor()), document_->IsPsb());
         document_->SetHasRealMergedData(false);
     }
 
@@ -186,8 +183,7 @@ namespace ffpsd
         if (IsBackground())
             throw std::invalid_argument("ffpsd: the background keeps the canvas size");
         if (width == 0 || height == 0)
-            throw std::invalid_argument(
-                "ffpsd: cannot resize a layer to " + std::to_string(width) + " x " + std::to_string(height));
+            throw std::invalid_argument("ffpsd: cannot resize a layer to " + std::to_string(width) + " x " + std::to_string(height));
         detail::CheckLayerSides(width, height, document_->IsPsb());
 
         const Image pixels = GetPixels();

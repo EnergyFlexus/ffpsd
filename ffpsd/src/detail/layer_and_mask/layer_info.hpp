@@ -39,10 +39,8 @@ namespace ffpsd::detail
     };
 
     // Layers bottom to top; none give an empty layer info, just its length field.
-    void
-    WriteLayerInfo(BigEndianWriter& writer, bool merged_alpha, const std::vector<LayerToWrite>& layers, bool is_psb);
-    void WriteLayerInfoBody(
-        BigEndianWriter& writer, bool merged_alpha, const std::vector<LayerToWrite>& layers, bool is_psb);
+    void WriteLayerInfo(BigEndianWriter& writer, bool merged_alpha, const std::vector<LayerToWrite>& layers, bool is_psb);
+    void WriteLayerInfoBody(BigEndianWriter& writer, bool merged_alpha, const std::vector<LayerToWrite>& layers, bool is_psb);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_LAYER_AND_MASK_LAYER_INFO_HPP_

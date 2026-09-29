@@ -403,13 +403,11 @@ TEST(DocumentTest, ABlockPaddedToTwoAsTheSpecificationSaysIsReadToo)
     bytes.erase(block + 12 + 6, block + 12 + 8);
 
     // The layer and mask section, after the header, the color mode data and the resources, is 2 shorter.
-    const std::size_t resources =
-        26 + 4 + BigEndianU32(std::vector<std::uint8_t>(bytes.begin() + 26, bytes.begin() + 30));
+    const std::size_t resources = 26 + 4 + BigEndianU32(std::vector<std::uint8_t>(bytes.begin() + 26, bytes.begin() + 30));
     const std::size_t section =
-        resources + 4 +
-        BigEndianU32(std::vector<std::uint8_t>(bytes.begin() + resources, bytes.begin() + resources + 4));
-    const std::vector<std::uint8_t> length = BigEndianBytes(
-        BigEndianU32(std::vector<std::uint8_t>(bytes.begin() + section, bytes.begin() + section + 4)) - 2);
+        resources + 4 + BigEndianU32(std::vector<std::uint8_t>(bytes.begin() + resources, bytes.begin() + resources + 4));
+    const std::vector<std::uint8_t> length =
+        BigEndianBytes(BigEndianU32(std::vector<std::uint8_t>(bytes.begin() + section, bytes.begin() + section + 4)) - 2);
     std::copy(length.begin(), length.end(), bytes.begin() + static_cast<std::ptrdiff_t>(section));
 
     const ffpsd::Document back = ffpsd::Document::Parse(bytes);

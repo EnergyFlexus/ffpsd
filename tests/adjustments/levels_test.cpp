@@ -54,8 +54,7 @@ TEST(LevelsTest, AGrayscaleDocumentHasTwoRecords)
 {
     ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kGrayscale);
 
-    const ffpsd::LevelsInfo info =
-        *doc.AddAdjustmentLayer<ffpsd::LevelsInfo>("levels")->GetAdjustment<ffpsd::LevelsInfo>();
+    const ffpsd::LevelsInfo info = *doc.AddAdjustmentLayer<ffpsd::LevelsInfo>("levels")->GetAdjustment<ffpsd::LevelsInfo>();
 
     EXPECT_EQ(info.channels.size(), 2u);
 }
@@ -142,8 +141,7 @@ TEST(LevelsTest, ANewLayerWithoutRecordsChangesNothing)
 {
     ffpsd::Document doc = NewDocument();
 
-    const ffpsd::LevelsInfo info =
-        *doc.AddAdjustmentLayer<ffpsd::LevelsInfo>("levels")->GetAdjustment<ffpsd::LevelsInfo>();
+    const ffpsd::LevelsInfo info = *doc.AddAdjustmentLayer<ffpsd::LevelsInfo>("levels")->GetAdjustment<ffpsd::LevelsInfo>();
 
     ASSERT_EQ(info.channels.size(), 4u);
     for (const ffpsd::LevelsInfo::Channel& channel : info.channels)

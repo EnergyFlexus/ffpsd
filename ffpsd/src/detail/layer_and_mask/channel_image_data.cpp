@@ -7,8 +7,7 @@
 
 namespace ffpsd::detail
 {
-    ChannelImageData
-    ParseChannelImageData(BigEndianReader& reader, std::size_t end, std::int16_t id, std::uint64_t length)
+    ChannelImageData ParseChannelImageData(BigEndianReader& reader, std::size_t end, std::int16_t id, std::uint64_t length)
     {
         if (length > end - reader.Tell())
             throw std::runtime_error(
@@ -24,8 +23,7 @@ namespace ffpsd::detail
     }
 
     ChannelImageData EncodeChannel(
-        std::int16_t id, const std::uint8_t* samples, std::size_t width, std::size_t height,
-        std::size_t bytes_per_sample, bool is_psb)
+        std::int16_t id, const std::uint8_t* samples, std::size_t width, std::size_t height, std::size_t bytes_per_sample, bool is_psb)
     {
         ChannelImageData channel;
         channel.id = id;

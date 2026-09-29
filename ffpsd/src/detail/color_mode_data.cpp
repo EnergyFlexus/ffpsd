@@ -10,8 +10,8 @@ namespace ffpsd::detail
         const std::uint32_t length = reader.ReadU32();
         if (length > reader.GetRemaining())
             throw std::runtime_error(
-                "ffpsd: color mode data claims " + std::to_string(length) + " bytes, only " +
-                std::to_string(reader.GetRemaining()) + " left");
+                "ffpsd: color mode data claims " + std::to_string(length) + " bytes, only " + std::to_string(reader.GetRemaining()) +
+                " left");
 
         std::vector<std::uint8_t> data(length);
         if (length != 0)

@@ -11,8 +11,7 @@
 namespace ffpsd::detail
 {
     // The first channel_count + 1 records: all of the color channels, then each channel.
-    template <>
-    LevelsInfo ParseAdjustment<LevelsInfo>(const std::vector<std::uint8_t>& data, std::size_t channel_count);
+    template <> LevelsInfo ParseAdjustment<LevelsInfo>(const std::vector<std::uint8_t>& data, std::size_t channel_count);
 
     // As Photoshop writes it: 29 records, then 'Lvls' with 62 in all; missing records are the identity.
     template <> std::vector<std::uint8_t> EncodeAdjustment<LevelsInfo>(const LevelsInfo& levels);

@@ -104,13 +104,12 @@ namespace ffpsd
         FFPSD_EXPORT const Layer* GetLayerByIndex(std::size_t index) const;
 
         // Adds a raster layer on top. One image plane beyond the color channels is transparency.
-        FFPSD_EXPORT Layer*
-        AddLayer(const std::string& name, const Image& image = Image(), std::int32_t top = 0, std::int32_t left = 0);
+        FFPSD_EXPORT Layer* AddLayer(const std::string& name, const Image& image = Image(), std::int32_t top = 0, std::int32_t left = 0);
 
         // The same from a planar buffer at the document's depth; it only has to live for the call.
         FFPSD_EXPORT Layer* AddLayer(
-            const std::string& name, const std::uint8_t* data, std::size_t size, std::uint32_t width,
-            std::uint32_t height, std::uint16_t channel_count, std::int32_t top = 0, std::int32_t left = 0);
+            const std::string& name, const std::uint8_t* data, std::size_t size, std::uint32_t width, std::uint32_t height,
+            std::uint16_t channel_count, std::int32_t top = 0, std::int32_t left = 0);
 
         // Photoshop's locked background: at the bottom, the document's size, one at most; alpha goes onto white.
         FFPSD_EXPORT Layer* AddBackgroundLayer(const std::string& name, const Image& image);

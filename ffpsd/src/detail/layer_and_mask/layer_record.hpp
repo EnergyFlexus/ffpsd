@@ -62,8 +62,7 @@ namespace ffpsd::detail
 
     // Pass one again, with the data written for each channel, which may differ from the record's.
     void WriteLayerRecord(
-        BigEndianWriter& writer, const LayerRecord& record,
-        const std::vector<const std::vector<std::uint8_t>*>& channels, bool is_psb);
+        BigEndianWriter& writer, const LayerRecord& record, const std::vector<const std::vector<std::uint8_t>*>& channels, bool is_psb);
 
     // Borrowed planar samples in native byte order; the caller keeps them alive for the call.
     struct SamplesView
@@ -99,8 +98,7 @@ namespace ffpsd::detail
 
     // Color planes first; one plane more is transparency. No samples give empty channels.
     LayerRecord CreateLayerRecord(
-        const std::string& name, const SamplesView& samples, std::int32_t top, std::int32_t left,
-        std::size_t color_count, bool is_psb);
+        const std::string& name, const SamplesView& samples, std::int32_t top, std::int32_t left, std::size_t color_count, bool is_psb);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_LAYER_AND_MASK_LAYER_RECORD_HPP_
