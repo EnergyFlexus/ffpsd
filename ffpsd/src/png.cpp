@@ -212,11 +212,11 @@ namespace ffpsd
         }
     } // namespace
 
-    Image LoadPng(const std::uint8_t* data, std::size_t size, ColorMode color, std::uint16_t depth)
+    Image LoadPng(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth)
     {
-        if (color != ColorMode::kGrayscale && color != ColorMode::kRgb)
+        if (color_mode != ColorMode::kGrayscale && color_mode != ColorMode::kRgb)
             throw std::invalid_argument(
-                "ffpsd: a PNG loads into grayscale or RGB, not color mode " + std::to_string(static_cast<int>(color)));
+                "ffpsd: a PNG loads into grayscale or RGB, not color mode " + std::to_string(static_cast<int>(color_mode)));
         if (depth != 8 && depth != 16)
             throw std::invalid_argument("ffpsd: a PNG loads at 8 or 16 bit, not " + std::to_string(depth));
         if (data == nullptr || size < kSignatureSize || png_sig_cmp(data, 0, kSignatureSize) != 0)
@@ -254,17 +254,17 @@ namespace ffpsd
         }
 
         const bool is_rgb = image.channel_count >= 3;
-        if (color == ColorMode::kGrayscale && is_rgb)
+        if (color_mode == ColorMode::kGrayscale && is_rgb)
             return detail::RgbToGray(image);
-        if (color == ColorMode::kRgb && !is_rgb)
+        if (color_mode == ColorMode::kRgb && !is_rgb)
             return detail::GrayToRgb(image);
         return image;
     }
 
-    Image LoadPng(const std::string& path, ColorMode color, std::uint16_t depth)
+    Image LoadPng(const std::string& path, ColorMode color_mode, std::uint16_t depth)
     {
         const std::vector<std::uint8_t> data = detail::ReadFile(path);
-        return LoadPng(data.data(), data.size(), color, depth);
+        return LoadPng(data.data(), data.size(), color_mode, depth);
     }
 
     std::vector<std::uint8_t> EncodePng(const Image& image)
@@ -326,10 +326,10 @@ namespace ffpsd
 
     std::vector<std::uint8_t> Layer::EncodePng() const
     {
-        const ColorMode color = document_->GetColorMode();
-        if (color != ColorMode::kGrayscale && color != ColorMode::kRgb)
+        const ColorMode color_mode = document_->GetColorMode();
+        if (color_mode != ColorMode::kGrayscale && color_mode != ColorMode::kRgb)
             throw std::invalid_argument(
-                "ffpsd: a PNG takes a gray or RGB layer, not color mode " + std::to_string(static_cast<int>(color)));
+                "ffpsd: a PNG takes a gray or RGB layer, not color mode " + std::to_string(static_cast<int>(color_mode)));
         return ffpsd::EncodePng(GetPixels());
     }
 

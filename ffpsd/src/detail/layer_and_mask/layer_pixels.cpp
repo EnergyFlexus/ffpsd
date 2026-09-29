@@ -1,7 +1,6 @@
 #include "detail/layer_and_mask/layer_pixels.hpp"
 
 #include "detail/file_header.hpp"
-#include "detail/io/fourcc.hpp"
 #include "detail/layer_and_mask/tagged_blocks/unicode_layer_name.hpp"
 #include "detail/pixel_data.hpp"
 

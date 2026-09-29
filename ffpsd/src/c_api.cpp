@@ -407,6 +407,14 @@ extern "C"
     {
         return Guard([&] { NeedOut(out) = new ffpsd_document_t(); });
     }
+    ffpsd_status_t
+    ffpsd_document_create_with(uint32_t width, uint32_t height, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_document_t** out)
+    {
+        return Guard([&] {
+            ffpsd_document_t*& target = NeedOut(out);
+            target = new ffpsd_document_t{ffpsd::Document(width, height, static_cast<ffpsd::ColorMode>(color_mode), depth)};
+        });
+    }
     ffpsd_status_t ffpsd_document_open(const char* path, ffpsd_document_t** out)
     {
         return Guard([&] {
@@ -453,7 +461,7 @@ extern "C"
     {
         return doc == nullptr ? 0 : doc->value.GetDepth();
     }
-    ffpsd_color_mode_t ffpsd_document_get_color(const ffpsd_document_t* doc)
+    ffpsd_color_mode_t ffpsd_document_get_color_mode(const ffpsd_document_t* doc)
     {
         return doc == nullptr ? FFPSD_COLOR_MODE_BITMAP : static_cast<ffpsd_color_mode_t>(doc->value.GetColorMode());
     }
@@ -482,9 +490,13 @@ extern "C"
     {
         return Guard([&] { Need(doc, "doc").value.SetDepth(depth); });
     }
-    ffpsd_status_t ffpsd_document_set_color(ffpsd_document_t* doc, ffpsd_color_mode_t color)
+    ffpsd_status_t ffpsd_document_set_color_mode(ffpsd_document_t* doc, ffpsd_color_mode_t color_mode)
     {
-        return Guard([&] { Need(doc, "doc").value.SetColorMode(static_cast<ffpsd::ColorMode>(color)); });
+        return Guard([&] { Need(doc, "doc").value.SetColorMode(static_cast<ffpsd::ColorMode>(color_mode)); });
+    }
+    ffpsd_status_t ffpsd_document_convert_color_mode(ffpsd_document_t* doc, ffpsd_color_mode_t color_mode)
+    {
+        return Guard([&] { Need(doc, "doc").value.ConvertColorMode(static_cast<ffpsd::ColorMode>(color_mode)); });
     }
     ffpsd_status_t ffpsd_document_set_psb(ffpsd_document_t* doc, int psb)
     {
@@ -850,21 +862,22 @@ extern "C"
         });
     }
 
-    ffpsd_status_t ffpsd_png_load(const char* path, ffpsd_color_mode_t color, uint16_t depth, ffpsd_image_t** out)
+    ffpsd_status_t ffpsd_png_load(const char* path, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_image_t** out)
     {
         return Guard([&] {
             ffpsd_image_t*& target = NeedOut(out);
             RequirePng();
             const std::string file(&Need(path, "path"));
-            target = NewImage(LoadPng(file, static_cast<ffpsd::ColorMode>(color), depth));
+            target = NewImage(LoadPng(file, static_cast<ffpsd::ColorMode>(color_mode), depth));
         });
     }
-    ffpsd_status_t ffpsd_png_load_memory(const uint8_t* data, size_t size, ffpsd_color_mode_t color, uint16_t depth, ffpsd_image_t** out)
+    ffpsd_status_t
+    ffpsd_png_load_memory(const uint8_t* data, size_t size, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_image_t** out)
     {
         return Guard([&] {
             ffpsd_image_t*& target = NeedOut(out);
             RequirePng();
-            target = NewImage(LoadPng(NeedBytes(data, size), size, static_cast<ffpsd::ColorMode>(color), depth));
+            target = NewImage(LoadPng(NeedBytes(data, size), size, static_cast<ffpsd::ColorMode>(color_mode), depth));
         });
     }
     ffpsd_status_t ffpsd_png_save(const ffpsd_image_view_t* image, const char* path)

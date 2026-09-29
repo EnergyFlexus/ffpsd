@@ -70,11 +70,11 @@ namespace ffpsd::detail
                 return static_cast<T>(Full<T>() / 2 + 1);
         }
 
-        template <typename T> void WhiteChannels(Image& image, ColorMode color)
+        template <typename T> void WhiteChannels(Image& image, ColorMode color_mode)
         {
             const T middle = Middle<T>();
             for (std::size_t channel = 0; channel < image.channel_count; ++channel)
-                Fill<T>(image, channel, color == ColorMode::kLab && channel > 0 ? middle : Full<T>());
+                Fill<T>(image, channel, color_mode == ColorMode::kLab && channel > 0 ? middle : Full<T>());
         }
 
         template <typename T>
@@ -112,7 +112,7 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    Image MakeWhiteImage(std::uint32_t width, std::uint32_t height, ColorMode color, std::size_t color_count, std::uint16_t depth)
+    Image MakeWhiteImage(std::uint32_t width, std::uint32_t height, ColorMode color_mode, std::size_t color_count, std::uint16_t depth)
     {
         Image image;
         image.width = width;
@@ -124,13 +124,13 @@ namespace ffpsd::detail
         switch (depth)
         {
         case 8:
-            WhiteChannels<std::uint8_t>(image, color);
+            WhiteChannels<std::uint8_t>(image, color_mode);
             break;
         case 16:
-            WhiteChannels<std::uint16_t>(image, color);
+            WhiteChannels<std::uint16_t>(image, color_mode);
             break;
         case 32:
-            WhiteChannels<float>(image, color);
+            WhiteChannels<float>(image, color_mode);
             break;
         default:
             throw std::invalid_argument("ffpsd: unsupported depth: " + std::to_string(depth));

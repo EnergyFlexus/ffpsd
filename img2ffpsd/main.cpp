@@ -308,19 +308,19 @@ namespace
 
     // ---- Converting one pair -------------------------------------------------------------------
 
-    ffpsd::Image LoadPng(const fs::path& path, ffpsd::ColorMode color)
+    ffpsd::Image LoadPng(const fs::path& path, ffpsd::ColorMode color_mode)
     {
         const std::vector<std::uint8_t> data = ReadFile(path);
-        return ffpsd::LoadPng(data.data(), data.size(), color, 8);
+        return ffpsd::LoadPng(data.data(), data.size(), color_mode, 8);
     }
 
     void Convert(const Options& options, const fs::path& file)
     {
-        const ffpsd::ColorMode color = options.gray ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb;
+        const ffpsd::ColorMode color_mode = options.gray ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb;
         const std::uint16_t color_count = options.gray ? 1 : 3;
 
-        const ffpsd::Image bottom = LoadPng(options.bottom / file, color);
-        ffpsd::Image top = LoadPng(options.top / file, color);
+        const ffpsd::Image bottom = LoadPng(options.bottom / file, color_mode);
+        ffpsd::Image top = LoadPng(options.top / file, color_mode);
 
         // The top picture loses its transparency, the plane after the color ones.
         top.channel_count = color_count;
@@ -331,11 +331,7 @@ namespace
         const std::uint32_t width = top_is_larger ? top.width : bottom.width;
         const std::uint32_t height = top_is_larger ? top.height : bottom.height;
 
-        ffpsd::Document doc;
-        doc.SetColorMode(color);
-        doc.SetWidth(width);
-        doc.SetHeight(height);
-        doc.SetChannelCount(color_count);
+        ffpsd::Document doc(width, height, color_mode);
 
         if (bottom.width == width && bottom.height == height)
         {

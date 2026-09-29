@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <ffpsd/ffpsd.hpp>
 #include <gtest/gtest.h>
+#include <optional>
 #include <stdexcept>
 #include <vector>
 
@@ -57,6 +58,24 @@ TEST(AdjustmentLevelsTest, AGrayscaleDocumentHasTwoRecords)
     const ffpsd::LevelsInfo info = *doc.AddAdjustmentLayer<ffpsd::LevelsInfo>("levels")->GetAdjustment<ffpsd::LevelsInfo>();
 
     EXPECT_EQ(info.channels.size(), 2u);
+}
+
+TEST(AdjustmentLevelsTest, PhotoshopKeepsAGrayChannelInRecordOne)
+{
+    // Set up as 25 to 237 on the Gray channel; record 0, every channel at once, stays the identity.
+    const ffpsd::Document doc = ffpsd::Document::Open(kGrayscaleLevelsPsd);
+    const ffpsd::Layer* levels = doc.GetLayerByIndex(2);
+
+    const std::optional<ffpsd::LevelsInfo> info = levels->GetAdjustment<ffpsd::LevelsInfo>();
+
+    ASSERT_TRUE(info.has_value());
+    ASSERT_EQ(info->channels.size(), 2u);
+    ExpectIdentity(info->channels[0]);
+    EXPECT_EQ(info->channels[1].input_floor, 25u);
+    EXPECT_EQ(info->channels[1].input_ceiling, 237u);
+    EXPECT_EQ(info->channels[1].output_floor, 0u);
+    EXPECT_EQ(info->channels[1].output_ceiling, 255u);
+    EXPECT_DOUBLE_EQ(info->channels[1].gamma, 1.0);
 }
 
 TEST(AdjustmentLevelsTest, OnlyALevelsLayerTakesLevels)

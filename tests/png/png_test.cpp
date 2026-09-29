@@ -123,14 +123,14 @@ TEST_P(PngRoundTripTest, EncodeThenLoadGivesTheSamePlanes)
 {
     const auto [channels, depth] = GetParam();
     const ffpsd::Image image = Pattern(5, 3, channels, depth);
-    const ffpsd::ColorMode color = channels < 3 ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb;
+    const ffpsd::ColorMode color_mode = channels < 3 ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb;
 
     const std::vector<std::uint8_t> png = ffpsd::EncodePng(image);
 
     // Gray, gray with alpha, RGB and RGBA are color types 0, 4, 2 and 6.
     const int color_types[] = {0, 4, 2, 6};
     EXPECT_EQ(Header(png), std::make_tuple(5u, 3u, int{depth}, color_types[channels - 1]));
-    EXPECT_EQ(ffpsd::LoadPng(png.data(), png.size(), color, depth).bytes, image.bytes);
+    EXPECT_EQ(ffpsd::LoadPng(png.data(), png.size(), color_mode, depth).bytes, image.bytes);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -153,13 +153,14 @@ TEST(PngTest, LayersOfBothFilesSaveAsWhatGetPixelsGives)
     const ffpsd::Document rgb = ffpsd::Document::Open(kRgbPsd);
     const ffpsd::Document gray = ffpsd::Document::Open(kGrayscalePsd);
 
-    for (const auto& [doc, color] : {std::make_pair(&rgb, ffpsd::ColorMode::kRgb), std::make_pair(&gray, ffpsd::ColorMode::kGrayscale)})
+    for (const auto& [doc, color_mode] :
+         {std::make_pair(&rgb, ffpsd::ColorMode::kRgb), std::make_pair(&gray, ffpsd::ColorMode::kGrayscale)})
     {
         for (std::size_t i = 0; i < doc->GetLayerCount(); ++i)
         {
             const ffpsd::Layer* layer = doc->GetLayerByIndex(i);
             const std::vector<std::uint8_t> png = layer->EncodePng();
-            EXPECT_EQ(ffpsd::LoadPng(png.data(), png.size(), color, 8).bytes, layer->GetPixels().bytes) << layer->GetName();
+            EXPECT_EQ(ffpsd::LoadPng(png.data(), png.size(), color_mode, 8).bytes, layer->GetPixels().bytes) << layer->GetName();
         }
     }
 }

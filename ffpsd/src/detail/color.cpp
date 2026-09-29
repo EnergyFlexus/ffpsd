@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -49,12 +50,12 @@ namespace ffpsd::detail
             }
         }
 
-        void CheckImage(const Image& image, std::uint16_t first, std::uint16_t second, const char* what)
+        void CheckImage(const Image& image, std::uint16_t fewest, std::uint16_t most, const char* what)
         {
-            if (image.channel_count != first && image.channel_count != second)
+            if (image.channel_count < fewest || image.channel_count > most)
                 throw std::invalid_argument(
-                    std::string("ffpsd: ") + what + " takes " + std::to_string(first) + " or " + std::to_string(second) +
-                    " channels, not " + std::to_string(image.channel_count));
+                    std::string("ffpsd: ") + what + " takes " + std::to_string(fewest) + " to " + std::to_string(most) + " channels, not " +
+                    std::to_string(image.channel_count));
             if (image.depth != 8 && image.depth != 16 && image.depth != 32)
                 throw std::invalid_argument("ffpsd: unsupported depth: " + std::to_string(image.depth));
             if (image.bytes.size() != image.GetSizeBytes())
@@ -75,9 +76,9 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    std::size_t LayerColorCount(ColorMode color)
+    std::size_t LayerColorCount(ColorMode color_mode)
     {
-        switch (color)
+        switch (color_mode)
         {
         case ColorMode::kGrayscale:
         case ColorMode::kDuotone:
@@ -88,15 +89,14 @@ namespace ffpsd::detail
         case ColorMode::kCmyk:
             return 4;
         default:
-            throw std::invalid_argument("ffpsd: color mode " + std::to_string(static_cast<int>(color)) + " has no layers");
+            throw std::invalid_argument("ffpsd: color mode " + std::to_string(static_cast<int>(color_mode)) + " has no layers");
         }
     }
 
     Image RgbToGray(const Image& rgb)
     {
-        CheckImage(rgb, 3, 4, "RGB to gray");
-        const bool has_alpha = rgb.channel_count == 4;
-        Image gray = MakeImage(rgb, has_alpha ? 2 : 1);
+        CheckImage(rgb, 3, std::numeric_limits<std::uint16_t>::max(), "RGB to gray");
+        Image gray = MakeImage(rgb, static_cast<std::uint16_t>(rgb.channel_count - 2));
 
         const std::size_t pixels = std::size_t{rgb.width} * rgb.height;
         const std::size_t plane = pixels * rgb.GetBytesPerSample();
@@ -113,16 +113,17 @@ namespace ffpsd::detail
             break;
         }
 
-        if (has_alpha && plane != 0)
-            std::memcpy(gray.bytes.data() + plane, rgb.bytes.data() + 3 * plane, plane);
+        // Transparency, or a composite's alpha channels.
+        const std::size_t extra = std::size_t{rgb.channel_count} - 3;
+        if (extra != 0 && plane != 0)
+            std::memcpy(gray.bytes.data() + plane, rgb.bytes.data() + 3 * plane, extra * plane);
         return gray;
     }
 
     Image GrayToRgb(const Image& gray)
     {
-        CheckImage(gray, 1, 2, "gray to RGB");
-        const bool has_alpha = gray.channel_count == 2;
-        Image rgb = MakeImage(gray, has_alpha ? 4 : 3);
+        CheckImage(gray, 1, std::numeric_limits<std::uint16_t>::max() - 2, "gray to RGB");
+        Image rgb = MakeImage(gray, static_cast<std::uint16_t>(gray.channel_count + 2));
 
         const std::size_t plane = std::size_t{gray.width} * gray.height * gray.GetBytesPerSample();
         if (plane == 0)
@@ -130,8 +131,11 @@ namespace ffpsd::detail
 
         for (std::size_t channel = 0; channel < 3; ++channel)
             std::memcpy(rgb.bytes.data() + channel * plane, gray.bytes.data(), plane);
-        if (has_alpha)
-            std::memcpy(rgb.bytes.data() + 3 * plane, gray.bytes.data() + plane, plane);
+
+        // Transparency, or a composite's alpha channels.
+        const std::size_t extra = std::size_t{gray.channel_count} - 1;
+        if (extra != 0)
+            std::memcpy(rgb.bytes.data() + 3 * plane, gray.bytes.data() + plane, extra * plane);
         return rgb;
     }
 } // namespace ffpsd::detail

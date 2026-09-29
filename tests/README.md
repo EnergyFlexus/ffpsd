@@ -29,6 +29,7 @@ together with what it leaves behind.
 | `photoshop/grayscale_two_layers.psd` | 836 x 1200 gray: a background and a fill layer with transparency |
 | `photoshop/rgb_two_layers.psd` | 1890 x 1417 RGB, RLE: a background and its copy with transparency |
 | `photoshop/rgb_levels.psd` | the same background under a Levels adjustment layer |
+| `photoshop/grayscale_two_layers_levels.psd` | the gray file under a Levels layer of 25 to 237 on its one channel |
 | `generated/rgba_8bit.png` | 3 x 2 RGBA with known colors and alpha |
 | `generated/gray_16bit.png` | 2 x 2 16 bit gray |
 | `generated/palette_transparent.png` | 2 x 1 palette, one entry fully transparent |

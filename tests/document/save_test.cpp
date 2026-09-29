@@ -49,7 +49,8 @@ TEST_P(DocumentSaveUnchangedTest, GivesBackTheSameBytes)
 INSTANTIATE_TEST_SUITE_P(
     PhotoshopFiles, DocumentSaveUnchangedTest,
     testing::Values(
-        PsdFile{"grayscale_two_layers", kGrayscalePsd}, PsdFile{"rgb_two_layers", kRgbPsd}, PsdFile{"rgb_levels", kRgbLevelsPsd}),
+        PsdFile{"grayscale_two_layers", kGrayscalePsd}, PsdFile{"rgb_two_layers", kRgbPsd}, PsdFile{"rgb_levels", kRgbLevelsPsd},
+        PsdFile{"grayscale_two_layers_levels", kGrayscaleLevelsPsd}),
     FileName);
 
 TEST(DocumentSaveTest, LayerBlocksCountTheirPaddingAsPhotoshopDoes)

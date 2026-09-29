@@ -6,6 +6,7 @@ add_executable(ffpsd_tests
     adjustments/levels_test.cpp
     c_api/c_api_test.cpp
     c_api/c_header_check.c
+    document/color_mode_test.cpp
     document/compression_test.cpp
     document/document_test.cpp
     document/format_test.cpp
