@@ -36,7 +36,7 @@ namespace ffpsd
     class Document
     {
     public:
-        FFPSD_EXPORT static Document Parse(const std::string& path);
+        FFPSD_EXPORT static Document Open(const std::string& path);
         FFPSD_EXPORT static Document Parse(const std::vector<std::uint8_t>& data);
         FFPSD_EXPORT static Document Parse(const std::uint8_t* data, std::size_t size);
 

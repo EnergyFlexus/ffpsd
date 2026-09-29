@@ -55,7 +55,7 @@ TEST(DocumentResourcesTest, ResolutionOutsideSixteenDotSixteenIsRefusedWhole)
 
 TEST(DocumentResourcesTest, TheCompositeFlagKeepsTheWriterNames)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
 
     doc.SetHasRealMergedData(false);
 

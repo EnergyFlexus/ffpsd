@@ -234,7 +234,7 @@ TEST(SmokeRgbLevelsTest, EveryValueIsTheDumps)
 TEST(SmokeRgbLevelsTest, SavingUnchangedGivesTheFileBack)
 {
     // Byte for byte, so what the API does not show survives too: flags, masks, blending ranges, legacy names.
-    const std::vector<std::uint8_t> saved = ffpsd::Document::Parse(kRgbLevelsPsd).Save();
+    const std::vector<std::uint8_t> saved = ffpsd::Document::Open(kRgbLevelsPsd).Save();
 
     EXPECT_EQ(saved.size(), kFileSize);
     EXPECT_EQ(Fnv1a64(saved), kFileFnv);
@@ -242,7 +242,7 @@ TEST(SmokeRgbLevelsTest, SavingUnchangedGivesTheFileBack)
 
 TEST(SmokeRgbLevelsTest, RawAndBackKeepsEveryValue)
 {
-    const std::vector<std::uint8_t> raw = ffpsd::Document::Parse(kRgbLevelsPsd).Save(ffpsd::Compression::kRaw);
+    const std::vector<std::uint8_t> raw = ffpsd::Document::Open(kRgbLevelsPsd).Save(ffpsd::Compression::kRaw);
     const ffpsd::Document from_raw = Reparsed(raw);
     ExpectTheFile(from_raw, false);
 
@@ -254,7 +254,7 @@ TEST(SmokeRgbLevelsTest, RawAndBackKeepsEveryValue)
 
 TEST(SmokeRgbLevelsTest, APsbKeepsEveryValueAndComesBackAsTheFile)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbLevelsPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbLevelsPsd);
     doc.SetPsb(true);
     ffpsd::Document psb = Reparsed(doc.Save());
     ExpectTheFile(psb, true);
@@ -268,7 +268,7 @@ TEST(SmokeRgbLevelsTest, APsbKeepsEveryValueAndComesBackAsTheFile)
 
 TEST(SmokeRgbLevelsTest, EditsChangeOnlyWhatTheyTouch)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbLevelsPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbLevelsPsd);
     ffpsd::Layer* background = doc.GetLayerByIndex(0);
     ffpsd::Layer* levels = doc.GetLayerByIndex(1);
 

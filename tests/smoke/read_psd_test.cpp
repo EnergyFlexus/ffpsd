@@ -13,7 +13,7 @@ using namespace ffpsd_test;
 
 TEST(SmokeTest, HeaderOfAGrayscaleFile)
 {
-    const ffpsd::Document doc = ffpsd::Document::Parse(kGrayscalePsd);
+    const ffpsd::Document doc = ffpsd::Document::Open(kGrayscalePsd);
 
     EXPECT_EQ(doc.GetWidth(), 836u);
     EXPECT_EQ(doc.GetHeight(), 1200u);
@@ -25,7 +25,7 @@ TEST(SmokeTest, HeaderOfAGrayscaleFile)
 
 TEST(SmokeTest, LayersOfAGrayscaleFile)
 {
-    const ffpsd::Document doc = ffpsd::Document::Parse(kGrayscalePsd);
+    const ffpsd::Document doc = ffpsd::Document::Open(kGrayscalePsd);
     ASSERT_EQ(doc.GetLayerCount(), 2u);
 
     const ffpsd::Layer* background = doc.GetLayerByIndex(0);
@@ -51,7 +51,7 @@ TEST(SmokeTest, LayersOfAGrayscaleFile)
 TEST(SmokeTest, LayerPixelsOfAGrayscaleFile)
 {
     // A background has no transparency; the layer above it has, as the last plane.
-    const ffpsd::Document doc = ffpsd::Document::Parse(kGrayscalePsd);
+    const ffpsd::Document doc = ffpsd::Document::Open(kGrayscalePsd);
     const ffpsd::Image background = doc.GetLayerByIndex(0)->GetPixels();
     const ffpsd::Image fill = doc.GetLayerByIndex(1)->GetPixels();
 
@@ -66,7 +66,7 @@ TEST(SmokeTest, LayerPixelsOfAGrayscaleFile)
 
 TEST(SmokeTest, ImageResourcesOfAnRgbFile)
 {
-    const ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    const ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
 
     EXPECT_EQ(doc.GetImageResourceCount(), 27u);
 
@@ -94,7 +94,7 @@ TEST(SmokeTest, ImageResourcesOfAnRgbFile)
 
 TEST(SmokeTest, LayersAndMergedImageOfAnRgbFile)
 {
-    const ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    const ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     ASSERT_EQ(doc.GetLayerCount(), 2u);
     EXPECT_EQ(doc.GetLayerByIndex(0)->GetName(), kBackgroundName);
     EXPECT_EQ(doc.GetLayerByIndex(1)->GetName(), kBackgroundCopyName);
@@ -112,7 +112,7 @@ TEST(SmokeTest, LayersAndMergedImageOfAnRgbFile)
 
 TEST(SmokeTest, LayerPixelsOfAnRgbFile)
 {
-    const ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    const ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     const ffpsd::Image background = doc.GetLayerByIndex(0)->GetPixels();
     const ffpsd::Image copy = doc.GetLayerByIndex(1)->GetPixels();
 
@@ -127,7 +127,7 @@ TEST(SmokeTest, LayerPixelsOfAnRgbFile)
 
 TEST(SmokeTest, SectionBlocksOfAnRgbFile)
 {
-    const ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    const ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
 
     // The blocks after the layers, in file order; three of them had padding to skip.
     const std::vector<std::pair<std::uint32_t, std::size_t>> expected = {{Fourcc("Patt"), 0},  {Fourcc("CAI "), 77}, {Fourcc("OCIO"), 172},
@@ -142,7 +142,7 @@ TEST(SmokeTest, SectionBlocksOfAnRgbFile)
 
 TEST(SmokeTest, LevelsLayerOfAnRgbFile)
 {
-    const ffpsd::Document doc = ffpsd::Document::Parse(kRgbLevelsPsd);
+    const ffpsd::Document doc = ffpsd::Document::Open(kRgbLevelsPsd);
     ASSERT_EQ(doc.GetLayerCount(), 2u);
     EXPECT_EQ(doc.GetLayerByIndex(0)->GetKind(), ffpsd::LayerKind::kRaster);
 

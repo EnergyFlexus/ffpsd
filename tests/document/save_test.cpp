@@ -79,7 +79,7 @@ TEST(DocumentSaveTest, LayerBlocksCountTheirPaddingAsPhotoshopDoes)
 
 TEST(DocumentSaveTest, ResourcesAndBlocksSurvive)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     ffpsd::ImageResource resource;
     resource.id = 4000;
     resource.name = "odd";
@@ -106,7 +106,7 @@ TEST(DocumentSaveTest, ResourcesAndBlocksSurvive)
 
 TEST(DocumentSaveTest, WithoutLayersTheCompositeStays)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     doc.RemoveLayer(1);
     doc.RemoveLayer(0);
 
@@ -162,7 +162,7 @@ TEST(DocumentSaveTest, APathGetsTheSameBytes)
 {
     const std::filesystem::path path = TempPath("ffpsd_save_test.psd");
 
-    ffpsd::Document::Parse(kGrayscalePsd).Save(path.string());
+    ffpsd::Document::Open(kGrayscalePsd).Save(path.string());
 
     EXPECT_EQ(ReadFile(path.string()), ReadFile(kGrayscalePsd));
     std::filesystem::remove(path);
@@ -171,7 +171,7 @@ TEST(DocumentSaveTest, APathGetsTheSameBytes)
 TEST(DocumentSaveTest, AnUnwritablePathIsASystemError)
 {
     const std::filesystem::path path = TempPath("no_such_directory") / "out.psd";
-    const ffpsd::Document doc = ffpsd::Document::Parse(kGrayscalePsd);
+    const ffpsd::Document doc = ffpsd::Document::Open(kGrayscalePsd);
 
     EXPECT_THROW(doc.Save(path.string()), std::system_error);
 }

@@ -32,7 +32,7 @@ TEST(LayerBackgroundTest, PhotoshopsBackgroundIsRecognised)
 {
     for (const std::string& path : {kRgbPsd, kGrayscalePsd, kRgbLevelsPsd})
     {
-        const ffpsd::Document doc = ffpsd::Document::Parse(path);
+        const ffpsd::Document doc = ffpsd::Document::Open(path);
         EXPECT_TRUE(doc.GetLayerByIndex(0)->IsBackground()) << path;
         EXPECT_FALSE(doc.GetLayerByIndex(1)->IsBackground()) << path;
     }
@@ -175,7 +175,7 @@ TEST(LayerBackgroundTest, ItStaysAtTheBottom)
 
 TEST(LayerBackgroundTest, ACopyOfItIsAnOrdinaryLayer)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     const ffpsd::Layer* photoshops_copy = doc.GetLayerByIndex(1);
 
     const ffpsd::Layer* copy = doc.AddLayerCopy(*doc.GetLayerByIndex(0));
@@ -206,7 +206,7 @@ TEST(LayerBackgroundTest, ItSurvivesSaving)
 
 TEST(LayerBackgroundTest, UnsetMakesItAnOrdinaryLayerWhereItIs)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     const ffpsd::Layer* photoshops_copy = doc.GetLayerByIndex(1);
     const ffpsd::Layer* background = doc.GetLayerByIndex(0);
     const ffpsd::Image pixels = background->GetPixels();
@@ -225,7 +225,7 @@ TEST(LayerBackgroundTest, UnsetMakesItAnOrdinaryLayerWhereItIs)
 
 TEST(LayerBackgroundTest, OnceUnsetItMovesLikeAnyOther)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     const ffpsd::Layer* former = doc.GetLayerByIndex(0);
     doc.UnsetBackgroundLayer();
 
@@ -281,7 +281,7 @@ TEST(LayerBackgroundTest, SetFoldsOpacityInAndDropsTheBlendMode)
 
 TEST(LayerBackgroundTest, UnsetThenSetGivesPhotoshopsPixelsBack)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     const ffpsd::Image background = doc.GetLayerByIndex(0)->GetPixels();
     ffpsd::Image copy = doc.GetLayerByIndex(1)->GetPixels();
     copy.bytes.resize(copy.bytes.size() / 4 * 3); // its alpha is fully opaque
@@ -298,12 +298,12 @@ TEST(LayerBackgroundTest, UnsetThenSetGivesPhotoshopsPixelsBack)
 
 TEST(LayerBackgroundTest, SetRefusesWhatCannotBeABackground)
 {
-    ffpsd::Document rgb = ffpsd::Document::Parse(kRgbPsd);
+    ffpsd::Document rgb = ffpsd::Document::Open(kRgbPsd);
     EXPECT_THROW(rgb.SetBackgroundLayer(1), std::logic_error);
     EXPECT_THROW(rgb.SetBackgroundLayer(2), std::out_of_range);
     rgb.SetBackgroundLayer(0); // already it
 
-    ffpsd::Document levels = ffpsd::Document::Parse(kRgbLevelsPsd);
+    ffpsd::Document levels = ffpsd::Document::Open(kRgbLevelsPsd);
     levels.UnsetBackgroundLayer();
     EXPECT_THROW(levels.SetBackgroundLayer(1), std::invalid_argument);
 

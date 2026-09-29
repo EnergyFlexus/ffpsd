@@ -97,7 +97,7 @@ TEST(LayerPixelsTest, SomeColorModesHaveNoLayers)
 
 TEST(LayerPixelsTest, SetWhatGetGaveKeepsEverySample)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     ffpsd::Layer* layer = doc.GetLayerByIndex(1);
     const ffpsd::Image before = layer->GetPixels();
     const ffpsd::Rect bounds = layer->GetBounds();
@@ -152,7 +152,7 @@ TEST(LayerPixelsTest, SetPositionRefusesBoundsPastThirtyTwoBits)
 
 TEST(LayerPixelsTest, AWrongImageIsRefusedAndTheLayerStays)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     ffpsd::Layer* layer = doc.GetLayerByIndex(1);
     const ffpsd::Image before = layer->GetPixels();
 
@@ -166,7 +166,7 @@ TEST(LayerPixelsTest, AWrongImageIsRefusedAndTheLayerStays)
 TEST(LayerPixelsTest, NewPixelsLeaveTheMaskAlone)
 {
     // Photoshop's Levels layer has a layer mask channel next to its empty ones.
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbLevelsPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbLevelsPsd);
     ffpsd::Layer* levels = doc.GetLayerByIndex(1);
     doc.SetHasRealMergedData(false);
     const std::vector<std::uint8_t> before = doc.Save();

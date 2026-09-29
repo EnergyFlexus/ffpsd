@@ -24,7 +24,7 @@ TEST(LayerTest, ANewLayerIsVisibleOpaqueAndNormal)
 
 TEST(LayerTest, VisibilityTogglesBackAndForth)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     ffpsd::Layer* layer = doc.GetLayerByIndex(0);
 
     layer->SetVisible(false);

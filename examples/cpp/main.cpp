@@ -24,7 +24,7 @@ int main(int argc, char** argv)
     try
     {
         // Open the document.
-        ffpsd::Document doc = ffpsd::Document::Parse(argv[1]);
+        ffpsd::Document doc = ffpsd::Document::Open(argv[1]);
 
         // Read what it holds; layers go from the bottom up.
         std::cout << doc.GetWidth() << " x " << doc.GetHeight() << ", " << doc.GetDepth() << " bit, " << doc.GetLayerCount() << " layers\n";

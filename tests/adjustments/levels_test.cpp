@@ -24,7 +24,7 @@ namespace
 
 TEST(AdjustmentLevelsTest, SetWhatGetGaveWritesPhotoshopsBytes)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbLevelsPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbLevelsPsd);
     ffpsd::Layer* levels = doc.GetLayerByIndex(1);
     const std::vector<std::uint8_t> before = levels->GetTaggedBlockByKey(kLevelsKey)->data;
 
@@ -35,7 +35,7 @@ TEST(AdjustmentLevelsTest, SetWhatGetGaveWritesPhotoshopsBytes)
 
 TEST(AdjustmentLevelsTest, AChangeReadsBackAndStalesTheComposite)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbLevelsPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbLevelsPsd);
     ffpsd::Layer* levels = doc.GetLayerByIndex(1);
     ffpsd::LevelsInfo info = *levels->GetAdjustment<ffpsd::LevelsInfo>();
     info.channels[0].gamma = 1.5;
@@ -61,7 +61,7 @@ TEST(AdjustmentLevelsTest, AGrayscaleDocumentHasTwoRecords)
 
 TEST(AdjustmentLevelsTest, OnlyALevelsLayerTakesLevels)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbLevelsPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbLevelsPsd);
     ffpsd::Layer* background = doc.GetLayerByIndex(0);
 
     EXPECT_FALSE(background->GetAdjustment<ffpsd::LevelsInfo>().has_value());
@@ -71,7 +71,7 @@ TEST(AdjustmentLevelsTest, OnlyALevelsLayerTakesLevels)
 
 TEST(AdjustmentLevelsTest, RecordsAreCheckedAgainstPhotoshopsRanges)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbLevelsPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbLevelsPsd);
     ffpsd::Layer* levels = doc.GetLayerByIndex(1);
     const std::vector<std::uint8_t> before = levels->GetTaggedBlockByKey(kLevelsKey)->data;
 
@@ -109,7 +109,7 @@ TEST(AdjustmentLevelsTest, RecordsAreCheckedAgainstPhotoshopsRanges)
 
 TEST(AdjustmentLevelsTest, NoRecordsMeanNothingChanges)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbLevelsPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbLevelsPsd);
     ffpsd::Layer* levels = doc.GetLayerByIndex(1);
 
     levels->SetAdjustment(ffpsd::LevelsInfo());
@@ -122,7 +122,7 @@ TEST(AdjustmentLevelsTest, NoRecordsMeanNothingChanges)
 
 TEST(AdjustmentLevelsTest, ANewLayerIsWhatPhotoshopWrites)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbLevelsPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbLevelsPsd);
     const ffpsd::Layer* photoshops = doc.GetLayerByIndex(1);
 
     const ffpsd::Layer* added = doc.AddAdjustmentLayer("levels", *photoshops->GetAdjustment<ffpsd::LevelsInfo>());

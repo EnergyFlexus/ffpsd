@@ -150,8 +150,8 @@ TEST(PngTest, EncodingRefusesWhatPngCannotHold)
 
 TEST(PngTest, LayersOfBothFilesSaveAsWhatGetPixelsGives)
 {
-    const ffpsd::Document rgb = ffpsd::Document::Parse(kRgbPsd);
-    const ffpsd::Document gray = ffpsd::Document::Parse(kGrayscalePsd);
+    const ffpsd::Document rgb = ffpsd::Document::Open(kRgbPsd);
+    const ffpsd::Document gray = ffpsd::Document::Open(kGrayscalePsd);
 
     for (const auto& [doc, color] : {std::make_pair(&rgb, ffpsd::ColorMode::kRgb), std::make_pair(&gray, ffpsd::ColorMode::kGrayscale)})
     {
@@ -177,7 +177,7 @@ TEST(PngTest, ASixteenBitLayerSavesSixteenBit)
 
 TEST(PngTest, SavePngWritesWhatEncodePngGives)
 {
-    const ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    const ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     const std::filesystem::path path = std::filesystem::path(testing::TempDir()) / "ffpsd_layer.png";
 
     doc.GetLayerByIndex(1)->SavePng(path.string());
@@ -188,7 +188,7 @@ TEST(PngTest, SavePngWritesWhatEncodePngGives)
 
 TEST(PngTest, OnlyAGrayOrRgbLayerWithPixelsSaves)
 {
-    const ffpsd::Document levels = ffpsd::Document::Parse(kRgbLevelsPsd);
+    const ffpsd::Document levels = ffpsd::Document::Open(kRgbLevelsPsd);
     ffpsd::Document cmyk = NewDocument(ffpsd::ColorMode::kCmyk);
     const ffpsd::Layer* cmyk_layer = cmyk.AddLayer("cmyk", Pattern(2, 2, 4));
 

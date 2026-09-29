@@ -7,7 +7,6 @@
 #include "detail/layer_and_mask/channel_image_data.hpp"
 #include "detail/layer_and_mask/tagged_blocks/tagged_block.hpp"
 
-#include <cstddef>
 #include <cstdint>
 #include <ffpsd/types.hpp>
 #include <string>
@@ -18,6 +17,14 @@ namespace ffpsd::detail
     // What ffpsd does not interpret stays as bytes.
     struct LayerRecord
     {
+        // Copied only through CopyLayerRecord: a record holds every channel's pixels.
+        LayerRecord() = default;
+        LayerRecord(const LayerRecord&) = delete;
+        LayerRecord& operator=(const LayerRecord&) = delete;
+        LayerRecord(LayerRecord&&) noexcept = default;
+        LayerRecord& operator=(LayerRecord&&) noexcept = default;
+        ~LayerRecord() = default;
+
         Rect bounds;
 
         std::uint32_t blend_signature = Fourcc('8', 'B', 'I', 'M');

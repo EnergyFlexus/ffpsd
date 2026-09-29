@@ -9,7 +9,7 @@ using namespace ffpsd_test;
 
 TEST(DocumentStackTest, AddLayerPutsItOnTopWithTheNextId)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     const std::uint32_t seed = BigEndianU32(doc.GetImageResourceById(1044)->data);
 
     const ffpsd::Layer* added = doc.AddLayer("top");
@@ -23,7 +23,7 @@ TEST(DocumentStackTest, AddLayerPutsItOnTopWithTheNextId)
 
 TEST(DocumentStackTest, AStackChangeDropsWhatIndexesLayers)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     ASSERT_NE(doc.GetImageResourceById(1024), nullptr);
 
     doc.RemoveLayer(1);
@@ -72,7 +72,7 @@ TEST(DocumentStackTest, RemoveLayerKeepsTheOthersInOrder)
 
 TEST(DocumentStackTest, ACopyGetsItsOwnIdAndLeavesTheSourceAlone)
 {
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     const ffpsd::Layer* source = doc.GetLayerByIndex(1);
     const std::uint32_t source_id = LayerId(*source);
 
@@ -86,8 +86,8 @@ TEST(DocumentStackTest, ACopyGetsItsOwnIdAndLeavesTheSourceAlone)
 
 TEST(DocumentStackTest, ACopyGoesAcrossDocumentsOfOneFormatOnly)
 {
-    const ffpsd::Document rgb = ffpsd::Document::Parse(kRgbPsd);
-    const ffpsd::Document gray = ffpsd::Document::Parse(kGrayscalePsd);
+    const ffpsd::Document rgb = ffpsd::Document::Open(kRgbPsd);
+    const ffpsd::Document gray = ffpsd::Document::Open(kGrayscalePsd);
     ffpsd::Document target = NewDocument();
 
     const ffpsd::Layer* copy = target.AddLayerCopy(*rgb.GetLayerByIndex(0));
@@ -126,7 +126,7 @@ TEST(DocumentStackTest, AStackChangeThatBreaksAGroupIsRolledBack)
 TEST(DocumentStackTest, EditsSurviveSaving)
 {
     // The background stays at the bottom; the new layer goes under the copy.
-    ffpsd::Document doc = ffpsd::Document::Parse(kRgbPsd);
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     doc.AddLayer("added", Pattern(2, 2, 4), 1, 2);
     doc.MoveLayer(2, 1);
     ffpsd::Layer* copy = doc.GetLayerByIndex(2);
