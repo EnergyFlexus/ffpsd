@@ -10,7 +10,7 @@ if(PROJECT_IS_TOP_LEVEL AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
         CACHE PATH "Install prefix" FORCE)
 endif()
 
-option(FFPSD_BUILD_TOOLS "Build command line tools (img2ffpsd)" ON)
+option(FFPSD_BUILD_APPS "Build the apps in apps/ (img2ffpsd)" ON)
 option(FFPSD_WITH_PNG "Build PNG loading, with libpng and zlib-ng from vendor/" ON)
 option(FFPSD_WITH_JPEG "Build JPEG loading, with libjpeg-turbo from vendor/" ON)
 option(FFPSD_BUILD_TESTS "Build the unit tests, with GoogleTest from vendor/" OFF)
@@ -94,11 +94,8 @@ include(GNUInstallDirs)
 
 add_subdirectory(ffpsd)
 
-# img2ffpsd reads PNG files, and JPEG ones too when there is JPEG support.
-if(FFPSD_BUILD_TOOLS AND FFPSD_WITH_PNG)
-    add_subdirectory(img2ffpsd)
-elseif(FFPSD_BUILD_TOOLS)
-    message(STATUS "img2ffpsd is skipped: it needs FFPSD_WITH_PNG")
+if(FFPSD_BUILD_APPS)
+    add_subdirectory(apps)
 endif()
 
 if(FFPSD_BUILD_TESTS)

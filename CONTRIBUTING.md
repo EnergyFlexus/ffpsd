@@ -16,13 +16,13 @@ reading it line by line and being able to explain every line of it.
 * `vendor/CMakeLists.txt`
 * documentation, including this file
 
-**Forbidden** - all C++ under `ffpsd/` and `img2ffpsd/`: every line of `.hpp`,
+**Forbidden** - all C++ under `ffpsd/` and `apps/`: every line of `.hpp`,
 `.h` and `.cpp` is written, or read and fully understood, by the human who signs
 the commit. "It compiles, the tests pass and it looks plausible" is not a
 review.
 
 Asking an assistant questions, or for a review or a sketch, is fine. Shipping
-library or tool code you cannot defend line by line is not, and such a change
+library or app code you cannot defend line by line is not, and such a change
 is rejected whole.
 
 ## Where things are
@@ -31,7 +31,7 @@ is rejected whole.
 ffpsd/include/ffpsd/   the public API, flat
 ffpsd/src/             the library
 ffpsd/src/detail/      everything not in the public API
-img2ffpsd/             the command line tool
+apps/                  the apps, a folder each: img2ffpsd
 docs/                  PSD.md, the format reference
 vendor/                libpng, zlib-ng, libjpeg-turbo, googletest, benchmark: submodules pinned to tags
 tests/                 GoogleTest, built with FFPSD_BUILD_TESTS
@@ -81,7 +81,7 @@ commit.
 | Public C header | `.h` | `ffpsd/include/ffpsd/c_api.h` |
 | Implementation | `.cpp` | `ffpsd/src/detail/io/big_endian_reader.cpp` |
 | C source | `.c` | `tests/c_api/c_header_check.c` |
-| Directory | - | `img2ffpsd/`, `scripts/`, `docs/` |
+| Directory | - | `apps/img2ffpsd/`, `scripts/`, `docs/` |
 
 * The name matches `^[a-z][a-z0-9_]*\.(h|hpp|c|cpp)$`; `.cc`, `.cxx` and `.hxx`
   are rejected. `.c` is only for code that must compile as C.
@@ -236,7 +236,7 @@ Only what is marked `FFPSD_EXPORT` is visible outside the library.
 
 | Entity | Convention | Example |
 |--------|------------|---------|
-| Cache option | `FFPSD_<NAME>` | `FFPSD_BUILD_TOOLS` |
+| Cache option | `FFPSD_<NAME>` | `FFPSD_BUILD_APPS` |
 | Target | `snake_case`, as the artifact | `ffpsd`, `img2ffpsd` |
 | Alias for consumers | `ffpsd::<target>` | `ffpsd::ffpsd` |
 | Local variable | `ffpsd_<name>`, lowercase | `ffpsd_warnings` |

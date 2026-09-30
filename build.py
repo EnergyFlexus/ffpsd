@@ -159,7 +159,7 @@ def show(directory):
 
 
 def smoke_test(directory, env):
-    """Run the installed tool once: it links the library, so this proves it works."""
+    """Run the installed img2ffpsd once: it links the library, so this proves it works."""
     tool = directory / "bin" / ("img2ffpsd.exe" if IS_WINDOWS else "img2ffpsd")
     if not tool.is_file():
         return
@@ -183,12 +183,12 @@ def main():
         description="Build ffpsd in Release and install it into ffpsd-out/.")
     parser.add_argument("--static", action="store_true",
                         help="build a static library instead of a shared one")
-    parser.add_argument("--no-tools", action="store_true",
-                        help="skip the img2ffpsd command line tool")
+    parser.add_argument("--no-apps", action="store_true",
+                        help="skip the apps in apps/, such as img2ffpsd")
     parser.add_argument("--no-png", action="store_true",
-                        help="build without PNG loading and saving, so without libpng and zlib-ng")
+                        help="build without PNG loading and saving, so without libpng, zlib-ng and img2ffpsd")
     parser.add_argument("--no-jpeg", action="store_true",
-                        help="build without JPEG loading and saving, so without libjpeg-turbo")
+                        help="build without JPEG loading and saving, so without libjpeg-turbo and img2ffpsd")
     parser.add_argument("--crt", choices=("static", "dynamic"),
                         help="MSVC: the C runtime, /MT or /MD (default: static for "
                              "--static, dynamic for a shared library)")
@@ -220,7 +220,7 @@ def main():
     run([cmake, "-S", ROOT, "-B", build_dir, "-G", generator,
          "-DCMAKE_BUILD_TYPE=Release",
          f"-DBUILD_SHARED_LIBS={'OFF' if args.static else 'ON'}",
-         f"-DFFPSD_BUILD_TOOLS={'OFF' if args.no_tools else 'ON'}",
+         f"-DFFPSD_BUILD_APPS={'OFF' if args.no_apps else 'ON'}",
          f"-DFFPSD_WITH_PNG={'OFF' if args.no_png else 'ON'}",
          f"-DFFPSD_WITH_JPEG={'OFF' if args.no_jpeg else 'ON'}",
          f"-DFFPSD_MSVC_STATIC_RUNTIME={'ON' if crt == 'static' else 'OFF'}",
