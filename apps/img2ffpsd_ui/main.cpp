@@ -358,12 +358,10 @@ namespace
             }
         }
 
-        // The document is as large as the larger of the bottom and the top pictures.
+        // The document is the size of the top picture; every other one is resized to it.
         const ffpsd::Image& bottom = images[0];
-        const ffpsd::Image& top = images[1];
-        const bool top_is_larger = std::uint64_t{top.width} * top.height >= std::uint64_t{bottom.width} * bottom.height;
-        const std::uint32_t width = top_is_larger ? top.width : bottom.width;
-        const std::uint32_t height = top_is_larger ? top.height : bottom.height;
+        const std::uint32_t width = images[1].width;
+        const std::uint32_t height = images[1].height;
 
         ffpsd::Document doc(width, height, color_mode);
         if (bottom.width == width && bottom.height == height)
