@@ -309,16 +309,16 @@ namespace
         const Pictures& bottoms = job.found[0];
         const Pictures& tops = job.found[1];
         for (const fs::path& file : OnlyIn(bottoms, tops))
-            job.errors.push_back("Only in Background: " + file.u8string());
+            job.errors.push_back("Missing in Layer 1: " + file.u8string());
         for (const fs::path& file : OnlyIn(tops, bottoms))
-            job.errors.push_back("Only in Layer 1: " + file.u8string());
+            job.errors.push_back("Missing in Background: " + file.u8string());
         if (bottoms.empty())
             job.errors.push_back("No pictures in " + job.folders[0].u8string());
 
         for (std::size_t i = 2; i < job.found.size(); ++i)
         {
             for (const fs::path& file : OnlyIn(job.found[i], bottoms))
-                job.warnings.push_back("Skipped, only in " + Label(i) + ": " + file.u8string());
+                job.warnings.push_back("Missing in Background, skipped in " + Label(i) + ": " + file.u8string());
         }
         for (const std::string& gap : FindGaps(bottoms))
             job.warnings.push_back("Possible miss: " + gap);

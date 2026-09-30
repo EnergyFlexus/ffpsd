@@ -228,13 +228,13 @@ namespace
     }
 
     // Prints the files of one folder that the other lacks; true when there are none.
-    bool CheckOnlyIn(const fs::path& folder, const Pictures& pictures, const Pictures& other)
+    bool CheckMissing(const fs::path& other_folder, const Pictures& pictures, const Pictures& other)
     {
         const std::vector<fs::path> only = OnlyIn(pictures, other);
         if (only.empty())
             return true;
 
-        std::cout << kRed << "error: files only in '" << Utf8(fs::absolute(folder)) << "':\n";
+        std::cout << kRed << "error: files missing in '" << Utf8(fs::absolute(other_folder)) << "':\n";
         for (const fs::path& file : only)
             std::cout << "    - " << Utf8(file) << "\n";
         std::cout << kEnd << "\n";
@@ -309,8 +309,8 @@ namespace
                       << kEnd << "\n";
             match = false;
         }
-        match = CheckOnlyIn(options.layers[0], bottoms, tops) && match;
-        match = CheckOnlyIn(options.layers[1], tops, bottoms) && match;
+        match = CheckMissing(options.layers[1], bottoms, tops) && match;
+        match = CheckMissing(options.layers[0], tops, bottoms) && match;
         if (!match)
         {
             std::cout << kRed << "Bad. Check errors. Conversion cancelled." << kEnd << "\n";
@@ -329,7 +329,8 @@ namespace
             const std::vector<fs::path> only = OnlyIn(found[i], bottoms);
             if (only.empty())
                 continue;
-            std::cout << kYellow << "warning: files only in '" << Utf8(fs::absolute(options.layers[i])) << "', skipped:\n";
+            std::cout << kYellow << "warning: files missing in '" << Utf8(fs::absolute(options.layers[0])) << "', skipped in '"
+                      << Utf8(fs::absolute(options.layers[i])) << "':\n";
             for (const fs::path& file : only)
                 std::cout << "    - " << Utf8(file) << "\n";
             std::cout << kEnd << "\n";
