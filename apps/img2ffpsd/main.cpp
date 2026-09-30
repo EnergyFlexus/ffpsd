@@ -41,8 +41,6 @@ namespace
         ffpsd::ResampleFilter resize = ffpsd::ResampleFilter::kNearest;
     };
 
-    // ---- Console -------------------------------------------------------------------------------
-
     const char* const kRed = "\033[91m";
     const char* const kYellow = "\033[93m";
     const char* const kGreen = "\033[92m";
@@ -123,8 +121,6 @@ namespace
         options.output = fs::u8path(folders.back());
         return true;
     }
-
-    // ---- Files ---------------------------------------------------------------------------------
 
     std::vector<std::uint8_t> ReadFile(const fs::path& path)
     {
@@ -230,8 +226,6 @@ namespace
         }
         return only;
     }
-
-    // ---- Checking the folders ------------------------------------------------------------------
 
     // Prints the files of one folder that the other lacks; true when there are none.
     bool CheckOnlyIn(const fs::path& folder, const Pictures& pictures, const Pictures& other)
@@ -374,8 +368,6 @@ namespace
         return true;
     }
 
-    // ---- Converting one pair -------------------------------------------------------------------
-
     // A JPEG is turned upright by its EXIF orientation, as Photoshop opens it.
     ffpsd::Image LoadPicture(const fs::path& path, ffpsd::ColorMode color_mode)
     {
@@ -448,8 +440,6 @@ namespace
         target += ".psd"; // the name has no extension left to replace
         WriteFile(target, doc.Save());
     }
-
-    // ---- Progress ------------------------------------------------------------------------------
 
     // The bar and the errors, from any thread.
     class Progress
@@ -541,8 +531,6 @@ namespace
 
         return progress.Failed();
     }
-
-    // ---- The program ---------------------------------------------------------------------------
 
     int Run(const std::vector<std::string>& args)
     {

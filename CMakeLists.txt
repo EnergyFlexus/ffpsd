@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.23)
 
 project(ffpsd
-    VERSION 0.2.5
+    VERSION 0.3.0
     DESCRIPTION "ffpsd library"
     LANGUAGES CXX)
 
@@ -13,6 +13,7 @@ endif()
 option(FFPSD_BUILD_APPS "Build the apps in apps/ (img2ffpsd)" ON)
 option(FFPSD_WITH_PNG "Build PNG loading, with libpng and zlib-ng from vendor/" ON)
 option(FFPSD_WITH_JPEG "Build JPEG loading, with libjpeg-turbo from vendor/" ON)
+option(FFPSD_WITH_IMGUI "Build the apps with a window, with Dear ImGui and SDL3 from vendor/" OFF)
 option(FFPSD_BUILD_TESTS "Build the unit tests, with GoogleTest from vendor/" OFF)
 option(FFPSD_BUILD_BENCHMARKS "Build the benchmarks, with Google Benchmark from vendor/" OFF)
 option(FFPSD_BUILD_EXAMPLES "Build the C and C++ examples in examples/" OFF)
@@ -52,6 +53,9 @@ endif()
 if(FFPSD_WITH_JPEG)
     list(APPEND ffpsd_vendored libjpeg-turbo)
 endif()
+if(FFPSD_WITH_IMGUI)
+    list(APPEND ffpsd_vendored imgui SDL)
+endif()
 if(FFPSD_BUILD_TESTS)
     list(APPEND ffpsd_vendored googletest)
 endif()
@@ -59,7 +63,8 @@ if(FFPSD_BUILD_BENCHMARKS)
     list(APPEND ffpsd_vendored benchmark)
 endif()
 foreach(ffpsd_library IN LISTS ffpsd_vendored)
-    if(NOT EXISTS "${PROJECT_SOURCE_DIR}/vendor/${ffpsd_library}/CMakeLists.txt")
+    if(NOT EXISTS "${PROJECT_SOURCE_DIR}/vendor/${ffpsd_library}/CMakeLists.txt"
+       AND NOT EXISTS "${PROJECT_SOURCE_DIR}/vendor/${ffpsd_library}/${ffpsd_library}.h")
         message(FATAL_ERROR "vendor/${ffpsd_library} is empty: run git submodule update --init")
     endif()
 endforeach()

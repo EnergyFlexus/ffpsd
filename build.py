@@ -26,6 +26,7 @@ OUT_DIR = ROOT / "ffpsd-out"
 MIN_CMAKE = (3, 23)
 PNG_VENDORED = ("libpng", "zlib-ng")
 JPEG_VENDORED = ("libjpeg-turbo",)
+UI_VENDORED = ("imgui", "SDL")
 
 IS_WINDOWS = platform.system() == "Windows"
 IS_MACOS = platform.system() == "Darwin"
@@ -168,8 +169,10 @@ def smoke_test(directory, env):
 
 
 def check_vendor(names=PNG_VENDORED + JPEG_VENDORED):
-    """PNG and JPEG support build libpng, zlib-ng and libjpeg-turbo from the submodules under vendor/."""
-    missing = [name for name in names if not (ROOT / "vendor" / name / "CMakeLists.txt").is_file()]
+    """PNG, JPEG and the window of img2ffpsd_ui build what they need from the submodules under vendor/."""
+    # Dear ImGui has no CMakeLists.txt of its own, so its header shows the submodule is there.
+    missing = [name for name in names if not (ROOT / "vendor" / name / "CMakeLists.txt").is_file()
+               and not (ROOT / "vendor" / name / f"{name}.h").is_file()]
     if not missing:
         return
     if not (ROOT / ".git").exists():
@@ -184,7 +187,7 @@ def main():
     parser.add_argument("--static", action="store_true",
                         help="build a static library instead of a shared one")
     parser.add_argument("--no-apps", action="store_true",
-                        help="skip the apps in apps/, such as img2ffpsd")
+                        help="skip the apps in apps/: img2ffpsd and img2ffpsd_ui")
     parser.add_argument("--no-png", action="store_true",
                         help="build without PNG loading and saving, so without libpng, zlib-ng and img2ffpsd")
     parser.add_argument("--no-jpeg", action="store_true",
@@ -206,7 +209,9 @@ def main():
     print(f"== ffpsd release build: {kind}{crt_note}, {platform.system()} {platform.machine()}")
 
     cmake = check_cmake()
-    check_vendor((() if args.no_png else PNG_VENDORED) + (() if args.no_jpeg else JPEG_VENDORED))
+    # img2ffpsd_ui reads PNG and JPEG too; without either there is no window to build.
+    ui = not (args.no_apps or args.no_png or args.no_jpeg)
+    check_vendor((() if args.no_png else PNG_VENDORED) + (() if args.no_jpeg else JPEG_VENDORED) + (UI_VENDORED if ui else ()))
     generator = pick_generator()
     env = build_env()
 
@@ -223,6 +228,7 @@ def main():
          f"-DFFPSD_BUILD_APPS={'OFF' if args.no_apps else 'ON'}",
          f"-DFFPSD_WITH_PNG={'OFF' if args.no_png else 'ON'}",
          f"-DFFPSD_WITH_JPEG={'OFF' if args.no_jpeg else 'ON'}",
+         f"-DFFPSD_WITH_IMGUI={'ON' if ui else 'OFF'}",
          f"-DFFPSD_MSVC_STATIC_RUNTIME={'ON' if crt == 'static' else 'OFF'}",
          f"-DCMAKE_INSTALL_PREFIX={out_dir}"], env)
     run([cmake, "--build", build_dir, "--config", "Release", "--parallel", args.jobs], env)

@@ -8,7 +8,7 @@ A PSD/PSB library with two APIs from one build:
 Code style: [CONTRIBUTING.md](CONTRIBUTING.md). Programs in C++, C and Rust:
 [examples/](examples/README.md).
 
-libpng, zlib-ng, libjpeg-turbo, GoogleTest and Google Benchmark are git submodules under
+libpng, zlib-ng, libjpeg-turbo, Dear ImGui, SDL3, GoogleTest and Google Benchmark are git submodules under
 `vendor/`; the test PSD files are in Git LFS (`git lfs install` before cloning).
 
 ```sh
@@ -31,7 +31,7 @@ itself and fetches missing submodules. Flags: `--clean`, `--jobs N`,
 `--no-apps`, `--no-png`, `--no-jpeg`, `--crt static|dynamic`, `--out DIR`.
 
 ```
-ffpsd-out/bin/        ffpsd.dll, img2ffpsd
+ffpsd-out/bin/        ffpsd.dll, img2ffpsd, img2ffpsd_ui
 ffpsd-out/lib/        ffpsd.lib / libffpsd.a, cmake/ffpsd/
                       static only: libpng16_static.lib, zlibstatic.lib, jpeg-static.lib
 ffpsd-out/include/    ffpsd/*.hpp, ffpsd/c_api.h, ffpsd/export.h
@@ -47,6 +47,7 @@ libjpeg-turbo is plain C, without SIMD, so no assembler is needed.
 Built with `FFPSD_BUILD_APPS` and installed into `bin/`:
 
 * [img2ffpsd](apps/img2ffpsd/README.md) - folders of PNG and JPEG pictures into layered PSD files
+* [img2ffpsd_ui](apps/img2ffpsd_ui/) - the same in a window, with `FFPSD_WITH_IMGUI`; `build.py` builds it
 
 ## Build with CMake
 
@@ -112,6 +113,7 @@ Benchmark's `compare.py`, which needs
 | `FFPSD_BUILD_APPS`  | `ON`    | `apps/`                            |
 | `FFPSD_WITH_PNG`    | `ON`    | `ffpsd/png.hpp`, with libpng and zlib-ng |
 | `FFPSD_WITH_JPEG`   | `ON`    | `ffpsd/jpeg.hpp`, with libjpeg-turbo |
+| `FFPSD_WITH_IMGUI`  | `OFF`   | the apps with a window, with Dear ImGui and SDL3 |
 | `FFPSD_BUILD_TESTS` | `OFF`, `ON` in the debug presets | `tests/` |
 | `FFPSD_BUILD_BENCHMARKS` | `OFF`, `ON` in `bench-release` and the debug presets | `benchmarks/` |
 | `FFPSD_BUILD_EXAMPLES` | `OFF`, `ON` in the debug presets | `examples/` in C and C++ |

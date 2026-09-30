@@ -34,8 +34,8 @@ jobs:
             exit 0
           fi
           gh release create "$GITHUB_REF_NAME" --draft --title "$GITHUB_REF_NAME" --generate-notes --notes \
-          "- \`ffpsd-*\`: the shared library, its headers and CMake package, and img2ffpsd using it.
-          - \`img2ffpsd-*\`: img2ffpsd alone, with ffpsd, libpng, zlib-ng and libjpeg-turbo built in, and their licenses.
+          "- \`ffpsd-*\`: the shared library, its headers and CMake package, and img2ffpsd and img2ffpsd_ui using it.
+          - \`img2ffpsd-*\`: img2ffpsd and img2ffpsd_ui, its window, alone: ffpsd, libpng, zlib-ng, libjpeg-turbo, Dear ImGui and SDL3 built in, and their licenses.
 
           macOS builds are for Apple Silicon and unsigned: run \`xattr -d com.apple.quarantine\` on them once.
 
@@ -62,9 +62,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Ninja (Linux)
+      # SDL3 opens its windows through X11 or Wayland, found when it runs; it needs their headers to build.
+      - name: Ninja and the headers SDL3 builds against (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ninja-build
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+            libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev libegl1-mesa-dev libgl1-mesa-dev \
+            libdbus-1-dev libudev-dev
 
       - name: Ninja (macOS)
         if: runner.os == 'macOS'
