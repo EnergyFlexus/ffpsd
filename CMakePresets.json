@@ -44,7 +44,7 @@
         "CMAKE_BUILD_TYPE": "Release",
         "BUILD_SHARED_LIBS": "OFF",
         "FFPSD_MSVC_STATIC_RUNTIME": "ON",
-        "FFPSD_BUILD_TOOLS": "OFF",
+        "FFPSD_BUILD_APPS": "OFF",
         "FFPSD_BUILD_BENCHMARKS": "ON"
       }
     },

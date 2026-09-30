@@ -153,13 +153,8 @@ namespace
 
     bool IsJpeg(const fs::path& path)
     {
-#if defined(FFPSD_HAS_JPEG)
         const std::string extension = Extension(path);
         return extension == ".jpg" || extension == ".jpeg";
-#else
-        (void)path;
-        return false;
-#endif
     }
 
     bool IsPicture(const fs::path& path)
@@ -385,10 +380,8 @@ namespace
     ffpsd::Image LoadPicture(const fs::path& path, ffpsd::ColorMode color_mode)
     {
         const std::vector<std::uint8_t> data = ReadFile(path);
-#if defined(FFPSD_HAS_JPEG)
         if (IsJpeg(path))
             return ffpsd::LoadJpeg(data.data(), data.size(), color_mode, 8);
-#endif
         return ffpsd::LoadPng(data.data(), data.size(), color_mode, 8);
     }
 
