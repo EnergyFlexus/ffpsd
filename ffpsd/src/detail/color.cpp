@@ -1,5 +1,6 @@
 #include "detail/color.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -76,11 +77,13 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    std::size_t LayerColorCount(ColorMode color_mode)
+    std::uint16_t ColorChannelCount(ColorMode color_mode)
     {
         switch (color_mode)
         {
+        case ColorMode::kBitmap:
         case ColorMode::kGrayscale:
+        case ColorMode::kIndexed:
         case ColorMode::kDuotone:
             return 1;
         case ColorMode::kRgb:
@@ -89,7 +92,8 @@ namespace ffpsd::detail
         case ColorMode::kCmyk:
             return 4;
         default:
-            throw std::invalid_argument("ffpsd: color mode " + std::to_string(static_cast<int>(color_mode)) + " has no layers");
+            throw std::invalid_argument(
+                "ffpsd: color mode " + std::to_string(static_cast<int>(color_mode)) + " has no fixed number of color channels");
         }
     }
 

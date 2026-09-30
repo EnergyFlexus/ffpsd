@@ -11,6 +11,7 @@ TEST(DocumentStackTest, AddLayerPutsItOnTopWithTheNextId)
 {
     ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     const std::uint32_t seed = BigEndianU32(doc.GetImageResourceById(1044)->data);
+    ASSERT_NE(doc.GetImageResourceById(1024), nullptr);
 
     const ffpsd::Layer* added = doc.AddLayer("top");
 
@@ -19,22 +20,15 @@ TEST(DocumentStackTest, AddLayerPutsItOnTopWithTheNextId)
     EXPECT_EQ(added->GetName(), "top");
     EXPECT_EQ(LayerId(*added), seed + 1);
     EXPECT_EQ(BigEndianU32(doc.GetImageResourceById(1044)->data), seed + 1);
-}
 
-TEST(DocumentStackTest, AStackChangeDropsWhatIndexesLayers)
-{
-    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
-    ASSERT_NE(doc.GetImageResourceById(1024), nullptr);
-
-    doc.RemoveLayer(1);
-
+    // A stack change drops the resources that index layers, and the composite is stale.
     EXPECT_EQ(doc.GetImageResourceById(1024), nullptr);
     EXPECT_EQ(doc.GetImageResourceById(1026), nullptr);
     EXPECT_EQ(doc.GetImageResourceById(1072), nullptr);
     EXPECT_FALSE(doc.HasRealMergedData());
 }
 
-TEST(DocumentStackTest, MoveLayerKeepsEveryPointer)
+TEST(DocumentStackTest, MoveAndRemoveKeepEveryPointer)
 {
     ffpsd::Document doc = NewDocument();
     ffpsd::Layer* a = doc.AddLayer("a");
@@ -45,24 +39,13 @@ TEST(DocumentStackTest, MoveLayerKeepsEveryPointer)
     EXPECT_EQ(doc.GetLayerByIndex(0), b);
     EXPECT_EQ(doc.GetLayerByIndex(1), c);
     EXPECT_EQ(doc.GetLayerByIndex(2), a);
-
     doc.MoveLayer(2, 0);
     EXPECT_EQ(doc.GetLayerByIndex(0), a);
     EXPECT_EQ(doc.GetLayerByIndex(2), c);
-
     EXPECT_THROW(doc.MoveLayer(0, 3), std::out_of_range);
     EXPECT_THROW(doc.MoveLayer(3, 0), std::out_of_range);
-}
-
-TEST(DocumentStackTest, RemoveLayerKeepsTheOthersInOrder)
-{
-    ffpsd::Document doc = NewDocument();
-    const ffpsd::Layer* a = doc.AddLayer("a");
-    doc.AddLayer("b");
-    const ffpsd::Layer* c = doc.AddLayer("c");
 
     doc.RemoveLayer(1);
-
     ASSERT_EQ(doc.GetLayerCount(), 2u);
     EXPECT_EQ(doc.GetLayerByIndex(0), a);
     EXPECT_EQ(doc.GetLayerByIndex(1), c);
@@ -70,7 +53,7 @@ TEST(DocumentStackTest, RemoveLayerKeepsTheOthersInOrder)
     EXPECT_THROW(doc.GetLayerByIndex(2), std::out_of_range);
 }
 
-TEST(DocumentStackTest, ACopyGetsItsOwnIdAndLeavesTheSourceAlone)
+TEST(DocumentStackTest, ACopyGetsItsOwnIdFromADocumentOfTheSameFormat)
 {
     ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     const ffpsd::Layer* source = doc.GetLayerByIndex(1);
@@ -82,17 +65,10 @@ TEST(DocumentStackTest, ACopyGetsItsOwnIdAndLeavesTheSourceAlone)
     EXPECT_EQ(copy->GetPixels().bytes, source->GetPixels().bytes);
     EXPECT_NE(LayerId(*copy), source_id);
     EXPECT_EQ(LayerId(*source), source_id);
-}
 
-TEST(DocumentStackTest, ACopyGoesAcrossDocumentsOfOneFormatOnly)
-{
-    const ffpsd::Document rgb = ffpsd::Document::Open(kRgbPsd);
     const ffpsd::Document gray = ffpsd::Document::Open(kGrayscalePsd);
     ffpsd::Document target = NewDocument();
-
-    const ffpsd::Layer* copy = target.AddLayerCopy(*rgb.GetLayerByIndex(0));
-    EXPECT_EQ(copy->GetName(), kBackgroundName);
-
+    EXPECT_EQ(target.AddLayerCopy(*doc.GetLayerByIndex(0))->GetName(), kBackgroundName);
     EXPECT_THROW(target.AddLayerCopy(*gray.GetLayerByIndex(0)), std::invalid_argument);
     EXPECT_EQ(target.GetLayerCount(), 1u);
 }

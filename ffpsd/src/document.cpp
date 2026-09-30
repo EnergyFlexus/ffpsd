@@ -69,21 +69,11 @@ namespace ffpsd
             return open == 0 ? nullptr : "breaks the group nesting";
         }
 
-        // The channels a new document of this mode has, alpha channels not counted.
-        std::uint16_t ChannelCountOf(ColorMode color_mode)
+        // Photoshop keeps no layers in these modes.
+        void CheckKeepsLayers(ColorMode color_mode)
         {
-            switch (color_mode)
-            {
-            case ColorMode::kRgb:
-            case ColorMode::kLab:
-                return 3;
-            case ColorMode::kCmyk:
-                return 4;
-            case ColorMode::kMultichannel:
-                throw std::invalid_argument("ffpsd: a multichannel document has no default channel count");
-            default:
-                return 1;
-            }
+            if (color_mode == ColorMode::kBitmap || color_mode == ColorMode::kIndexed || color_mode == ColorMode::kMultichannel)
+                throw std::invalid_argument("ffpsd: color mode " + std::to_string(static_cast<int>(color_mode)) + " has no layers");
         }
 
         // Layers are packed for the channels, depth and color mode they were added with.
@@ -145,7 +135,7 @@ namespace ffpsd
         : Document()
     {
         SetColorMode(color_mode);
-        SetChannelCount(ChannelCountOf(color_mode));
+        SetChannelCount(detail::ColorChannelCount(color_mode));
         SetDepth(depth);
         SetWidth(width);
         SetHeight(height);
@@ -510,7 +500,8 @@ namespace ffpsd
         const std::string& name, const std::uint8_t* data, std::size_t size, std::uint32_t width, std::uint32_t height,
         std::uint16_t channel_count, std::int32_t top, std::int32_t left)
     {
-        const std::size_t color_count = detail::LayerColorCount(impl_->color_mode);
+        CheckKeepsLayers(impl_->color_mode);
+        const std::size_t color_count = detail::ColorChannelCount(impl_->color_mode);
 
         // Keeps the size arithmetic below far from overflow.
         detail::CheckLayerSides(width, height, IsPsb());
@@ -532,7 +523,8 @@ namespace ffpsd
 
     Layer* Document::AddBackgroundLayer(const std::string& name, const Image& image)
     {
-        const std::size_t color_count = detail::LayerColorCount(impl_->color_mode);
+        CheckKeepsLayers(impl_->color_mode);
+        const std::size_t color_count = detail::ColorChannelCount(impl_->color_mode);
         if (image.depth != impl_->depth)
             throw std::invalid_argument(
                 "ffpsd: a " + std::to_string(image.depth) + " bit image in a " + std::to_string(impl_->depth) + " bit document");
@@ -578,7 +570,7 @@ namespace ffpsd
         if (detail::HasLayerMask(*layer.record_))
             throw std::invalid_argument("ffpsd: a layer with a mask cannot become the background");
 
-        const std::size_t color_count = detail::LayerColorCount(impl_->color_mode);
+        const std::size_t color_count = detail::ColorChannelCount(impl_->color_mode);
         Image canvas = detail::MakeWhiteImage(impl_->width, impl_->height, impl_->color_mode, color_count, impl_->depth);
         const Rect bounds = layer.GetBounds();
         detail::BlendNormal(canvas, layer.GetPixels(), bounds.top, bounds.left, layer.GetOpacity(), color_count);
@@ -608,7 +600,8 @@ namespace ffpsd
 
     template <class T> Layer* Document::AddAdjustmentLayer(const std::string& name, const T& value)
     {
-        const std::size_t color_count = detail::LayerColorCount(impl_->color_mode);
+        CheckKeepsLayers(impl_->color_mode);
+        const std::size_t color_count = detail::ColorChannelCount(impl_->color_mode);
 
         auto settings = std::make_unique<TaggedBlock>();
         settings->key = T::kKey;

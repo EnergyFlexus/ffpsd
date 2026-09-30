@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 using namespace ffpsd_test;
@@ -41,64 +42,45 @@ namespace
     }
 } // namespace
 
-TEST(PngTest, LoadsRgbaIntoPlanes)
+TEST(PngTest, LoadsWhatTheFileHoldsIntoPlanes)
 {
-    const ffpsd::Image image = ffpsd::LoadPng(kRgbaPng, ffpsd::ColorMode::kRgb, 8);
+    const ffpsd::Image rgba = ffpsd::LoadPng(kRgbaPng, ffpsd::ColorMode::kRgb, 8);
+    EXPECT_EQ(rgba.width, 3u);
+    EXPECT_EQ(rgba.height, 2u);
+    EXPECT_EQ(rgba.channel_count, 4u);
+    EXPECT_EQ(rgba.depth, 8u);
+    EXPECT_EQ(rgba.bytes, kRgbaPlanes);
 
-    EXPECT_EQ(image.width, 3u);
-    EXPECT_EQ(image.height, 2u);
-    EXPECT_EQ(image.channel_count, 4u);
-    EXPECT_EQ(image.depth, 8u);
-    EXPECT_EQ(image.bytes, kRgbaPlanes);
+    const ffpsd::Image gray = ffpsd::LoadPng(kGray16Png, ffpsd::ColorMode::kGrayscale, 16);
+    ASSERT_EQ(gray.channel_count, 1u);
+    EXPECT_EQ(Samples16(gray), (std::vector<std::uint16_t>{0x0000, 0xFFFF, 0x8080, 0x1234}));
+
+    const ffpsd::Image palette = ffpsd::LoadPng(kPalettePng, ffpsd::ColorMode::kRgb, 8);
+    ASSERT_EQ(palette.channel_count, 4u);
+    EXPECT_EQ(palette.bytes, (std::vector<std::uint8_t>{10, 200, 20, 100, 30, 50, 255, 0}));
 }
 
-TEST(PngTest, RgbIntoGrayIsRec709Luma)
+TEST(PngTest, LoadsIntoTheModeAndDepthAskedFor)
 {
-    const ffpsd::Image image = ffpsd::LoadPng(kRgbaPng, ffpsd::ColorMode::kGrayscale, 8);
+    // 0.2126, 0.7152 and 0.0722 of 255, rounded.
+    const ffpsd::Image gray = ffpsd::LoadPng(kRgbaPng, ffpsd::ColorMode::kGrayscale, 8);
+    ASSERT_EQ(gray.channel_count, 2u);
+    EXPECT_EQ(gray.bytes, (std::vector<std::uint8_t>{54, 182, 18, 255, 0, 128, 255, 128, 0, 255, 255, 64}));
 
-    ASSERT_EQ(image.channel_count, 2u);
-    const std::vector<std::uint8_t> expected = {54,  182, 18, 255, 0,   128, // 0.2126, 0.7152 and 0.0722 of 255, rounded
-                                                255, 128, 0,  255, 255, 64};
-    EXPECT_EQ(image.bytes, expected);
-}
-
-TEST(PngTest, EightBitWidensToSixteenExactly)
-{
-    const ffpsd::Image image = ffpsd::LoadPng(kRgbaPng, ffpsd::ColorMode::kRgb, 16);
-
-    ASSERT_EQ(image.depth, 16u);
-    const std::vector<std::uint16_t> samples = Samples16(image);
+    const ffpsd::Image wide = ffpsd::LoadPng(kRgbaPng, ffpsd::ColorMode::kRgb, 16);
+    ASSERT_EQ(wide.depth, 16u);
+    const std::vector<std::uint16_t> samples = Samples16(wide);
     EXPECT_EQ(samples[0], 65535u);
     EXPECT_EQ(samples[1], 0u);
     EXPECT_EQ(samples[5], 32896u); // 128 * 257
-}
 
-TEST(PngTest, SixteenBitGrayKeepsItsSamples)
-{
-    const ffpsd::Image image = ffpsd::LoadPng(kGray16Png, ffpsd::ColorMode::kGrayscale, 16);
-
-    ASSERT_EQ(image.channel_count, 1u);
-    EXPECT_EQ(Samples16(image), (std::vector<std::uint16_t>{0x0000, 0xFFFF, 0x8080, 0x1234}));
-}
-
-TEST(PngTest, SixteenBitNarrowsToEightRounded)
-{
-    const ffpsd::Image image = ffpsd::LoadPng(kGray16Png, ffpsd::ColorMode::kRgb, 8);
-
-    ASSERT_EQ(image.channel_count, 3u);
+    const ffpsd::Image narrow = ffpsd::LoadPng(kGray16Png, ffpsd::ColorMode::kRgb, 8);
+    ASSERT_EQ(narrow.channel_count, 3u);
     const std::vector<std::uint8_t> plane = {0, 255, 128, 18};
     std::vector<std::uint8_t> expected;
     for (int i = 0; i < 3; ++i)
         expected.insert(expected.end(), plane.begin(), plane.end());
-    EXPECT_EQ(image.bytes, expected);
-}
-
-TEST(PngTest, APaletteWithTransparencyBecomesRgba)
-{
-    const ffpsd::Image image = ffpsd::LoadPng(kPalettePng, ffpsd::ColorMode::kRgb, 8);
-
-    ASSERT_EQ(image.channel_count, 4u);
-    EXPECT_EQ(image.bytes, (std::vector<std::uint8_t>{10, 200, 20, 100, 30, 50, 255, 0}));
+    EXPECT_EQ(narrow.bytes, expected);
 }
 
 TEST(PngTest, LoadingRefusesWhatItCannotDo)
@@ -115,27 +97,24 @@ TEST(PngTest, LoadingRefusesWhatItCannotDo)
     EXPECT_THROW(ffpsd::LoadPng(DataFile("no_such_file.png"), ffpsd::ColorMode::kRgb, 8), std::filesystem::filesystem_error);
 }
 
-class PngRoundTripTest : public testing::TestWithParam<std::tuple<std::uint16_t, std::uint16_t>>
+TEST(PngTest, EncodeThenLoadGivesTheSamePlanes)
 {
-};
-
-TEST_P(PngRoundTripTest, EncodeThenLoadGivesTheSamePlanes)
-{
-    const auto [channels, depth] = GetParam();
-    const ffpsd::Image image = Pattern(5, 3, channels, depth);
-    const ffpsd::ColorMode color_mode = channels < 3 ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb;
-
-    const std::vector<std::uint8_t> png = ffpsd::EncodePng(image);
-
     // Gray, gray with alpha, RGB and RGBA are color types 0, 4, 2 and 6.
     const int color_types[] = {0, 4, 2, 6};
-    EXPECT_EQ(Header(png), std::make_tuple(5u, 3u, int{depth}, color_types[channels - 1]));
-    EXPECT_EQ(ffpsd::LoadPng(png.data(), png.size(), color_mode, depth).bytes, image.bytes);
-}
+    for (const std::uint16_t channels : {std::uint16_t{1}, std::uint16_t{2}, std::uint16_t{3}, std::uint16_t{4}})
+    {
+        for (const std::uint16_t depth : {std::uint16_t{8}, std::uint16_t{16}})
+        {
+            const ffpsd::Image image = Pattern(5, 3, channels, depth);
+            const ffpsd::ColorMode color_mode = channels < 3 ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb;
 
-INSTANTIATE_TEST_SUITE_P(
-    ChannelsAndDepths, PngRoundTripTest,
-    testing::Combine(testing::Values<std::uint16_t>(1, 2, 3, 4), testing::Values<std::uint16_t>(8, 16)));
+            const std::vector<std::uint8_t> png = ffpsd::EncodePng(image);
+
+            EXPECT_EQ(Header(png), std::make_tuple(5u, 3u, int{depth}, color_types[channels - 1])) << channels << " x " << depth;
+            EXPECT_EQ(ffpsd::LoadPng(png.data(), png.size(), color_mode, depth).bytes, image.bytes) << channels << " x " << depth;
+        }
+    }
+}
 
 TEST(PngTest, EncodingRefusesWhatPngCannotHold)
 {
@@ -148,11 +127,10 @@ TEST(PngTest, EncodingRefusesWhatPngCannotHold)
     EXPECT_THROW(ffpsd::EncodePng(cut), std::invalid_argument);
 }
 
-TEST(PngTest, LayersOfBothFilesSaveAsWhatGetPixelsGives)
+TEST(PngTest, AGrayOrRgbLayerSavesAsWhatGetPixelsGives)
 {
     const ffpsd::Document rgb = ffpsd::Document::Open(kRgbPsd);
     const ffpsd::Document gray = ffpsd::Document::Open(kGrayscalePsd);
-
     for (const auto& [doc, color_mode] :
          {std::make_pair(&rgb, ffpsd::ColorMode::kRgb), std::make_pair(&gray, ffpsd::ColorMode::kGrayscale)})
     {
@@ -163,36 +141,20 @@ TEST(PngTest, LayersOfBothFilesSaveAsWhatGetPixelsGives)
             EXPECT_EQ(ffpsd::LoadPng(png.data(), png.size(), color_mode, 8).bytes, layer->GetPixels().bytes) << layer->GetName();
         }
     }
-}
 
-TEST(PngTest, ASixteenBitLayerSavesSixteenBit)
-{
-    ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kRgb, 16);
-    const ffpsd::Layer* layer = doc.AddLayer("deep", Pattern(3, 2, 4, 16));
+    ffpsd::Document deep = NewDocument(ffpsd::ColorMode::kRgb, 16);
+    const std::vector<std::uint8_t> deep_png = deep.AddLayer("deep", Pattern(3, 2, 4, 16))->EncodePng();
+    EXPECT_EQ(std::get<2>(Header(deep_png)), 16);
+    EXPECT_EQ(ffpsd::LoadPng(deep_png.data(), deep_png.size(), ffpsd::ColorMode::kRgb, 16).bytes, Pattern(3, 2, 4, 16).bytes);
 
-    const std::vector<std::uint8_t> png = layer->EncodePng();
-
-    EXPECT_EQ(std::get<2>(Header(png)), 16);
-    EXPECT_EQ(ffpsd::LoadPng(png.data(), png.size(), ffpsd::ColorMode::kRgb, 16).bytes, Pattern(3, 2, 4, 16).bytes);
-}
-
-TEST(PngTest, SavePngWritesWhatEncodePngGives)
-{
-    const ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     const std::filesystem::path path = std::filesystem::path(testing::TempDir()) / "ffpsd_layer.png";
-
-    doc.GetLayerByIndex(1)->SavePng(path.string());
-
-    EXPECT_EQ(ReadFile(path.string()), doc.GetLayerByIndex(1)->EncodePng());
+    rgb.GetLayerByIndex(1)->SavePng(path.string());
+    EXPECT_EQ(ReadFile(path.string()), rgb.GetLayerByIndex(1)->EncodePng());
     std::filesystem::remove(path);
-}
 
-TEST(PngTest, OnlyAGrayOrRgbLayerWithPixelsSaves)
-{
+    // A layer without pixels, or of another mode, makes no PNG.
     const ffpsd::Document levels = ffpsd::Document::Open(kRgbLevelsPsd);
     ffpsd::Document cmyk = NewDocument(ffpsd::ColorMode::kCmyk);
-    const ffpsd::Layer* cmyk_layer = cmyk.AddLayer("cmyk", Pattern(2, 2, 4));
-
     EXPECT_THROW(levels.GetLayerByIndex(1)->EncodePng(), std::invalid_argument);
-    EXPECT_THROW(cmyk_layer->EncodePng(), std::invalid_argument);
+    EXPECT_THROW(cmyk.AddLayer("cmyk", Pattern(2, 2, 4))->EncodePng(), std::invalid_argument);
 }

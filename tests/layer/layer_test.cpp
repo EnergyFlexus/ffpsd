@@ -8,11 +8,10 @@
 
 using namespace ffpsd_test;
 
-TEST(LayerTest, ANewLayerIsVisibleOpaqueAndNormal)
+TEST(LayerTest, ANewLayerIsVisibleOpaqueAndNormalUntilSet)
 {
     ffpsd::Document doc = NewDocument();
-
-    const ffpsd::Layer* layer = doc.AddLayer("new");
+    ffpsd::Layer* layer = doc.AddLayer("new");
 
     EXPECT_EQ(layer->GetKind(), ffpsd::LayerKind::kRaster);
     EXPECT_TRUE(layer->IsVisible());
@@ -20,12 +19,12 @@ TEST(LayerTest, ANewLayerIsVisibleOpaqueAndNormal)
     EXPECT_EQ(layer->GetBlendKey(), Fourcc("norm"));
     EXPECT_EQ(layer->GetAdjustmentKey(), 0u);
     EXPECT_FALSE(layer->GetAdjustment<ffpsd::LevelsInfo>().has_value());
-}
 
-TEST(LayerTest, VisibilityTogglesBackAndForth)
-{
-    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
-    ffpsd::Layer* layer = doc.GetLayerByIndex(0);
+    // An unknown blend mode is kept as it is.
+    layer->SetBlendKey(Fourcc("zzzz"));
+    layer->SetOpacity(0);
+    EXPECT_EQ(layer->GetBlendKey(), Fourcc("zzzz"));
+    EXPECT_EQ(layer->GetOpacity(), 0u);
 
     layer->SetVisible(false);
     EXPECT_FALSE(layer->IsVisible());
@@ -35,40 +34,21 @@ TEST(LayerTest, VisibilityTogglesBackAndForth)
     EXPECT_TRUE(layer->IsVisible());
 }
 
-TEST(LayerTest, AnUnknownBlendModeIsKeptAsIs)
+TEST(LayerTest, TheNameIsUnicodeWithALegacyCopy)
 {
     ffpsd::Document doc = NewDocument();
-    ffpsd::Layer* layer = doc.AddLayer("new");
-
-    layer->SetBlendKey(Fourcc("zzzz"));
-    layer->SetOpacity(0);
-
-    EXPECT_EQ(layer->GetBlendKey(), Fourcc("zzzz"));
-    EXPECT_EQ(layer->GetOpacity(), 0u);
-}
-
-TEST(LayerTest, TheNameIsUnicodeAndWrittenTwice)
-{
-    ffpsd::Document doc = NewDocument();
-
-    ffpsd::Layer* layer = doc.AddLayer(kColorFillName);
 
     // 'luni' holds the name as UTF-16; the record keeps its own legacy copy.
-    ASSERT_NE(layer->GetTaggedBlockByKey(Fourcc("luni")), nullptr);
-    EXPECT_EQ(layer->GetName(), kColorFillName);
-}
+    ffpsd::Layer* unicode = doc.AddLayer(kColorFillName);
+    ASSERT_NE(unicode->GetTaggedBlockByKey(Fourcc("luni")), nullptr);
+    EXPECT_EQ(unicode->GetName(), kColorFillName);
 
-TEST(LayerTest, TheNameFallsBackToTheLegacyOneWithoutAUsableLuni)
-{
-    ffpsd::Document doc = NewDocument();
-    ffpsd::Layer* layer = doc.AddLayer("plain");
-
-    // A count of 1000 characters in a block of 6 bytes.
-    layer->SetTaggedBlock(Block("luni", {0, 0, 0x03, 0xE8, 0, 'x'}));
-    EXPECT_EQ(layer->GetName(), "plain");
-
-    layer->RemoveTaggedBlock(Fourcc("luni"));
-    EXPECT_EQ(layer->GetName(), "plain");
+    // A count of 1000 characters in a block of 6 bytes, then no block at all: the legacy name stands.
+    ffpsd::Layer* plain = doc.AddLayer("plain");
+    plain->SetTaggedBlock(Block("luni", {0, 0, 0x03, 0xE8, 0, 'x'}));
+    EXPECT_EQ(plain->GetName(), "plain");
+    plain->RemoveTaggedBlock(Fourcc("luni"));
+    EXPECT_EQ(plain->GetName(), "plain");
 }
 
 TEST(LayerTest, TheKindComesFromTheSectionDivider)

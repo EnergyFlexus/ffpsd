@@ -122,7 +122,7 @@ namespace ffpsd
     Image Layer::GetPixels() const
     {
         return detail::DecodeLayerPixels(
-            *record_, detail::LayerColorCount(document_->GetColorMode()), document_->GetDepth(), document_->IsPsb());
+            *record_, detail::ColorChannelCount(document_->GetColorMode()), document_->GetDepth(), document_->IsPsb());
     }
 
     void Layer::SetPixels(const Image& image)
@@ -136,7 +136,7 @@ namespace ffpsd
         detail::SamplesView samples = detail::ViewOf(image);
         samples.depth = depth; // an empty image says nothing about its depth
 
-        detail::ReplaceLayerPixels(*record_, samples, detail::LayerColorCount(document_->GetColorMode()), document_->IsPsb());
+        detail::ReplaceLayerPixels(*record_, samples, detail::ColorChannelCount(document_->GetColorMode()), document_->IsPsb());
         document_->SetHasRealMergedData(false);
     }
 
@@ -179,7 +179,7 @@ namespace ffpsd
         if (pixels.IsEmpty())
             throw std::invalid_argument("ffpsd: an empty layer has nothing to resize");
 
-        const std::size_t color_count = detail::LayerColorCount(document_->GetColorMode());
+        const std::size_t color_count = detail::ColorChannelCount(document_->GetColorMode());
         const Image resized = detail::Resample(pixels, width, height, color_count, filter);
         detail::ReplaceLayerPixels(*record_, detail::ViewOf(resized), color_count, document_->IsPsb());
         document_->SetHasRealMergedData(false);

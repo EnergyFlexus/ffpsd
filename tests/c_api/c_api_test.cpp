@@ -78,16 +78,23 @@ namespace
     }
 } // namespace
 
-TEST(CApiTest, TheHeaderCompilesAsC)
+TEST(CApiTest, TheHeaderIsCAndNullHandlesAreHarmless)
 {
     EXPECT_EQ(ffpsd_test_count_layers_from_c(kRgbPsd.c_str()), 2);
-}
 
-TEST(CApiTest, VersionIsThreeNumbers)
-{
     const std::string version = ffpsd_version();
-
     EXPECT_EQ(std::count(version.begin(), version.end(), '.'), 2);
+
+    EXPECT_EQ(ffpsd_document_get_width(nullptr), 0u);
+    EXPECT_EQ(ffpsd_document_get_layer_count(nullptr), 0u);
+    EXPECT_EQ(ffpsd_layer_get_opacity(nullptr), 0u);
+    EXPECT_EQ(ffpsd_buffer_get_data(nullptr), nullptr);
+    EXPECT_EQ(ffpsd_version_info_get_writer_name(nullptr), nullptr);
+
+    // Destroying NULL is allowed.
+    ffpsd_document_destroy(nullptr);
+    ffpsd_image_destroy(nullptr);
+    ffpsd_buffer_destroy(nullptr);
 }
 
 TEST(CApiTest, ReadsWhatTheCppApiReads)
@@ -123,6 +130,14 @@ TEST(CApiTest, ReadsWhatTheCppApiReads)
     ASSERT_EQ(ffpsd_document_get_merged_image(file.doc, &merged), FFPSD_STATUS_OK);
     EXPECT_EQ(Bytes(merged), cpp.GetMergedImage().bytes);
     ffpsd_image_destroy(merged);
+
+    // "Fon" is 6 bytes of UTF-8; 4 bytes of buffer hold 3 of them and the null.
+    char buffer[4] = {'x', 'x', 'x', 'x'};
+    size_t length = 0;
+    ASSERT_EQ(ffpsd_layer_get_name(background, buffer, sizeof(buffer), &length), FFPSD_STATUS_OK);
+    EXPECT_EQ(length, 6u);
+    EXPECT_EQ(std::memcmp(buffer, kBackgroundName.data(), 3), 0);
+    EXPECT_EQ(buffer[3], '\0');
 }
 
 TEST(CApiTest, ResolutionAndVersionInfo)
@@ -189,24 +204,40 @@ TEST(CApiTest, ADocumentBuiltInCSavesAndOpensAgain)
     EXPECT_EQ(read.input_floor, 40u);
     ffpsd_levels_destroy(levels);
     ffpsd_document_destroy(back);
+
+    // Past the end, the records in between are the identity.
+    ASSERT_EQ(ffpsd_levels_create(&levels), FFPSD_STATUS_OK);
+    const ffpsd_levels_channel_t record = {10, 200, 0, 255, 2.0};
+    ASSERT_EQ(ffpsd_levels_set_channel(levels, 2, &record), FFPSD_STATUS_OK);
+    ASSERT_EQ(ffpsd_levels_get_count(levels), 3u);
+    ASSERT_EQ(ffpsd_levels_get_channel(levels, 0, &read), FFPSD_STATUS_OK);
+    EXPECT_EQ(read.input_ceiling, 255u);
+    EXPECT_DOUBLE_EQ(read.gamma, 1.0);
+    ASSERT_EQ(ffpsd_levels_get_channel(levels, 2, &read), FFPSD_STATUS_OK);
+    EXPECT_DOUBLE_EQ(read.gamma, 2.0);
+    EXPECT_EQ(ffpsd_levels_get_channel(levels, 3, &read), FFPSD_STATUS_OUT_OF_RANGE);
+    ffpsd_levels_destroy(levels);
 }
 
-TEST(CApiTest, SaveTakesACompression)
+TEST(CApiTest, SaveTakesACompressionAndAPath)
 {
     OpenDocument file(kRgbPsd);
     ffpsd_buffer_t* raw = nullptr;
     ffpsd_buffer_t* rle = nullptr;
-
     ASSERT_EQ(ffpsd_document_save_memory(file.doc, FFPSD_COMPRESSION_RAW, &raw), FFPSD_STATUS_OK);
     ASSERT_EQ(ffpsd_document_save_memory(file.doc, FFPSD_COMPRESSION_RLE, &rle), FFPSD_STATUS_OK);
-
     EXPECT_GT(ffpsd_buffer_get_size(raw), ffpsd_buffer_get_size(rle));
     EXPECT_EQ(ffpsd_buffer_get_size(rle), ReadFile(kRgbPsd).size());
     ffpsd_buffer_destroy(raw);
     ffpsd_buffer_destroy(rle);
+
+    const std::string path = testing::TempDir() + "ffpsd_c_api_test.psd";
+    ASSERT_EQ(ffpsd_document_save(file.doc, path.c_str(), FFPSD_COMPRESSION_RLE), FFPSD_STATUS_OK) << ffpsd_last_error();
+    EXPECT_EQ(ReadFile(path), ReadFile(kRgbPsd));
+    std::remove(path.c_str());
 }
 
-TEST(CApiTest, StackEditsThroughC)
+TEST(CApiTest, StackAndLayerEditsThroughC)
 {
     OpenDocument file(kRgbPsd);
     ffpsd_layer_t* copy = nullptr;
@@ -223,6 +254,22 @@ TEST(CApiTest, StackEditsThroughC)
     EXPECT_EQ(ffpsd_layer_get_opacity(copy), 10u);
     EXPECT_EQ(ffpsd_layer_is_visible(copy), 0);
     EXPECT_EQ(ffpsd_document_get_has_real_merged_data(file.doc), 0);
+
+    ffpsd_document_t* doc = NewRgbDocument();
+    const ffpsd::Image image = Pattern(3, 2, 4);
+    const ffpsd_image_view_t layer_view = View(image);
+    ffpsd_layer_t* layer = nullptr;
+    ASSERT_EQ(ffpsd_document_add_layer(doc, "layer", &layer_view, 0, 0, &layer), FFPSD_STATUS_OK);
+    ASSERT_EQ(ffpsd_layer_set_position(layer, 5, 6), FFPSD_STATUS_OK);
+    ASSERT_EQ(ffpsd_layer_resize(layer, 6, 4, FFPSD_RESAMPLE_FILTER_BICUBIC), FFPSD_STATUS_OK);
+
+    ffpsd_rect_t bounds = {};
+    ASSERT_EQ(ffpsd_layer_get_bounds(layer, &bounds), FFPSD_STATUS_OK);
+    EXPECT_EQ(bounds.top, 5);
+    EXPECT_EQ(bounds.left, 6);
+    EXPECT_EQ(bounds.right - bounds.left, 6);
+    EXPECT_EQ(ffpsd_layer_resize(layer, 0, 4, FFPSD_RESAMPLE_FILTER_NEAREST), FFPSD_STATUS_INVALID_ARGUMENT);
+    ffpsd_document_destroy(doc);
 }
 
 TEST(CApiTest, ABackgroundThroughC)
@@ -270,25 +317,6 @@ TEST(CApiTest, ColorModeConvertsThroughC)
     ffpsd_document_destroy(doc);
 }
 
-TEST(CApiTest, ResizeThroughC)
-{
-    ffpsd_document_t* doc = NewRgbDocument();
-    const ffpsd::Image image = Pattern(3, 2, 4);
-    const ffpsd_image_view_t layer_view = View(image);
-    ffpsd_layer_t* layer = nullptr;
-    ASSERT_EQ(ffpsd_document_add_layer(doc, "layer", &layer_view, 0, 0, &layer), FFPSD_STATUS_OK);
-    ASSERT_EQ(ffpsd_layer_set_position(layer, 5, 6), FFPSD_STATUS_OK);
-    ASSERT_EQ(ffpsd_layer_resize(layer, 6, 4, FFPSD_RESAMPLE_FILTER_BICUBIC), FFPSD_STATUS_OK);
-
-    ffpsd_rect_t bounds = {};
-    ASSERT_EQ(ffpsd_layer_get_bounds(layer, &bounds), FFPSD_STATUS_OK);
-    EXPECT_EQ(bounds.top, 5);
-    EXPECT_EQ(bounds.left, 6);
-    EXPECT_EQ(bounds.right - bounds.left, 6);
-    EXPECT_EQ(ffpsd_layer_resize(layer, 0, 4, FFPSD_RESAMPLE_FILTER_NEAREST), FFPSD_STATUS_INVALID_ARGUMENT);
-    ffpsd_document_destroy(doc);
-}
-
 TEST(CApiTest, ResourcesAndBlocksAreBorrowed)
 {
     OpenDocument file(kRgbPsd);
@@ -319,39 +347,6 @@ TEST(CApiTest, ResourcesAndBlocksAreBorrowed)
     ffpsd_tagged_block_t first = {};
     ASSERT_EQ(ffpsd_document_get_tagged_block_by_index(file.doc, 0, &first), FFPSD_STATUS_OK);
     EXPECT_EQ(first.key, Fourcc("Patt"));
-}
-
-TEST(CApiTest, TheNameIsCutToTheBuffer)
-{
-    OpenDocument file(kRgbPsd);
-    const ffpsd_layer_t* layer = Layer(file.doc, 0);
-
-    // "Fon" is 6 bytes of UTF-8; 4 bytes of buffer hold 3 of them and the null.
-    char buffer[4] = {'x', 'x', 'x', 'x'};
-    size_t length = 0;
-    ASSERT_EQ(ffpsd_layer_get_name(layer, buffer, sizeof(buffer), &length), FFPSD_STATUS_OK);
-    EXPECT_EQ(length, 6u);
-    EXPECT_EQ(std::memcmp(buffer, kBackgroundName.data(), 3), 0);
-    EXPECT_EQ(buffer[3], '\0');
-}
-
-TEST(CApiTest, LevelsGrowWithUntouchedRecords)
-{
-    ffpsd_levels_t* levels = nullptr;
-    ASSERT_EQ(ffpsd_levels_create(&levels), FFPSD_STATUS_OK);
-    const ffpsd_levels_channel_t record = {10, 200, 0, 255, 2.0};
-
-    ASSERT_EQ(ffpsd_levels_set_channel(levels, 2, &record), FFPSD_STATUS_OK);
-
-    ASSERT_EQ(ffpsd_levels_get_count(levels), 3u);
-    ffpsd_levels_channel_t read = {};
-    ASSERT_EQ(ffpsd_levels_get_channel(levels, 0, &read), FFPSD_STATUS_OK);
-    EXPECT_EQ(read.input_ceiling, 255u);
-    EXPECT_DOUBLE_EQ(read.gamma, 1.0);
-    ASSERT_EQ(ffpsd_levels_get_channel(levels, 2, &read), FFPSD_STATUS_OK);
-    EXPECT_DOUBLE_EQ(read.gamma, 2.0);
-    EXPECT_EQ(ffpsd_levels_get_channel(levels, 3, &read), FFPSD_STATUS_OUT_OF_RANGE);
-    ffpsd_levels_destroy(levels);
 }
 
 TEST(CApiTest, EveryFailureIsAStatusWithAMessage)
@@ -392,32 +387,7 @@ TEST(CApiTest, EveryFailureIsAStatusWithAMessage)
     EXPECT_STREQ(ffpsd_last_error(), "");
 }
 
-TEST(CApiTest, NullHandlesGiveZeroes)
-{
-    EXPECT_EQ(ffpsd_document_get_width(nullptr), 0u);
-    EXPECT_EQ(ffpsd_document_get_layer_count(nullptr), 0u);
-    EXPECT_EQ(ffpsd_layer_get_opacity(nullptr), 0u);
-    EXPECT_EQ(ffpsd_buffer_get_data(nullptr), nullptr);
-    EXPECT_EQ(ffpsd_version_info_get_writer_name(nullptr), nullptr);
-
-    // Destroying NULL is allowed.
-    ffpsd_document_destroy(nullptr);
-    ffpsd_image_destroy(nullptr);
-    ffpsd_buffer_destroy(nullptr);
-}
-
-TEST(CApiTest, SaveWritesAFile)
-{
-    OpenDocument file(kGrayscalePsd);
-    const std::string path = testing::TempDir() + "ffpsd_c_api_test.psd";
-
-    ASSERT_EQ(ffpsd_document_save(file.doc, path.c_str(), FFPSD_COMPRESSION_RLE), FFPSD_STATUS_OK) << ffpsd_last_error();
-
-    EXPECT_EQ(ReadFile(path), ReadFile(kGrayscalePsd));
-    std::remove(path.c_str());
-}
-
-TEST(CApiTest, PngThroughC)
+TEST(CApiTest, PngAndJpegThroughC)
 {
     OpenDocument file(kRgbPsd);
     const ffpsd_layer_t* layer = Layer(file.doc, 1);
@@ -436,31 +406,26 @@ TEST(CApiTest, PngThroughC)
     EXPECT_EQ(status, FFPSD_STATUS_UNSUPPORTED);
     EXPECT_EQ(png, nullptr);
 #endif
-}
 
-TEST(CApiTest, JpegThroughC)
-{
-    OpenDocument file(kRgbPsd);
-    const ffpsd_layer_t* layer = Layer(file.doc, 1);
     ffpsd_buffer_t* jpeg = nullptr;
-    const ffpsd_status_t status = ffpsd_layer_save_as_jpeg_memory(layer, 90, &jpeg);
+    const ffpsd_status_t jpeg_status = ffpsd_layer_save_as_jpeg_memory(layer, 90, &jpeg);
 
 #if defined(FFPSD_HAS_JPEG)
-    ASSERT_EQ(status, FFPSD_STATUS_OK) << ffpsd_last_error();
-    ffpsd_image_t* image = nullptr;
+    ASSERT_EQ(jpeg_status, FFPSD_STATUS_OK) << ffpsd_last_error();
+    ffpsd_image_t* decoded = nullptr;
     ASSERT_EQ(
-        ffpsd_jpeg_load_memory(ffpsd_buffer_get_data(jpeg), ffpsd_buffer_get_size(jpeg), FFPSD_COLOR_MODE_RGB, 8, 1, &image),
+        ffpsd_jpeg_load_memory(ffpsd_buffer_get_data(jpeg), ffpsd_buffer_get_size(jpeg), FFPSD_COLOR_MODE_RGB, 8, 1, &decoded),
         FFPSD_STATUS_OK)
         << ffpsd_last_error();
     ffpsd_image_view_t view = {};
-    ASSERT_EQ(ffpsd_image_get_view(image, &view), FFPSD_STATUS_OK);
+    ASSERT_EQ(ffpsd_image_get_view(decoded, &view), FFPSD_STATUS_OK);
     EXPECT_EQ(view.channel_count, 3u);
     EXPECT_EQ(view.size, Pixels(layer).size() / 4 * 3); // the layer's transparency is dropped
-    ffpsd_image_destroy(image);
+    ffpsd_image_destroy(decoded);
     ffpsd_buffer_destroy(jpeg);
     EXPECT_EQ(ffpsd_layer_save_as_jpeg_memory(layer, 0, &jpeg), FFPSD_STATUS_INVALID_ARGUMENT);
 #else
-    EXPECT_EQ(status, FFPSD_STATUS_UNSUPPORTED);
+    EXPECT_EQ(jpeg_status, FFPSD_STATUS_UNSUPPORTED);
     EXPECT_EQ(jpeg, nullptr);
 #endif
 }
