@@ -85,7 +85,6 @@ jobs:
             cp ffpsd-out/bin/img2ffpsd* "$name"/
             cp -R ffpsd-out/share/ffpsd/licenses "$name"/licenses
           fi
-          cp LICENSE "$name"/
 
           # tar keeps the executable bit and the symlinks of a .so or .dylib.
           if [ "$RUNNER_OS" = Windows ]; then

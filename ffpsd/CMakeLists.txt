@@ -144,6 +144,10 @@ install(TARGETS ffpsd
     EXPORT ffpsd-targets
     FILE_SET HEADERS)
 
+# Beside the licenses of the vendored libraries.
+install(FILES "${PROJECT_SOURCE_DIR}/LICENSE"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/ffpsd/licenses" RENAME ffpsd.txt)
+
 # A static ffpsd needs them at link time, so they ship in the same package.
 if(FFPSD_WITH_PNG AND NOT BUILD_SHARED_LIBS)
     install(TARGETS png_static zlib-ng EXPORT ffpsd-targets)
