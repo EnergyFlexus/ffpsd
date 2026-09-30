@@ -27,6 +27,15 @@
       }
     },
     {
+      "name": "ui-debug",
+      "displayName": "UI · Debug",
+      "description": "Static Debug with the apps that have a window, Dear ImGui and SDL3 included",
+      "inherits": "static-debug",
+      "cacheVariables": {
+        "FFPSD_WITH_IMGUI": "ON"
+      }
+    },
+    {
       "name": "static-release",
       "displayName": "Static · Release",
       "inherits": "base",
@@ -75,6 +84,7 @@
 
   "buildPresets": [
     { "name": "static-debug",   "configurePreset": "static-debug" },
+    { "name": "ui-debug",       "configurePreset": "ui-debug" },
     { "name": "static-release", "configurePreset": "static-release" },
     { "name": "shared-debug",   "configurePreset": "shared-debug" },
     { "name": "shared-release", "configurePreset": "shared-release" },

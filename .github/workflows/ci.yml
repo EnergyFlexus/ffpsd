@@ -44,9 +44,14 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Ninja (Linux)
+      # SDL3 opens its windows through X11 or Wayland, found when it runs; it needs their headers to build.
+      - name: Ninja and the headers SDL3 builds against (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ninja-build
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+            libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev libegl1-mesa-dev libgl1-mesa-dev \
+            libdbus-1-dev libudev-dev
 
       - name: Ninja (macOS)
         if: runner.os == 'macOS'

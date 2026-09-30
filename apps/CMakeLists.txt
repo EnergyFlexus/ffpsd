@@ -1,9 +1,15 @@
 # One folder per app; each says here what it needs.
 
-# img2ffpsd and its UI read PNG and JPEG files.
+# img2ffpsd reads PNG and JPEG files.
 if(FFPSD_WITH_PNG AND FFPSD_WITH_JPEG)
     add_subdirectory(img2ffpsd)
+else()
+    message(STATUS "img2ffpsd is skipped: it needs FFPSD_WITH_PNG and FFPSD_WITH_JPEG")
+endif()
+
+# Its UI draws with Dear ImGui.
+if(FFPSD_WITH_PNG AND FFPSD_WITH_JPEG AND FFPSD_WITH_IMGUI)
     add_subdirectory(img2ffpsd_ui)
 else()
-    message(STATUS "img2ffpsd and img2ffpsd_ui are skipped: they need FFPSD_WITH_PNG and FFPSD_WITH_JPEG")
+    message(STATUS "img2ffpsd_ui is skipped: it needs FFPSD_WITH_PNG, FFPSD_WITH_JPEG and FFPSD_WITH_IMGUI")
 endif()

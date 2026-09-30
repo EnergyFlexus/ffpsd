@@ -100,6 +100,34 @@ if(FFPSD_WITH_JPEG)
         DESTINATION "${CMAKE_INSTALL_DATADIR}/ffpsd/licenses" RENAME libjpeg-turbo-ijg.txt)
 endif()
 
+if(FFPSD_WITH_IMGUI)
+    # SDL3 opens the window and hands over the input, static like the rest.
+    set(SDL_SHARED OFF)
+    set(SDL_STATIC ON)
+    set(SDL_TEST_LIBRARY OFF)
+    set(SDL_TESTS OFF)
+    set(SDL_EXAMPLES OFF)
+    set(SDL_INSTALL OFF)
+    add_subdirectory(SDL)
+
+    # Dear ImGui has no build of its own: its core, std::string for text fields, and the SDL3 input and SDL_Renderer drawing.
+    add_library(imgui STATIC
+        imgui/imgui.cpp
+        imgui/imgui_draw.cpp
+        imgui/imgui_tables.cpp
+        imgui/imgui_widgets.cpp
+        imgui/misc/cpp/imgui_stdlib.cpp
+        imgui/backends/imgui_impl_sdl3.cpp
+        imgui/backends/imgui_impl_sdlrenderer3.cpp)
+    target_include_directories(imgui SYSTEM PUBLIC imgui imgui/misc/cpp imgui/backends)
+    target_link_libraries(imgui PUBLIC SDL3::SDL3-static)
+
+    install(FILES imgui/LICENSE.txt
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/ffpsd/licenses" RENAME dear-imgui.txt)
+    install(FILES SDL/LICENSE.txt
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/ffpsd/licenses" RENAME sdl3.txt)
+endif()
+
 # Only the tests link it, and nothing of it is installed.
 if(FFPSD_BUILD_TESTS)
     set(BUILD_GMOCK OFF)

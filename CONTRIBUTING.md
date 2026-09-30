@@ -33,7 +33,7 @@ ffpsd/src/             the library
 ffpsd/src/detail/      everything not in the public API
 apps/                  the apps, a folder each: img2ffpsd
 docs/                  PSD.md, the format reference
-vendor/                libpng, zlib-ng, libjpeg-turbo, googletest, benchmark: submodules pinned to tags
+vendor/                libpng, zlib-ng, libjpeg-turbo, imgui, SDL, googletest, benchmark: submodules pinned to tags
 tests/                 GoogleTest, built with FFPSD_BUILD_TESTS
 benchmarks/            Google Benchmark, built with FFPSD_BUILD_BENCHMARKS
 examples/              programs that use the installed package
