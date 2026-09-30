@@ -8,25 +8,19 @@
 
 using namespace ffpsd_test;
 
-TEST(DocumentFormatTest, APsbRoundTrips)
+TEST(DocumentFormatTest, APsbKeepsEveryPixel)
 {
-    ffpsd::Document doc = NewDocument();
-    doc.SetPsb(true);
-    doc.AddLayer("one", Pattern(3, 2, 4));
+    ffpsd::Document made = NewDocument();
+    made.SetPsb(true);
+    made.AddLayer("one", Pattern(3, 2, 4));
+    const ffpsd::Document made_back = ffpsd::Document::Parse(made.Save());
+    EXPECT_TRUE(made_back.IsPsb());
+    EXPECT_EQ(made_back.GetLayerByIndex(0)->GetPixels().bytes, Pattern(3, 2, 4).bytes);
+    EXPECT_EQ(made_back.GetMergedImage().bytes.size(), 4u * 3 * 3);
 
-    const ffpsd::Document back = ffpsd::Document::Parse(doc.Save());
-
-    EXPECT_TRUE(back.IsPsb());
-    EXPECT_EQ(back.GetLayerByIndex(0)->GetPixels().bytes, Pattern(3, 2, 4).bytes);
-    EXPECT_EQ(back.GetMergedImage().bytes.size(), 4u * 3 * 3);
-}
-
-TEST(DocumentFormatTest, SwitchingTheFormatKeepsEveryPixel)
-{
     // Photoshop's RLE, with 2 byte row counts, through a PSB with 4 byte ones and back.
     const ffpsd::Document original = ffpsd::Document::Open(kRgbPsd);
     ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
-
     doc.SetPsb(true);
     const ffpsd::Document psb = ffpsd::Document::Parse(doc.Save());
     doc.SetPsb(false);

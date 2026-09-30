@@ -71,7 +71,9 @@ if(FFPSD_WITH_JPEG)
     foreach(ffpsd_variable IN ITEMS CMAKE_BUILD_TYPE CMAKE_C_COMPILER CMAKE_MAKE_PROGRAM CMAKE_TOOLCHAIN_FILE
                                     CMAKE_OSX_ARCHITECTURES CMAKE_OSX_DEPLOYMENT_TARGET)
         if(${ffpsd_variable})
-            list(APPEND ffpsd_jpeg_args "-D${ffpsd_variable}=${${ffpsd_variable}}")
+            # Backslashes of a Windows path would be escapes in the script ExternalProject writes.
+            file(TO_CMAKE_PATH "${${ffpsd_variable}}" ffpsd_value)
+            list(APPEND ffpsd_jpeg_args "-D${ffpsd_variable}=${ffpsd_value}")
         endif()
     endforeach()
 

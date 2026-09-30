@@ -273,6 +273,7 @@ git add vendor/libpng
 ```sh
 pip install pre-commit && pre-commit install   # once
 python scripts/run_tests.py --all              # Debug has the warnings; keep it free of them
+python scripts/run_coverage.py                 # what of the library the tests reach, with clang
 ```
 
 Tests, `tests/README.md` has the folders:

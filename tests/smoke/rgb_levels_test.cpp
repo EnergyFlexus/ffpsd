@@ -231,29 +231,16 @@ TEST(SmokeRgbLevelsTest, EveryValueIsTheDumps)
     ExpectTheFile(ffpsd::Document::Parse(file), false);
 }
 
-TEST(SmokeRgbLevelsTest, SavingUnchangedGivesTheFileBack)
-{
-    // Byte for byte, so what the API does not show survives too: flags, masks, blending ranges, legacy names.
-    const std::vector<std::uint8_t> saved = ffpsd::Document::Open(kRgbLevelsPsd).Save();
-
-    EXPECT_EQ(saved.size(), kFileSize);
-    EXPECT_EQ(Fnv1a64(saved), kFileFnv);
-}
-
-TEST(SmokeRgbLevelsTest, RawAndBackKeepsEveryValue)
+TEST(SmokeRgbLevelsTest, RawAndPsbKeepEveryValue)
 {
     const std::vector<std::uint8_t> raw = ffpsd::Document::Open(kRgbLevelsPsd).Save(ffpsd::Compression::kRaw);
     const ffpsd::Document from_raw = Reparsed(raw);
     ExpectTheFile(from_raw, false);
+    ExpectTheFile(Reparsed(from_raw.Save()), false);
 
     // Unpacked, the composite alone is three planes of 1890 x 1417.
     EXPECT_GT(raw.size(), std::size_t{kWidth} * kHeight * 3);
 
-    ExpectTheFile(Reparsed(from_raw.Save()), false);
-}
-
-TEST(SmokeRgbLevelsTest, APsbKeepsEveryValueAndComesBackAsTheFile)
-{
     ffpsd::Document doc = ffpsd::Document::Open(kRgbLevelsPsd);
     doc.SetPsb(true);
     ffpsd::Document psb = Reparsed(doc.Save());
@@ -261,7 +248,6 @@ TEST(SmokeRgbLevelsTest, APsbKeepsEveryValueAndComesBackAsTheFile)
 
     psb.SetPsb(false);
     const std::vector<std::uint8_t> back = psb.Save();
-
     EXPECT_EQ(back.size(), kFileSize);
     EXPECT_EQ(Fnv1a64(back), kFileFnv);
 }

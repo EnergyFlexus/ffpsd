@@ -21,9 +21,16 @@ data/          photoshop/: written by Photoshop; generated/: written by scripts/
 scripts/       what writes data/generated/ and dumps data/photoshop/; run by hand
 ```
 
-One behaviour per test, named as a sentence:
-`DocumentStackTest.AStackChangeThatBreaksAGroupIsRolledBack`. A refusal is checked
+One feature per test, named as a sentence:
+`DocumentStackTest.AStackChangeThatBreaksAGroupIsRolledBack`. Its cases go into the
+same test, after a one-line comment where they need one, and variations are a loop
+rather than parameters. No two tests check the same thing. A refusal is checked
 together with what it leaves behind.
+
+`python scripts/run_coverage.py` builds them with clang's coverage into
+`build/coverage/` and reports what of `ffpsd/src` and `ffpsd/include` they reach;
+`--save before.json`, then `--compare before.json` after a change, lists every line
+and branch that is no longer covered. `--html DIR` shows it line by line.
 
 | File | What it holds |
 |------|---------------|

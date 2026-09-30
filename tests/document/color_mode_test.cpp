@@ -51,27 +51,27 @@ namespace
     }
 } // namespace
 
-TEST(DocumentColorModeTest, TheSameModeChangesNothing)
-{
-    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
-    const std::vector<std::uint8_t> before = doc.Save();
-
-    doc.ConvertColorMode(ffpsd::ColorMode::kRgb);
-
-    EXPECT_EQ(doc.Save(), before);
-}
-
-TEST(DocumentColorModeTest, OnlyRgbAndGrayConvertIntoEachOther)
+TEST(DocumentColorModeTest, OnlyRgbAndGrayConvertAndARefusalChangesNothing)
 {
     ffpsd::Document rgb = ffpsd::Document::Open(kRgbPsd);
     ffpsd::Document cmyk = NewDocument(ffpsd::ColorMode::kCmyk);
     const std::vector<std::uint8_t> before = rgb.Save();
+
+    rgb.ConvertColorMode(ffpsd::ColorMode::kRgb);
+    EXPECT_EQ(rgb.Save(), before);
 
     EXPECT_THROW(rgb.ConvertColorMode(ffpsd::ColorMode::kCmyk), std::invalid_argument);
     EXPECT_THROW(rgb.ConvertColorMode(ffpsd::ColorMode::kLab), std::invalid_argument);
     EXPECT_THROW(cmyk.ConvertColorMode(ffpsd::ColorMode::kGrayscale), std::invalid_argument);
     EXPECT_EQ(rgb.Save(), before);
     EXPECT_EQ(cmyk.GetColorMode(), ffpsd::ColorMode::kCmyk);
+
+    // An adjustment it cannot convert stops it before anything changes.
+    rgb.GetLayerByIndex(1)->SetTaggedBlock(Block("curv", {0, 1}));
+    const std::vector<std::uint8_t> with_curves = rgb.Save();
+    EXPECT_THROW(rgb.ConvertColorMode(ffpsd::ColorMode::kGrayscale), std::invalid_argument);
+    EXPECT_EQ(rgb.GetColorMode(), ffpsd::ColorMode::kRgb);
+    EXPECT_EQ(rgb.Save(), with_curves);
 }
 
 TEST(DocumentColorModeTest, RgbToGrayIsLumaWithTransparencyKept)
@@ -88,6 +88,10 @@ TEST(DocumentColorModeTest, RgbToGrayIsLumaWithTransparencyKept)
     composite.channel_count = 3;
     composite.bytes.resize(12);
     doc.SetMergedImage(composite);
+    ffpsd::ImageResource profile;
+    profile.id = 1039;
+    profile.data = {1, 2, 3};
+    doc.SetImageResource(profile);
 
     doc.ConvertColorMode(ffpsd::ColorMode::kGrayscale);
 
@@ -99,10 +103,20 @@ TEST(DocumentColorModeTest, RgbToGrayIsLumaWithTransparencyKept)
     EXPECT_EQ(gray.bytes, (std::vector<std::uint8_t>{54, 182, 18, 255, 255, 128, 0, 64}));
     EXPECT_EQ(doc.GetMergedImage().bytes, (std::vector<std::uint8_t>{54, 182, 18, 255}));
     EXPECT_TRUE(doc.HasRealMergedData());
+    EXPECT_EQ(doc.GetImageResourceById(1039), nullptr); // an RGB profile does not describe gray
 
     const ffpsd::Document back = ffpsd::Document::Parse(doc.Save());
     EXPECT_EQ(back.GetColorMode(), ffpsd::ColorMode::kGrayscale);
     EXPECT_EQ(back.GetLayerByIndex(0)->GetPixels().bytes, gray.bytes);
+
+    // A composite's alpha channels stay as they are.
+    ffpsd::Document channels = NewDocument();
+    channels.SetChannelCount(5);
+    const ffpsd::Image five = Pattern(4, 3, 5);
+    channels.SetMergedImage(five);
+    channels.ConvertColorMode(ffpsd::ColorMode::kGrayscale);
+    EXPECT_EQ(channels.GetChannelCount(), 3u);
+    EXPECT_EQ(channels.GetMergedImage().bytes, ExpectedGray(five));
 }
 
 TEST(DocumentColorModeTest, APhotoshopFileTurnsGrayLayerByLayer)
@@ -129,67 +143,6 @@ TEST(DocumentColorModeTest, APhotoshopFileTurnsGrayLayerByLayer)
     EXPECT_EQ(back.GetMergedImage().bytes, ExpectedGray(original.GetMergedImage()));
 }
 
-TEST(DocumentColorModeTest, LevelsMovesItsRgbRecordToTheGrayOne)
-{
-    ffpsd::Document doc = ffpsd::Document::Open(kRgbLevelsPsd);
-
-    doc.ConvertColorMode(ffpsd::ColorMode::kGrayscale);
-    const ffpsd::Document back = ffpsd::Document::Parse(doc.Save());
-
-    // Photoshop's 70 to 200 on every RGB channel lands in record 1, where a gray document keeps its channel.
-    const std::optional<ffpsd::LevelsInfo> levels = back.GetLayerByIndex(1)->GetAdjustment<ffpsd::LevelsInfo>();
-    ASSERT_TRUE(levels.has_value());
-    ASSERT_EQ(levels->channels.size(), 2u);
-    EXPECT_EQ(levels->channels[0].input_floor, 0u);
-    EXPECT_EQ(levels->channels[0].input_ceiling, 255u);
-    EXPECT_EQ(levels->channels[1].input_floor, 70u);
-    EXPECT_EQ(levels->channels[1].input_ceiling, 200u);
-
-    // Levels is not linear, so the gray of the old composite would not be what the layers give.
-    EXPECT_FALSE(back.HasRealMergedData());
-    const ffpsd::Image merged = back.GetMergedImage();
-    EXPECT_EQ(merged.channel_count, 1u);
-    EXPECT_EQ(PlaneSum(merged, 0), 0u);
-}
-
-TEST(DocumentColorModeTest, ACompositesAlphaChannelsStayAsTheyAre)
-{
-    ffpsd::Document doc = NewDocument();
-    doc.SetChannelCount(5);
-    const ffpsd::Image composite = Pattern(4, 3, 5);
-    doc.SetMergedImage(composite);
-
-    doc.ConvertColorMode(ffpsd::ColorMode::kGrayscale);
-
-    EXPECT_EQ(doc.GetChannelCount(), 3u);
-    EXPECT_EQ(doc.GetMergedImage().bytes, ExpectedGray(composite));
-}
-
-TEST(DocumentColorModeTest, TheRgbProfileGoes)
-{
-    ffpsd::Document doc = NewDocument();
-    ffpsd::ImageResource profile;
-    profile.id = 1039;
-    profile.data = {1, 2, 3};
-    doc.SetImageResource(profile);
-
-    doc.ConvertColorMode(ffpsd::ColorMode::kGrayscale);
-
-    EXPECT_EQ(doc.GetImageResourceById(1039), nullptr);
-}
-
-TEST(DocumentColorModeTest, AnAdjustmentItCannotConvertLeavesTheDocumentAlone)
-{
-    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
-    doc.GetLayerByIndex(1)->SetTaggedBlock(Block("curv", {0, 1}));
-    const std::vector<std::uint8_t> before = doc.Save();
-
-    EXPECT_THROW(doc.ConvertColorMode(ffpsd::ColorMode::kGrayscale), std::invalid_argument);
-
-    EXPECT_EQ(doc.GetColorMode(), ffpsd::ColorMode::kRgb);
-    EXPECT_EQ(doc.Save(), before);
-}
-
 TEST(DocumentColorModeTest, GrayToRgbCopiesThePlaneThreeTimes)
 {
     ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kGrayscale, 8, 3, 1);
@@ -212,9 +165,18 @@ TEST(DocumentColorModeTest, GrayToRgbCopiesThePlaneThreeTimes)
         doc.GetLayerByIndex(0)->GetPixels().bytes, (std::vector<std::uint8_t>{10, 128, 250, 10, 128, 250, 10, 128, 250, 255, 128, 0}));
     EXPECT_EQ(doc.GetMergedImage().bytes, (std::vector<std::uint8_t>{10, 128, 250, 10, 128, 250, 10, 128, 250}));
     EXPECT_TRUE(doc.HasRealMergedData());
+
+    // A composite's alpha channels stay as they are.
+    ffpsd::Document channels = NewDocument(ffpsd::ColorMode::kGrayscale);
+    channels.SetChannelCount(3);
+    const ffpsd::Image three = Pattern(4, 3, 3);
+    channels.SetMergedImage(three);
+    channels.ConvertColorMode(ffpsd::ColorMode::kRgb);
+    EXPECT_EQ(channels.GetChannelCount(), 5u);
+    EXPECT_EQ(channels.GetMergedImage().bytes, ExpectedRgb(three));
 }
 
-TEST(DocumentColorModeTest, APhotoshopGrayFileTurnsRgbLayerByLayer)
+TEST(DocumentColorModeTest, APhotoshopGrayFileTurnsRgbAndBack)
 {
     const ffpsd::Document original = ffpsd::Document::Open(kGrayscalePsd);
     ffpsd::Document doc = ffpsd::Document::Open(kGrayscalePsd);
@@ -228,23 +190,44 @@ TEST(DocumentColorModeTest, APhotoshopGrayFileTurnsRgbLayerByLayer)
         EXPECT_EQ(back.GetLayerByIndex(i)->GetPixels().bytes, ExpectedRgb(original.GetLayerByIndex(i)->GetPixels())) << "layer " << i;
     EXPECT_TRUE(back.HasRealMergedData());
     EXPECT_EQ(back.GetMergedImage().bytes, ExpectedRgb(original.GetMergedImage()));
-}
-
-TEST(DocumentColorModeTest, GrayToRgbAndBackGivesTheSamePixels)
-{
-    const ffpsd::Document original = ffpsd::Document::Open(kGrayscalePsd);
-    ffpsd::Document doc = ffpsd::Document::Open(kGrayscalePsd);
 
     // Three equal channels have that same luma: the weights add up to exactly 1.
-    doc.ConvertColorMode(ffpsd::ColorMode::kRgb);
     doc.ConvertColorMode(ffpsd::ColorMode::kGrayscale);
-
     for (std::size_t i = 0; i < 2; ++i)
         EXPECT_EQ(doc.GetLayerByIndex(i)->GetPixels().bytes, original.GetLayerByIndex(i)->GetPixels().bytes) << "layer " << i;
     EXPECT_EQ(doc.GetMergedImage().bytes, original.GetMergedImage().bytes);
 }
 
-TEST(DocumentColorModeTest, GrayLevelsBecomesTheRecordOfEveryRgbChannel)
+TEST(DocumentColorModeTest, RgbLevelsMoveToTheGrayRecordAndBack)
+{
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbLevelsPsd);
+
+    doc.ConvertColorMode(ffpsd::ColorMode::kGrayscale);
+    const ffpsd::Document back = ffpsd::Document::Parse(doc.Save());
+
+    // Photoshop's 70 to 200 on every RGB channel lands in record 1, where a gray document keeps its channel.
+    const std::optional<ffpsd::LevelsInfo> gray = back.GetLayerByIndex(1)->GetAdjustment<ffpsd::LevelsInfo>();
+    ASSERT_TRUE(gray.has_value());
+    ASSERT_EQ(gray->channels.size(), 2u);
+    ExpectRecord(gray->channels[0], 0, 255, "all");
+    ExpectRecord(gray->channels[1], 70, 200, "gray");
+
+    // Levels is not linear, so the gray of the old composite would not be what the layers give.
+    EXPECT_FALSE(back.HasRealMergedData());
+    const ffpsd::Image merged = back.GetMergedImage();
+    EXPECT_EQ(merged.channel_count, 1u);
+    EXPECT_EQ(PlaneSum(merged, 0), 0u);
+
+    // Record 0 is Photoshop's 70 to 200 again; the channel records of the RGB file are gone with the gray step.
+    doc.ConvertColorMode(ffpsd::ColorMode::kRgb);
+    const ffpsd::LevelsInfo rgb = *doc.GetLayerByIndex(1)->GetAdjustment<ffpsd::LevelsInfo>();
+    ASSERT_EQ(rgb.channels.size(), 4u);
+    ExpectRecord(rgb.channels[0], 70, 200, "all");
+    for (std::size_t i = 1; i < 4; ++i)
+        ExpectRecord(rgb.channels[i], 0, 255, "channel");
+}
+
+TEST(DocumentColorModeTest, GrayLevelsBecomeTheRecordOfEveryRgbChannel)
 {
     ffpsd::Document doc = ffpsd::Document::Open(kGrayscaleLevelsPsd);
 
@@ -260,51 +243,18 @@ TEST(DocumentColorModeTest, GrayLevelsBecomesTheRecordOfEveryRgbChannel)
 
     // The same Levels on three equal channels gives what it gave on gray.
     EXPECT_TRUE(back.HasRealMergedData());
-}
 
-TEST(DocumentColorModeTest, RgbLevelsComeBackFromGray)
-{
-    ffpsd::Document doc = ffpsd::Document::Open(kRgbLevelsPsd);
-
-    doc.ConvertColorMode(ffpsd::ColorMode::kGrayscale);
-    doc.ConvertColorMode(ffpsd::ColorMode::kRgb);
-
-    // Record 0 is Photoshop's 70 to 200 again; the channel records of the RGB file are gone with the gray step.
-    const ffpsd::LevelsInfo levels = *doc.GetLayerByIndex(1)->GetAdjustment<ffpsd::LevelsInfo>();
-    ASSERT_EQ(levels.channels.size(), 4u);
-    ExpectRecord(levels.channels[0], 70, 200, "all");
-    for (std::size_t i = 1; i < 4; ++i)
-        ExpectRecord(levels.channels[i], 0, 255, "channel");
-}
-
-TEST(DocumentColorModeTest, GrayLevelsInBothRecordsKeepsBoth)
-{
-    ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kGrayscale);
+    // With both records set, record 0 still applies to every channel, and every channel gets the gray one.
+    ffpsd::Document both_doc = NewDocument(ffpsd::ColorMode::kGrayscale);
     ffpsd::LevelsInfo both;
     both.channels.resize(2);
     both.channels[0].input_floor = 20;
     both.channels[1].input_floor = 30;
-    doc.AddAdjustmentLayer("levels", both);
-
-    doc.ConvertColorMode(ffpsd::ColorMode::kRgb);
-
-    // Record 0 still applies to every channel, and every channel gets gray's own record.
-    const ffpsd::LevelsInfo levels = *doc.GetLayerByIndex(0)->GetAdjustment<ffpsd::LevelsInfo>();
-    ASSERT_EQ(levels.channels.size(), 4u);
-    ExpectRecord(levels.channels[0], 20, 255, "all");
+    both_doc.AddAdjustmentLayer("levels", both);
+    both_doc.ConvertColorMode(ffpsd::ColorMode::kRgb);
+    const ffpsd::LevelsInfo rgb = *both_doc.GetLayerByIndex(0)->GetAdjustment<ffpsd::LevelsInfo>();
+    ASSERT_EQ(rgb.channels.size(), 4u);
+    ExpectRecord(rgb.channels[0], 20, 255, "all");
     for (std::size_t i = 1; i < 4; ++i)
-        ExpectRecord(levels.channels[i], 30, 255, "channel");
-}
-
-TEST(DocumentColorModeTest, AGrayCompositesAlphaChannelsStayAsTheyAre)
-{
-    ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kGrayscale);
-    doc.SetChannelCount(3);
-    const ffpsd::Image composite = Pattern(4, 3, 3);
-    doc.SetMergedImage(composite);
-
-    doc.ConvertColorMode(ffpsd::ColorMode::kRgb);
-
-    EXPECT_EQ(doc.GetChannelCount(), 5u);
-    EXPECT_EQ(doc.GetMergedImage().bytes, ExpectedRgb(composite));
+        ExpectRecord(rgb.channels[i], 30, 255, "channel");
 }

@@ -13,11 +13,13 @@ using namespace ffpsd_test;
 TEST(DocumentParseTest, BytesAndPathGiveTheSameDocument)
 {
     const std::vector<std::uint8_t> bytes = ReadFile(kGrayscalePsd);
+    const std::filesystem::path missing = std::filesystem::path(FFPSD_TEST_DATA_DIR) / "no_such_file.psd";
 
     const ffpsd::Document from_path = ffpsd::Document::Open(kGrayscalePsd);
     const ffpsd::Document from_pointer = ffpsd::Document::Parse(bytes.data(), bytes.size());
 
     EXPECT_EQ(from_pointer.Save(), from_path.Save());
+    EXPECT_THROW(ffpsd::Document::Open(missing.string()), std::filesystem::filesystem_error);
 }
 
 TEST(DocumentParseTest, WhatIsNotAPsdIsRefused)
@@ -30,13 +32,6 @@ TEST(DocumentParseTest, WhatIsNotAPsdIsRefused)
     EXPECT_THROW(ffpsd::Document::Parse(empty), std::runtime_error);
     EXPECT_THROW(ffpsd::Document::Parse(other), std::runtime_error);
     EXPECT_THROW(ffpsd::Document::Parse(cut), std::runtime_error);
-}
-
-TEST(DocumentParseTest, AMissingFileIsAFilesystemError)
-{
-    const std::filesystem::path missing = std::filesystem::path(FFPSD_TEST_DATA_DIR) / "no_such_file.psd";
-
-    EXPECT_THROW(ffpsd::Document::Open(missing.string()), std::filesystem::filesystem_error);
 }
 
 TEST(DocumentParseTest, ABlockPaddedToTwoAsTheSpecificationSaysIsReadToo)

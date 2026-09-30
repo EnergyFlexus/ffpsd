@@ -9,7 +9,7 @@
 
 using namespace ffpsd_test;
 
-TEST(DocumentTest, ANewOneIsAnEmptyEightBitRgbPsd)
+TEST(DocumentTest, ANewOneIsAnEmptyEightBitRgbPsdWithNothingToSave)
 {
     const ffpsd::Document doc;
 
@@ -25,9 +25,32 @@ TEST(DocumentTest, ANewOneIsAnEmptyEightBitRgbPsd)
     EXPECT_TRUE(doc.GetMergedImage().bytes.empty());
     EXPECT_TRUE(doc.HasRealMergedData());
     EXPECT_DOUBLE_EQ(doc.GetResolutionInfo().horizontal, 72.0);
+    EXPECT_THROW(doc.Save(), std::logic_error);
 }
 
-TEST(DocumentTest, SidesAreLimitedByTheFormat)
+TEST(DocumentTest, ANewOneOfASizeAndModeHasTheModesChannels)
+{
+    const std::pair<ffpsd::ColorMode, std::uint16_t> modes[] = {{ffpsd::ColorMode::kGrayscale, 1}, {ffpsd::ColorMode::kIndexed, 1},
+                                                                {ffpsd::ColorMode::kDuotone, 1},   {ffpsd::ColorMode::kRgb, 3},
+                                                                {ffpsd::ColorMode::kLab, 3},       {ffpsd::ColorMode::kCmyk, 4}};
+    for (const auto& [mode, channels] : modes)
+    {
+        const ffpsd::Document doc(40, 30, mode, 16);
+        EXPECT_EQ(doc.GetWidth(), 40u);
+        EXPECT_EQ(doc.GetHeight(), 30u);
+        EXPECT_EQ(doc.GetColorMode(), mode);
+        EXPECT_EQ(doc.GetChannelCount(), channels);
+        EXPECT_EQ(doc.GetDepth(), 16u);
+    }
+
+    EXPECT_EQ(ffpsd::Document(4, 3, ffpsd::ColorMode::kRgb).GetDepth(), 8u);
+    EXPECT_EQ(ffpsd::Document(4, 3, ffpsd::ColorMode::kBitmap, 1).GetChannelCount(), 1u);
+    EXPECT_THROW(ffpsd::Document(4, 3, ffpsd::ColorMode::kMultichannel), std::invalid_argument);
+    EXPECT_THROW(ffpsd::Document(0, 3, ffpsd::ColorMode::kRgb), std::invalid_argument);
+    EXPECT_THROW(ffpsd::Document(4, 3, ffpsd::ColorMode::kRgb, 12), std::invalid_argument);
+}
+
+TEST(DocumentTest, TheHeaderTakesOnlyWhatTheFormatHas)
 {
     ffpsd::Document doc;
 
@@ -35,17 +58,11 @@ TEST(DocumentTest, SidesAreLimitedByTheFormat)
     EXPECT_THROW(doc.SetWidth(30001), std::invalid_argument);
     EXPECT_THROW(doc.SetHeight(0), std::invalid_argument);
     EXPECT_EQ(doc.GetWidth(), 30000u);
-
     doc.SetPsb(true);
     doc.SetWidth(300000);
     doc.SetHeight(300000);
     EXPECT_THROW(doc.SetWidth(300001), std::invalid_argument);
     EXPECT_EQ(doc.GetWidth(), 300000u);
-}
-
-TEST(DocumentTest, ChannelCountAndDepthTakeOnlyWhatPsdHas)
-{
-    ffpsd::Document doc;
 
     doc.SetChannelCount(56);
     EXPECT_THROW(doc.SetChannelCount(57), std::invalid_argument);
@@ -61,27 +78,7 @@ TEST(DocumentTest, ChannelCountAndDepthTakeOnlyWhatPsdHas)
     EXPECT_EQ(doc.GetDepth(), 32u);
 }
 
-TEST(DocumentTest, ANewOneOfASizeAndModeHasTheModesChannels)
-{
-    const std::pair<ffpsd::ColorMode, std::uint16_t> modes[] = {
-        {ffpsd::ColorMode::kGrayscale, 1}, {ffpsd::ColorMode::kRgb, 3}, {ffpsd::ColorMode::kLab, 3}, {ffpsd::ColorMode::kCmyk, 4}};
-    for (const auto& [mode, channels] : modes)
-    {
-        const ffpsd::Document doc(40, 30, mode, 16);
-        EXPECT_EQ(doc.GetWidth(), 40u);
-        EXPECT_EQ(doc.GetHeight(), 30u);
-        EXPECT_EQ(doc.GetColorMode(), mode);
-        EXPECT_EQ(doc.GetChannelCount(), channels);
-        EXPECT_EQ(doc.GetDepth(), 16u);
-    }
-
-    EXPECT_EQ(ffpsd::Document(4, 3, ffpsd::ColorMode::kRgb).GetDepth(), 8u);
-    EXPECT_THROW(ffpsd::Document(4, 3, ffpsd::ColorMode::kMultichannel), std::invalid_argument);
-    EXPECT_THROW(ffpsd::Document(0, 3, ffpsd::ColorMode::kRgb), std::invalid_argument);
-    EXPECT_THROW(ffpsd::Document(4, 3, ffpsd::ColorMode::kRgb, 12), std::invalid_argument);
-}
-
-TEST(DocumentTest, OnceThereAreLayersChannelsDepthAndModeStay)
+TEST(DocumentTest, LayersPinWhatTheyWerePackedFor)
 {
     ffpsd::Document doc = NewDocument();
     doc.AddLayer("a", Pattern(2, 2, 3));
@@ -99,31 +96,34 @@ TEST(DocumentTest, OnceThereAreLayersChannelsDepthAndModeStay)
     doc.SetColorMode(ffpsd::ColorMode::kRgb);
     doc.SetWidth(10);
     EXPECT_EQ(doc.GetWidth(), 10u);
+
+    // A background does: it covers the canvas, until it is an ordinary layer.
+    ffpsd::Document photoshop = ffpsd::Document::Open(kRgbPsd);
+    EXPECT_THROW(photoshop.SetWidth(100), std::logic_error);
+    EXPECT_THROW(photoshop.SetHeight(100), std::logic_error);
+    EXPECT_EQ(photoshop.GetWidth(), 1890u);
+    EXPECT_EQ(photoshop.GetHeight(), 1417u);
+    photoshop.UnsetBackgroundLayer();
+    photoshop.SetWidth(100);
+    EXPECT_EQ(photoshop.GetWidth(), 100u);
 }
 
-TEST(DocumentTest, UnderABackgroundTheCanvasSizeStays)
-{
-    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
-
-    EXPECT_THROW(doc.SetWidth(100), std::logic_error);
-    EXPECT_THROW(doc.SetHeight(100), std::logic_error);
-    EXPECT_EQ(doc.GetWidth(), 1890u);
-    EXPECT_EQ(doc.GetHeight(), 1417u);
-
-    // Once it is an ordinary layer, nothing has to cover the canvas.
-    doc.UnsetBackgroundLayer();
-    doc.SetWidth(100);
-    EXPECT_EQ(doc.GetWidth(), 100u);
-}
-
-TEST(DocumentTest, AHeaderChangeDropsTheComposite)
+TEST(DocumentTest, TheCompositeMatchesTheHeaderOrGoes)
 {
     ffpsd::Document doc = NewDocument();
-    doc.SetMergedImage(Pattern(4, 3, 3));
+    doc.SetHasRealMergedData(false);
+    EXPECT_THROW(doc.SetMergedImage(Pattern(4, 2, 3)), std::invalid_argument);
+    EXPECT_THROW(doc.SetMergedImage(Pattern(4, 3, 4)), std::invalid_argument);
+    EXPECT_THROW(doc.SetMergedImage(Pattern(4, 3, 3, 16)), std::invalid_argument);
+    EXPECT_TRUE(doc.GetMergedImage().bytes.empty());
 
+    doc.SetMergedImage(Pattern(4, 3, 3));
+    EXPECT_EQ(doc.GetMergedImage().bytes, Pattern(4, 3, 3).bytes);
+    EXPECT_TRUE(doc.HasRealMergedData());
+
+    // The same size is no change; a new one drops the composite.
     doc.SetWidth(4);
     EXPECT_EQ(doc.GetMergedImage().bytes, Pattern(4, 3, 3).bytes);
-
     doc.SetWidth(8);
     EXPECT_TRUE(doc.GetMergedImage().bytes.empty());
     EXPECT_FALSE(doc.HasRealMergedData());
@@ -165,19 +165,4 @@ TEST(DocumentTest, SectionBlocksAreARawDoor)
     EXPECT_FALSE(doc.RemoveTaggedBlock(Fourcc("Patt")));
     EXPECT_EQ(doc.GetTaggedBlockByIndex(0)->key, Fourcc("cinf"));
     EXPECT_THROW(doc.GetTaggedBlockByIndex(1), std::out_of_range);
-}
-
-TEST(DocumentTest, TheCompositeMustMatchTheDocument)
-{
-    ffpsd::Document doc = NewDocument();
-    doc.SetHasRealMergedData(false);
-
-    EXPECT_THROW(doc.SetMergedImage(Pattern(4, 2, 3)), std::invalid_argument);
-    EXPECT_THROW(doc.SetMergedImage(Pattern(4, 3, 4)), std::invalid_argument);
-    EXPECT_THROW(doc.SetMergedImage(Pattern(4, 3, 3, 16)), std::invalid_argument);
-    EXPECT_TRUE(doc.GetMergedImage().bytes.empty());
-
-    doc.SetMergedImage(Pattern(4, 3, 3));
-    EXPECT_EQ(doc.GetMergedImage().bytes, Pattern(4, 3, 3).bytes);
-    EXPECT_TRUE(doc.HasRealMergedData());
 }
