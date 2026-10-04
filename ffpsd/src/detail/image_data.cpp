@@ -5,7 +5,6 @@
 #include "detail/io/compression.hpp"
 
 #include <stdexcept>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -26,16 +25,10 @@ namespace ffpsd::detail
     {
         if (data.IsEmpty())
             return Image();
-        if (depth != 8 && depth != 16 && depth != 32)
-            throw std::runtime_error("ffpsd: a " + std::to_string(depth) + " bit merged image is not supported");
+        if (!IsSampleDepth(depth))
+            throw std::runtime_error(UnsupportedDepth(depth));
 
-        Image image;
-        image.width = width;
-        image.height = height;
-        image.channel_count = channel_count;
-        image.depth = depth;
-        image.color_mode = color_mode;
-        image.bytes.resize(image.GetSizeBytes());
+        Image image = MakeImage(width, height, channel_count, depth, color_mode);
         data.Decode(is_psb, image.bytes.data());
         return image;
     }

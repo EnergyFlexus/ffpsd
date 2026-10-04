@@ -1,5 +1,6 @@
 #include "detail/layer_and_mask/layer_record.hpp"
 
+#include "detail/file_header.hpp"
 #include "detail/io/big_endian_writer.hpp"
 #include "detail/io/strings.hpp"
 #include "detail/layer_and_mask/tagged_blocks/layer_name_source_setting.hpp"
@@ -17,14 +18,12 @@ namespace ffpsd::detail
 {
     namespace
     {
-        constexpr std::uint32_t kBlockSignature = Fourcc('8', 'B', 'I', 'M');
 
         // Bit 0 of the flags; Photoshop sets it on a background and nowhere else by default.
         constexpr std::uint8_t kTransparencyLocked = 0x01;
 
         // Transparency, position and bit 3, which the specification leaves out, as Photoshop writes it.
         constexpr std::uint32_t kBackgroundProtection = 0x0000000D;
-        constexpr std::uint16_t kMaxChannels = 56;
 
         // Bit 4 of the mask flags: density and feather follow, as the parameter flags pick them.
         constexpr std::uint8_t kMaskHasParameters = 0x10;
@@ -48,18 +47,12 @@ namespace ffpsd::detail
             return rect;
         }
 
-        // A length-prefixed field of the extra data, which must not run past its end.
-        std::vector<std::uint8_t> ReadExtraField(BigEndianReader& reader, std::size_t end, const char* what)
+        void WriteRect(BigEndianWriter& writer, const Rect& rect)
         {
-            const std::uint32_t length = reader.ReadU32();
-            if (reader.Tell() > end || length > end - reader.Tell())
-                throw std::runtime_error(
-                    std::string("ffpsd: layer ") + what + " claims " + std::to_string(length) + " bytes, more than the extra data holds");
-
-            std::vector<std::uint8_t> field(length);
-            if (length != 0)
-                reader.ReadU8Array(field.data(), field.size());
-            return field;
+            writer.WriteI32(rect.top);
+            writer.WriteI32(rect.left);
+            writer.WriteI32(rect.bottom);
+            writer.WriteI32(rect.right);
         }
 
         std::optional<std::size_t> FindMaskRectOffset(const std::vector<std::uint8_t>& mask_data, std::int16_t id)
@@ -106,13 +99,6 @@ namespace ffpsd::detail
             return id == kLayerMaskId ? *rect + kRectSize : *rect - 1;
         }
 
-        void WriteExtraField(BigEndianWriter& writer, const std::vector<std::uint8_t>& field)
-        {
-            const std::size_t length = writer.ReserveLength(false);
-            if (!field.empty())
-                writer.WriteU8Array(field.data(), field.size());
-            writer.PatchLength(length, false);
-        }
     } // namespace
 
     LayerRecord ParseLayerRecord(BigEndianReader& reader, bool is_psb, std::vector<std::uint64_t>& channel_lengths)
@@ -132,7 +118,7 @@ namespace ffpsd::detail
         for (ChannelImageData& channel : record.channels)
         {
             channel.id = reader.ReadI16();
-            channel_lengths.push_back(is_psb ? reader.ReadU64() : reader.ReadU32());
+            channel_lengths.push_back(reader.ReadLength(is_psb));
         }
 
         record.blend_signature = reader.ReadU32();
@@ -147,15 +133,11 @@ namespace ffpsd::detail
         record.flags = reader.ReadU8();
         reader.Skip(1); // filler
 
-        const std::uint32_t extra_length = reader.ReadU32();
-        if (extra_length > reader.GetRemaining())
-            throw std::runtime_error(
-                "ffpsd: layer extra data claims " + std::to_string(extra_length) + " bytes, only " + std::to_string(reader.GetRemaining()) +
-                " left");
+        const std::size_t extra_length = reader.CheckLength(reader.ReadU32(), reader.GetSize(), "layer extra data");
         const std::size_t extra_end = reader.Tell() + extra_length;
 
-        record.mask_data = ReadExtraField(reader, extra_end, "mask data");
-        record.blending_ranges = ReadExtraField(reader, extra_end, "blending ranges");
+        record.mask_data = reader.ReadBlob(extra_end, "layer mask data");
+        record.blending_ranges = reader.ReadBlob(extra_end, "layer blending ranges");
         record.name = ReadPascalString(reader, kLayerNameAlignment);
         if (reader.Tell() > extra_end)
             throw std::runtime_error(
@@ -167,10 +149,7 @@ namespace ffpsd::detail
 
     void WriteLayerRecord(BigEndianWriter& writer, const LayerRecord& record, const std::vector<const PixelData*>& channels, bool is_psb)
     {
-        writer.WriteI32(record.bounds.top);
-        writer.WriteI32(record.bounds.left);
-        writer.WriteI32(record.bounds.bottom);
-        writer.WriteI32(record.bounds.right);
+        WriteRect(writer, record.bounds);
 
         writer.WriteU16(static_cast<std::uint16_t>(record.channels.size()));
         for (std::size_t i = 0; i < record.channels.size(); ++i)
@@ -193,8 +172,8 @@ namespace ffpsd::detail
         writer.WriteU8(0); // filler
 
         const std::size_t extra_length = writer.ReserveLength(false);
-        WriteExtraField(writer, record.mask_data);
-        WriteExtraField(writer, record.blending_ranges);
+        writer.WriteBlob(record.mask_data);
+        writer.WriteBlob(record.blending_ranges);
         WritePascalString(writer, record.name, kLayerNameAlignment);
         WriteLayerTaggedBlocks(writer, record.blocks, is_psb);
         writer.PatchLength(extra_length, false);
@@ -203,8 +182,7 @@ namespace ffpsd::detail
     bool HasBackgroundMarks(const LayerRecord& record) noexcept
     {
         const std::optional<ProtectedSetting> locks = GetTaggedBlock<ProtectedSetting>(record.blocks);
-        const bool has_transparency = std::any_of(
-            record.channels.begin(), record.channels.end(), [](const ChannelImageData& channel) { return channel.id == kTransparencyId; });
+        const bool has_transparency = FindChannel(record, kTransparencyId) != nullptr;
         return (record.flags & kTransparencyLocked) != 0 || (locks.has_value() && locks->flags != 0) || !has_transparency;
     }
 
@@ -221,14 +199,27 @@ namespace ffpsd::detail
         SetTaggedBlock(record.blocks, LayerNameSourceSetting{LayerNameSourceSetting::kLayer});
         SetTaggedBlock(record.blocks, ProtectedSetting{0});
 
-        const bool has_transparency = std::any_of(
-            record.channels.begin(), record.channels.end(), [](const ChannelImageData& channel) { return channel.id == kTransparencyId; });
+        const bool has_transparency = FindChannel(record, kTransparencyId) != nullptr;
         if (!has_transparency)
         {
-            const auto width = static_cast<std::size_t>(std::max(record.bounds.GetWidth(), 0));
-            const auto height = static_cast<std::size_t>(std::max(record.bounds.GetHeight(), 0));
+            const auto width = static_cast<std::size_t>(std::max<std::int64_t>(record.bounds.GetWidth(), 0));
+            const auto height = static_cast<std::size_t>(std::max<std::int64_t>(record.bounds.GetHeight(), 0));
             record.channels.insert(record.channels.begin(), EncodeOpaqueChannel(kTransparencyId, width, height, depth, is_psb));
         }
+    }
+
+    Rect MakeRect(std::int64_t top, std::int64_t left, std::int64_t bottom, std::int64_t right)
+    {
+        constexpr std::int64_t kLowest = std::numeric_limits<std::int32_t>::min();
+        constexpr std::int64_t kHighest = std::numeric_limits<std::int32_t>::max();
+        for (const std::int64_t edge : {top, left, bottom, right})
+        {
+            if (edge < kLowest || edge > kHighest)
+                throw std::invalid_argument("ffpsd: layer bounds do not fit in 32 bits");
+        }
+        return {
+            static_cast<std::int32_t>(top), static_cast<std::int32_t>(left), static_cast<std::int32_t>(bottom),
+            static_cast<std::int32_t>(right)};
     }
 
     std::optional<Rect> FindMaskBounds(const std::vector<std::uint8_t>& mask_data, std::int16_t id)
@@ -242,17 +233,22 @@ namespace ffpsd::detail
         return ReadRect(reader);
     }
 
+    Rect RequireMaskBounds(const std::vector<std::uint8_t>& mask_data, std::int16_t id)
+    {
+        const std::optional<Rect> bounds = FindMaskBounds(mask_data, id);
+        if (!bounds.has_value())
+            throw std::runtime_error("ffpsd: the mask data has no rectangle for mask " + std::to_string(id));
+        return *bounds;
+    }
+
     void SetMaskBounds(std::vector<std::uint8_t>& mask_data, std::int16_t id, const Rect& bounds)
     {
         const std::optional<std::size_t> offset = FindMaskRectOffset(mask_data, id);
         if (!offset.has_value())
-            throw std::invalid_argument("ffpsd: the mask data has no rectangle for mask " + std::to_string(id));
+            throw std::runtime_error("ffpsd: the mask data has no rectangle for mask " + std::to_string(id));
 
         BigEndianWriter writer(kRectSize);
-        writer.WriteI32(bounds.top);
-        writer.WriteI32(bounds.left);
-        writer.WriteI32(bounds.bottom);
-        writer.WriteI32(bounds.right);
+        WriteRect(writer, bounds);
         std::copy(writer.GetBytes().begin(), writer.GetBytes().end(), mask_data.begin() + static_cast<std::ptrdiff_t>(*offset));
     }
 
@@ -266,13 +262,31 @@ namespace ffpsd::detail
     {
         const std::optional<std::size_t> offset = FindMaskDefaultColorOffset(mask_data, id);
         if (!offset.has_value())
-            throw std::invalid_argument("ffpsd: the mask data has no default color for mask " + std::to_string(id));
+            throw std::runtime_error("ffpsd: the mask data has no default color for mask " + std::to_string(id));
         mask_data[*offset] = color;
     }
 
     bool IsRenderedMask(const std::vector<std::uint8_t>& mask_data) noexcept
     {
         return mask_data.size() >= kRectSize + 2 && (mask_data[kRectSize + 1] & kMaskFromRender) != 0;
+    }
+
+    const ChannelImageData* FindChannel(const LayerRecord& record, std::int16_t id) noexcept
+    {
+        for (const ChannelImageData& channel : record.channels)
+        {
+            if (channel.id == id)
+                return &channel;
+        }
+        return nullptr;
+    }
+
+    void RemoveChannels(LayerRecord& record, std::int16_t id)
+    {
+        std::vector<ChannelImageData>& channels = record.channels;
+        channels.erase(
+            std::remove_if(channels.begin(), channels.end(), [id](const ChannelImageData& channel) { return channel.id == id; }),
+            channels.end());
     }
 
     std::vector<std::uint8_t> NewMaskData()

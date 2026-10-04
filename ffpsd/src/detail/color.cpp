@@ -1,6 +1,7 @@
 #include "detail/color.hpp"
 
 #include "detail/image.hpp"
+#include "detail/samples.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -19,18 +20,6 @@ namespace ffpsd::detail
         constexpr std::uint32_t kGreenWeight = 23436;
         constexpr std::uint32_t kBlueWeight = 2366;
         constexpr std::uint32_t kWeightShift = 15;
-
-        template <typename T> T Load(const std::uint8_t* at) noexcept
-        {
-            T value;
-            std::memcpy(&value, at, sizeof(T));
-            return value;
-        }
-
-        template <typename T> void Store(std::uint8_t* at, T value) noexcept
-        {
-            std::memcpy(at, &value, sizeof(T));
-        }
 
         template <typename T> T Luma(T red, T green, T blue) noexcept
         {
@@ -65,17 +54,6 @@ namespace ffpsd::detail
             CheckImage(image);
         }
 
-        Image MakeImage(const Image& source, ColorMode color_mode, std::uint16_t channel_count)
-        {
-            Image result;
-            result.width = source.width;
-            result.height = source.height;
-            result.depth = source.depth;
-            result.color_mode = color_mode;
-            result.channel_count = channel_count;
-            result.bytes.resize(result.GetSizeBytes());
-            return result;
-        }
     } // namespace
 
     std::uint16_t ColorChannelCount(ColorMode color_mode)
@@ -101,7 +79,7 @@ namespace ffpsd::detail
     Image RgbToGray(const Image& rgb)
     {
         CheckSource(rgb, ColorMode::kRgb, std::numeric_limits<std::uint16_t>::max(), "RGB to gray");
-        Image gray = MakeImage(rgb, ColorMode::kGrayscale, static_cast<std::uint16_t>(rgb.channel_count - 2));
+        Image gray = MakeImage(rgb.width, rgb.height, static_cast<std::uint16_t>(rgb.channel_count - 2), rgb.depth, ColorMode::kGrayscale);
 
         const std::size_t pixels = std::size_t{rgb.width} * rgb.height;
         const std::size_t plane = pixels * rgb.GetBytesPerSample();
@@ -128,7 +106,7 @@ namespace ffpsd::detail
     Image GrayToRgb(const Image& gray)
     {
         CheckSource(gray, ColorMode::kGrayscale, std::numeric_limits<std::uint16_t>::max() - 2, "gray to RGB");
-        Image rgb = MakeImage(gray, ColorMode::kRgb, static_cast<std::uint16_t>(gray.channel_count + 2));
+        Image rgb = MakeImage(gray.width, gray.height, static_cast<std::uint16_t>(gray.channel_count + 2), gray.depth, ColorMode::kRgb);
 
         const std::size_t plane = std::size_t{gray.width} * gray.height * gray.GetBytesPerSample();
         if (plane == 0)

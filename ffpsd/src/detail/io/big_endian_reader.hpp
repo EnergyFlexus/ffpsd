@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <vector>
 
 namespace ffpsd::detail
@@ -34,9 +35,24 @@ namespace ffpsd::detail
         std::size_t GetRemaining() const noexcept;
         bool AtEnd() const noexcept;
 
+        // A 4 byte length, or 8 when wide.
+        std::uint64_t ReadLength(bool wide);
+
+        // Whether that many bytes from here end by end.
+        bool FitsLength(std::uint64_t length, std::size_t end) const noexcept;
+
+        // The length, when it fits; what names the field in the error.
+        std::size_t CheckLength(std::uint64_t length, std::size_t end, const char* what) const;
+
+        // A 4 byte length and that many bytes, which must end by end.
+        std::vector<std::uint8_t> ReadBlob(std::size_t end, const char* what);
+
         std::uint8_t ReadU8();
         std::uint16_t ReadU16();
         std::uint32_t ReadU32();
+
+        // None, reading nothing, when fewer than 4 bytes are left.
+        std::optional<std::uint32_t> TryReadU32();
         std::uint64_t ReadU64();
 
         std::int16_t ReadI16();

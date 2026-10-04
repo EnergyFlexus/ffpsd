@@ -236,7 +236,7 @@ namespace ffpsd::detail
     Image DecodeJpeg(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth, bool apply_orientation)
     {
         CheckPictureMode(color_mode, depth, "JPEG");
-        if (data == nullptr || size < 3 || data[0] != 0xFF || data[1] != 0xD8 || data[2] != 0xFF)
+        if (FindFormat(data, size) != Format::kJpeg)
             throw std::runtime_error("ffpsd: not a JPEG");
         if (size > std::numeric_limits<unsigned long>::max())
             throw std::runtime_error("ffpsd: JPEG is larger than libjpeg reads");

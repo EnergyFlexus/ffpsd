@@ -10,8 +10,6 @@ namespace ffpsd::detail
     namespace
     {
         constexpr std::uint32_t kSignature = Fourcc('8', 'B', 'P', 'S');
-        constexpr std::uint16_t kVersionPsd = 1;
-        constexpr std::uint16_t kVersionPsb = 2;
         constexpr std::size_t kReservedBytes = 6;
     } // namespace
 

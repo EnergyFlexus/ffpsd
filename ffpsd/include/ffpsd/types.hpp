@@ -25,18 +25,33 @@ namespace ffpsd
         kRleOrRaw = 2, // per channel, whichever is smaller
     };
 
-    // Where Document::ResizeCanvas keeps the old canvas within the new one.
+    // Where Document::ResizeCanvas keeps the old canvas; row by row, since it reads value / 3 and value % 3.
     enum class Anchor : std::uint8_t
     {
-        kTopLeft,
-        kTop,
-        kTopRight,
-        kLeft,
-        kCenter,
-        kRight,
-        kBottomLeft,
-        kBottom,
-        kBottomRight
+        kTopLeft = 0,
+        kTop = 1,
+        kTopRight = 2,
+        kLeft = 3,
+        kCenter = 4,
+        kRight = 5,
+        kBottomLeft = 6,
+        kBottom = 7,
+        kBottomRight = 8
+    };
+
+    // Clockwise.
+    enum class Rotation : std::uint8_t
+    {
+        k90 = 0,
+        k180 = 1,
+        k270 = 2
+    };
+
+    // kHorizontal mirrors left and right.
+    enum class FlipDirection : std::uint8_t
+    {
+        kHorizontal = 0,
+        kVertical = 1
     };
 
     // Signed: a layer may extend past the canvas.
@@ -47,13 +62,14 @@ namespace ffpsd
         std::int32_t bottom = 0;
         std::int32_t right = 0;
 
-        std::int32_t GetWidth() const noexcept
+        // 64 bit, so rectangles from a damaged file cannot overflow.
+        std::int64_t GetWidth() const noexcept
         {
-            return right - left;
+            return std::int64_t{right} - left;
         }
-        std::int32_t GetHeight() const noexcept
+        std::int64_t GetHeight() const noexcept
         {
-            return bottom - top;
+            return std::int64_t{bottom} - top;
         }
     };
 } // namespace ffpsd

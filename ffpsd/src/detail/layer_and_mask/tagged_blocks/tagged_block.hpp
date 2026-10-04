@@ -58,9 +58,6 @@ namespace ffpsd::detail
         FindOrAppendTaggedBlock(blocks, T::kKey).data = std::move(data);
     }
 
-    // For the blocks that hold one u32; empty when the data is shorter.
-    std::optional<std::uint32_t> DecodeU32(const std::vector<std::uint8_t>& data);
-    std::vector<std::uint8_t> EncodeU32(std::uint32_t value);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_LAYER_AND_MASK_TAGGED_BLOCKS_TAGGED_BLOCK_HPP_

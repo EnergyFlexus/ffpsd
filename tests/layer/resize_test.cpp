@@ -79,24 +79,24 @@ TEST(LayerResizeTest, WhatCannotMoveOrResizeIsRefused)
 {
     ffpsd::Document rgb = ffpsd::Document::Open(kRgbPsd);
     ffpsd::Layer* background = rgb.GetLayerByIndex(0);
-    EXPECT_THROW(background->SetPosition(1, 0), std::invalid_argument);
-    EXPECT_THROW(background->Resize(10, 10), std::invalid_argument);
+    EXPECT_THROW(background->SetPosition(1, 0), std::logic_error);
+    EXPECT_THROW(background->Resize(10, 10), std::logic_error);
     background->SetPosition(0, 0); // where it is already
 
     ffpsd::Document levels = ffpsd::Document::Open(kRgbLevelsPsd);
-    EXPECT_THROW(levels.GetLayerByIndex(1)->Resize(10, 10), std::invalid_argument);
-    EXPECT_THROW(levels.GetLayerByIndex(1)->SetPosition(3, 3), std::invalid_argument);
+    EXPECT_THROW(levels.GetLayerByIndex(1)->Resize(10, 10), std::logic_error);
+    EXPECT_THROW(levels.GetLayerByIndex(1)->SetPosition(3, 3), std::logic_error);
 
     ffpsd::Document doc = NewDocument();
     ffpsd::Layer* empty = doc.AddLayer("empty");
     ffpsd::Layer* layer = doc.AddLayer("layer", Pattern(3, 2, 4));
-    EXPECT_THROW(empty->Resize(4, 4), std::invalid_argument);
+    EXPECT_THROW(empty->Resize(4, 4), std::logic_error);
     EXPECT_THROW(layer->Resize(0, 4), std::invalid_argument);
     EXPECT_THROW(layer->Resize(30001, 4), std::invalid_argument);
     EXPECT_EQ(layer->GetBounds().GetWidth(), 3);
 
     SetSectionDivider(*layer, 3);
-    EXPECT_THROW(layer->Resize(4, 4), std::invalid_argument);
+    EXPECT_THROW(layer->Resize(4, 4), std::logic_error);
 }
 
 // The pixels Resize computes; expected values are worked out by hand from the filter definitions.

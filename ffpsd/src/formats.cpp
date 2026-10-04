@@ -43,7 +43,7 @@ namespace ffpsd
 #if defined(FFPSD_HAS_PNG)
             return detail::DecodePng(data, size, color_mode, depth);
 #else
-            throw std::runtime_error("ffpsd: built without PNG support");
+            throw std::logic_error("ffpsd: built without PNG support");
 #endif
         }
         if (format == Format::kJpeg)
@@ -51,7 +51,7 @@ namespace ffpsd
 #if defined(FFPSD_HAS_JPEG)
             return detail::DecodeJpeg(data, size, color_mode, depth, true);
 #else
-            throw std::runtime_error("ffpsd: built without JPEG support");
+            throw std::logic_error("ffpsd: built without JPEG support");
 #endif
         }
         throw std::runtime_error("ffpsd: unsupported image format");

@@ -1,7 +1,6 @@
 #ifndef FFPSD_DETAIL_COMPOSITE_HPP_
 #define FFPSD_DETAIL_COMPOSITE_HPP_
 
-#include <cstddef>
 #include <cstdint>
 #include <ffpsd/image.hpp>
 #include <ffpsd/types.hpp>

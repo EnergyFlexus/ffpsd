@@ -5,6 +5,7 @@
 #include "detail/io/big_endian_writer.hpp"
 
 #include <cstddef>
+#include <optional>
 #include <string>
 
 namespace ffpsd::detail
@@ -21,6 +22,9 @@ namespace ffpsd::detail
 
     // UTF-16 in, UTF-8 out; one trailing null is dropped, since some blocks count it.
     std::string ReadUnicodeString(BigEndianReader& reader);
+
+    // None, reading nothing, when the count claims more than the reader holds.
+    std::optional<std::string> TryReadUnicodeString(BigEndianReader& reader);
 
     // No trailing null; anything unrepresentable becomes U+FFFD.
     void WriteUnicodeString(BigEndianWriter& writer, const std::string& text);

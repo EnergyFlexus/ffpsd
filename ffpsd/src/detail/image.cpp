@@ -10,10 +10,32 @@
 
 namespace ffpsd::detail
 {
+    bool IsSampleDepth(std::uint16_t depth) noexcept
+    {
+        return depth == 8 || depth == 16 || depth == 32;
+    }
+
+    std::string UnsupportedDepth(std::uint16_t depth)
+    {
+        return "ffpsd: " + std::to_string(depth) + " bit samples are not supported";
+    }
+
+    Image MakeImage(std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, ColorMode color_mode)
+    {
+        Image image;
+        image.width = width;
+        image.height = height;
+        image.channel_count = channel_count;
+        image.depth = depth;
+        image.color_mode = color_mode;
+        image.bytes.resize(image.GetSizeBytes());
+        return image;
+    }
+
     void CheckImage(const ImageView& image)
     {
-        if (image.depth != 8 && image.depth != 16 && image.depth != 32)
-            throw std::invalid_argument("ffpsd: unsupported depth: " + std::to_string(image.depth));
+        if (!IsSampleDepth(image.depth))
+            throw std::invalid_argument(UnsupportedDepth(image.depth));
 
         const std::size_t needed = image.GetSizeBytes();
         if ((image.data == nullptr && needed != 0) || image.size != needed)

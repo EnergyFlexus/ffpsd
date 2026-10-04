@@ -137,7 +137,7 @@ namespace
     bool IsHidden(const fs::path& path)
     {
         const std::string name = path.filename().u8string();
-        return name[0] == '.' || name == "Thumbs.db" || name == "desktop.ini";
+        return name.empty() || name[0] == '.' || name == "Thumbs.db" || name == "desktop.ini";
     }
 
     // The regular files under the folder, hidden files and whatever hidden folders hold left out.
@@ -397,7 +397,7 @@ namespace
                 if (resized)
                     doc.SetMergedImage(layer->GetPixels());
                 else
-                    doc.SetMergedImage(image);
+                    doc.SetMergedImage(image); // a ternary would copy the picture
             }
         }
 

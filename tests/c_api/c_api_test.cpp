@@ -325,11 +325,19 @@ TEST(CApiTest, MasksAndSizesThroughC)
     EXPECT_EQ(ffpsd_layer_set_mask(Layer(file.doc, 1), &view, 5, 6, 0), FFPSD_STATUS_OK) << ffpsd_last_error();
     EXPECT_EQ(ffpsd_layer_remove_mask(Layer(file.doc, 1)), FFPSD_STATUS_OK);
     EXPECT_EQ(ffpsd_layer_remove_mask(Layer(file.doc, 1)), FFPSD_STATUS_NOT_FOUND);
-    EXPECT_EQ(ffpsd_layer_set_mask(Layer(file.doc, 3), &view, 0, 0, 255), FFPSD_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(ffpsd_layer_set_mask(Layer(file.doc, 3), &view, 0, 0, 255), FFPSD_STATUS_INVALID_OPERATION);
 
-    EXPECT_EQ(ffpsd_document_resize_canvas(file.doc, 2000, 1500, FFPSD_ANCHOR_CENTER), FFPSD_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(ffpsd_document_resize_canvas(file.doc, 2000, 1500, FFPSD_ANCHOR_CENTER), FFPSD_STATUS_INVALID_OPERATION);
     ASSERT_EQ(ffpsd_document_resize(file.doc, 945, 709, FFPSD_RESAMPLE_FILTER_BICUBIC), FFPSD_STATUS_OK) << ffpsd_last_error();
     EXPECT_EQ(ffpsd_document_get_width(file.doc), 945u);
+
+    EXPECT_EQ(ffpsd_document_rotate_canvas(file.doc, FFPSD_ROTATION_90), FFPSD_STATUS_INVALID_OPERATION);
+    EXPECT_EQ(ffpsd_layer_rotate(Layer(file.doc, 1), FFPSD_ROTATION_180), FFPSD_STATUS_OK) << ffpsd_last_error();
+    EXPECT_EQ(ffpsd_layer_flip(Layer(file.doc, 0), FFPSD_FLIP_VERTICAL), FFPSD_STATUS_INVALID_OPERATION);
+    ASSERT_EQ(ffpsd_document_remove_layer(file.doc, 3), FFPSD_STATUS_OK);
+    ASSERT_EQ(ffpsd_document_rotate_canvas(file.doc, FFPSD_ROTATION_90), FFPSD_STATUS_OK) << ffpsd_last_error();
+    EXPECT_EQ(ffpsd_document_get_width(file.doc), 709u);
+    EXPECT_EQ(ffpsd_document_flip_canvas(file.doc, FFPSD_FLIP_HORIZONTAL), FFPSD_STATUS_OK);
 }
 
 TEST(CApiTest, ColorModeConvertsThroughC)

@@ -33,8 +33,8 @@ namespace ffpsd::detail
     // A layer may be no wider or taller than the document could be.
     void CheckLayerSides(std::uint32_t width, std::uint32_t height, bool is_psb);
 
-    // An empty image, or one of the document's mode and depth with the colors, transparency at most, and their bytes.
-    void CheckLayerImage(const ImageView& image, ColorMode color_mode, std::uint16_t depth, bool is_psb);
+    // An empty image or one of the document's mode and depth, colors and at most transparency; returned in that mode.
+    ImageView CheckLayerImage(const ImageView& image, ColorMode color_mode, std::uint16_t depth, bool is_psb);
 
     // Transparency first, opaque when the image has none unless it is the background's; then the color planes.
     std::vector<ChannelImageData> EncodeLayerPixels(const ImageView& image, bool is_background, bool is_psb);

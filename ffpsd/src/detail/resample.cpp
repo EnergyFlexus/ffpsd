@@ -2,13 +2,12 @@
 
 #include "detail/color.hpp"
 #include "detail/image.hpp"
+#include "detail/samples.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <limits>
 #include <type_traits>
-#include <utility>
 #include <vector>
 
 namespace ffpsd::detail
@@ -75,24 +74,12 @@ namespace ffpsd::detail
             return taps;
         }
 
-        template <typename T> constexpr float Full() noexcept
-        {
-            if constexpr (std::is_floating_point_v<T>)
-                return 1.0f;
-            else
-                return static_cast<float>(std::numeric_limits<T>::max());
-        }
-
         template <typename T> std::vector<float> ToFloat(const Image& image)
         {
             const std::size_t samples = image.bytes.size() / sizeof(T);
             std::vector<float> values(samples);
             for (std::size_t i = 0; i < samples; ++i)
-            {
-                T value;
-                std::memcpy(&value, image.bytes.data() + i * sizeof(T), sizeof(T));
-                values[i] = static_cast<float>(value);
-            }
+                values[i] = static_cast<float>(Load<T>(image.bytes.data() + i * sizeof(T)));
             return values;
         }
 
@@ -104,8 +91,8 @@ namespace ffpsd::detail
                 if constexpr (std::is_floating_point_v<T>)
                     value = values[i];
                 else
-                    value = static_cast<T>(std::lround(std::clamp(values[i], 0.0f, Full<T>())));
-                std::memcpy(image.bytes.data() + i * sizeof(T), &value, sizeof(T));
+                    value = static_cast<T>(std::lround(std::clamp(values[i], 0.0f, static_cast<float>(Full<T>()))));
+                Store(image.bytes.data() + i * sizeof(T), value);
             }
         }
 
@@ -145,13 +132,13 @@ namespace ffpsd::detail
             }
         }
 
-        template <typename T> Image CubicImage(const Image& image, Image result)
+        template <typename T> void CubicImage(const Image& image, Image& result, bool planes_alone)
         {
             const std::size_t in_plane = std::size_t{image.width} * image.height;
             const std::size_t out_plane = std::size_t{result.width} * result.height;
-            const std::size_t color_count = ColorChannelCount(image.color_mode);
-            const bool has_alpha = HasTransparency(image);
-            const float full = Full<T>();
+            const bool has_alpha = !planes_alone && HasTransparency(image);
+            const std::size_t color_count = has_alpha ? ColorChannelCount(image.color_mode) : 0;
+            const auto full = static_cast<float>(Full<T>());
 
             // Color times alpha, so a clear pixel adds no color to its neighbours.
             std::vector<float> in = ToFloat<T>(image);
@@ -185,7 +172,6 @@ namespace ffpsd::detail
             }
 
             FromFloat<T>(out, result);
-            return result;
         }
 
         // The source pixel whose center is nearest; integer arithmetic, so it never drifts.
@@ -218,61 +204,21 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    Image Resample(const Image& image, std::uint32_t width, std::uint32_t height, ResampleFilter filter)
+    Image Resample(const Image& image, std::uint32_t width, std::uint32_t height, ResampleFilter filter, bool planes_alone)
     {
         if (image.width == width && image.height == height)
             return image;
 
-        Image result;
-        result.width = width;
-        result.height = height;
-        result.channel_count = image.channel_count;
-        result.depth = image.depth;
-        result.color_mode = image.color_mode;
-        result.bytes.resize(result.GetSizeBytes());
+        Image result = MakeImage(width, height, image.channel_count, image.depth, image.color_mode);
 
         if (filter == ResampleFilter::kNearest)
-        {
             NearestImage(image, result);
-            return result;
-        }
-
-        switch (image.depth)
-        {
-        case 8:
-            return CubicImage<std::uint8_t>(image, std::move(result));
-        case 16:
-            return CubicImage<std::uint16_t>(image, std::move(result));
-        default:
-            return CubicImage<float>(image, std::move(result));
-        }
-    }
-
-    Image ResamplePlanes(const Image& image, std::uint32_t width, std::uint32_t height, ResampleFilter filter)
-    {
-        Image result;
-        result.width = width;
-        result.height = height;
-        result.channel_count = image.channel_count;
-        result.depth = image.depth;
-        result.color_mode = image.color_mode;
-        result.bytes.resize(result.GetSizeBytes());
-
-        Image plane;
-        plane.width = image.width;
-        plane.height = image.height;
-        plane.channel_count = 1;
-        plane.depth = image.depth;
-        plane.color_mode = ColorMode::kGrayscale;
-        const std::size_t in_plane = plane.GetSizeBytes();
-        const std::size_t out_plane = std::size_t{width} * height * image.GetBytesPerSample();
-        for (std::size_t channel = 0; channel < image.channel_count; ++channel)
-        {
-            const auto first = image.bytes.begin() + static_cast<std::ptrdiff_t>(channel * in_plane);
-            plane.bytes.assign(first, first + static_cast<std::ptrdiff_t>(in_plane));
-            const Image resized = Resample(plane, width, height, filter);
-            std::copy(resized.bytes.begin(), resized.bytes.end(), result.bytes.begin() + static_cast<std::ptrdiff_t>(channel * out_plane));
-        }
+        else if (image.depth == 8)
+            CubicImage<std::uint8_t>(image, result, planes_alone);
+        else if (image.depth == 16)
+            CubicImage<std::uint16_t>(image, result, planes_alone);
+        else
+            CubicImage<float>(image, result, planes_alone);
         return result;
     }
 } // namespace ffpsd::detail

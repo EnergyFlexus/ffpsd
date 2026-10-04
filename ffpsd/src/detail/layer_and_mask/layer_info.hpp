@@ -39,6 +39,11 @@ namespace ffpsd::detail
         std::vector<const PixelData*> channels;
     };
 
+    // Headers, resources and records beside the pixel data, generously, so a writer reserved for both never copies.
+    constexpr std::size_t kWriteHeadroom = std::size_t{1} << 20;
+
+    std::size_t PixelBytes(const std::vector<LayerToWrite>& layers) noexcept;
+
     // Layers bottom to top; none give an empty layer info, just its length field.
     void WriteLayerInfo(BigEndianWriter& writer, bool merged_alpha, const std::vector<LayerToWrite>& layers, bool is_psb);
     void WriteLayerInfoBody(BigEndianWriter& writer, bool merged_alpha, const std::vector<LayerToWrite>& layers, bool is_psb);

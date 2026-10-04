@@ -8,11 +8,10 @@ namespace ffpsd::detail
     template <>
     std::optional<DocumentSpecificIdsSeedNumber> DecodeImageResource<DocumentSpecificIdsSeedNumber>(const std::vector<std::uint8_t>& data)
     {
-        if (data.size() < sizeof(std::uint32_t))
+        const std::optional<std::uint32_t> value = BigEndianReader(data).TryReadU32();
+        if (!value.has_value())
             return std::nullopt;
-
-        BigEndianReader reader(data);
-        return DocumentSpecificIdsSeedNumber{reader.ReadU32()};
+        return DocumentSpecificIdsSeedNumber{*value};
     }
 
     template <> std::vector<std::uint8_t> EncodeImageResource<DocumentSpecificIdsSeedNumber>(const DocumentSpecificIdsSeedNumber& value)

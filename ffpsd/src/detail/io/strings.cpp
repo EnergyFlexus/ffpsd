@@ -136,6 +136,14 @@ namespace ffpsd::detail
         writer.WriteZeros(PaddingFor(1 + length, alignment));
     }
 
+    std::optional<std::string> TryReadUnicodeString(BigEndianReader& reader)
+    {
+        if (reader.GetRemaining() < sizeof(std::uint32_t) ||
+            reader.PeekU32() > (reader.GetRemaining() - sizeof(std::uint32_t)) / sizeof(std::uint16_t))
+            return std::nullopt;
+        return ReadUnicodeString(reader);
+    }
+
     std::string ReadUnicodeString(BigEndianReader& reader)
     {
         const std::uint32_t count = reader.ReadU32();

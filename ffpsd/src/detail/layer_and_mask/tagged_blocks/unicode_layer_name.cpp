@@ -9,10 +9,10 @@ namespace ffpsd::detail
     template <> std::optional<UnicodeLayerName> DecodeTaggedBlock<UnicodeLayerName>(const std::vector<std::uint8_t>& data)
     {
         BigEndianReader reader(data);
-        if (reader.GetRemaining() < sizeof(std::uint32_t) ||
-            reader.PeekU32() > (reader.GetRemaining() - sizeof(std::uint32_t)) / sizeof(std::uint16_t))
+        std::optional<std::string> name = TryReadUnicodeString(reader);
+        if (!name.has_value())
             return std::nullopt;
-        return UnicodeLayerName{ReadUnicodeString(reader)};
+        return UnicodeLayerName{std::move(*name)};
     }
 
     template <> std::vector<std::uint8_t> EncodeTaggedBlock<UnicodeLayerName>(const UnicodeLayerName& value)

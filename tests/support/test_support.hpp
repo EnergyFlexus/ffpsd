@@ -6,6 +6,7 @@
 #include <cstring>
 #include <ffpsd/ffpsd.hpp>
 #include <fstream>
+#include <gtest/gtest.h>
 #include <iterator>
 #include <optional>
 #include <string>
@@ -128,6 +129,32 @@ namespace ffpsd_test
             std::memcpy(image.bytes.data() + at, &full, sizeof(full));
         ++image.channel_count;
         return image;
+    }
+
+    inline void ExpectRect(const ffpsd::Rect& rect, std::int32_t top, std::int32_t left, std::int32_t bottom, std::int32_t right)
+    {
+        EXPECT_EQ(rect.top, top);
+        EXPECT_EQ(rect.left, left);
+        EXPECT_EQ(rect.bottom, bottom);
+        EXPECT_EQ(rect.right, right);
+    }
+
+    // Every 8 bit pixel a quarter turn clockwise.
+    inline ffpsd::Image Clockwise(const ffpsd::Image& image)
+    {
+        ffpsd::Image result = image;
+        result.width = image.height;
+        result.height = image.width;
+        for (std::size_t c = 0; c < image.channel_count; ++c)
+        {
+            for (std::size_t y = 0; y < image.height; ++y)
+            {
+                for (std::size_t x = 0; x < image.width; ++x)
+                    result.bytes[(c * result.height + x) * result.width + (image.height - 1 - y)] =
+                        image.bytes[(c * image.height + y) * image.width + x];
+            }
+        }
+        return result;
     }
 
     // A small document with no layers.

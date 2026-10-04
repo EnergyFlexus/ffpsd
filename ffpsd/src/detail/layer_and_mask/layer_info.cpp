@@ -1,7 +1,6 @@
 #include "detail/layer_and_mask/layer_info.hpp"
 
 #include <cstdint>
-#include <optional>
 #include <stdexcept>
 #include <string>
 
@@ -15,13 +14,10 @@ namespace ffpsd::detail
 
     LayerInfo ParseLayerInfo(BigEndianReader& reader, bool is_psb, std::uint16_t depth)
     {
-        const std::uint64_t length = is_psb ? reader.ReadU64() : reader.ReadU32();
-        if (length > reader.GetRemaining())
-            throw std::runtime_error(
-                "ffpsd: layer info claims " + std::to_string(length) + " bytes, only " + std::to_string(reader.GetRemaining()) + " left");
+        const std::size_t length = reader.CheckLength(reader.ReadLength(is_psb), reader.GetSize(), "layer info");
 
         // The length counts the padding, which is 4 in practice and 2 by the specification.
-        return ParseLayerInfoBody(reader, reader.Tell() + static_cast<std::size_t>(length), is_psb, depth);
+        return ParseLayerInfoBody(reader, reader.Tell() + length, is_psb, depth);
     }
 
     LayerInfo ParseLayerInfoBody(BigEndianReader& reader, std::size_t end, bool is_psb, std::uint16_t depth)
@@ -53,18 +49,24 @@ namespace ffpsd::detail
             for (std::size_t c = 0; c < record.channels.size(); ++c)
             {
                 ChannelImageData& channel = record.channels[c];
-                std::optional<Rect> bounds = record.bounds;
-                if (channel.id < kTransparencyId)
-                    bounds = FindMaskBounds(record.mask_data, channel.id);
-                if (!bounds.has_value())
-                    throw std::runtime_error(
-                        "ffpsd: layer " + std::to_string(i) + " has mask channel " + std::to_string(channel.id) + " without its rectangle");
-                channel = ParseChannelImageData(reader, end, channel.id, channel_lengths[i][c], *bounds, depth);
+                const Rect bounds = channel.id < kTransparencyId ? RequireMaskBounds(record.mask_data, channel.id) : record.bounds;
+                channel = ParseChannelImageData(reader, end, channel.id, channel_lengths[i][c], bounds, depth);
             }
         }
 
         reader.Skip(end - reader.Tell());
         return info;
+    }
+
+    std::size_t PixelBytes(const std::vector<LayerToWrite>& layers) noexcept
+    {
+        std::size_t bytes = 0;
+        for (const LayerToWrite& layer : layers)
+        {
+            for (const PixelData* channel : layer.channels)
+                bytes += channel->GetBytes().size();
+        }
+        return bytes;
     }
 
     void WriteLayerInfo(BigEndianWriter& writer, bool merged_alpha, const std::vector<LayerToWrite>& layers, bool is_psb)

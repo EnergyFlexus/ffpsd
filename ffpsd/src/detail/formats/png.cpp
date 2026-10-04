@@ -1,6 +1,7 @@
 #include "detail/formats/png.hpp"
 
 #include "detail/color.hpp"
+#include "detail/file_header.hpp"
 #include "detail/formats/picture.hpp"
 #include "detail/formats/planes.hpp"
 #include "detail/image.hpp"
@@ -21,8 +22,6 @@ namespace ffpsd::detail
 {
     namespace
     {
-        constexpr std::size_t kSignatureSize = 8;
-        constexpr std::uint32_t kMaxSide = 300000;
         constexpr std::size_t kErrorSize = 256;
 
         struct Source
@@ -123,7 +122,7 @@ namespace ffpsd::detail
             out.width = png_get_image_width(png, info);
             out.height = png_get_image_height(png, info);
             out.channels = png_get_channels(png, info);
-            if (out.width > kMaxSide || out.height > kMaxSide)
+            if (out.width > kMaxSidePsb || out.height > kMaxSidePsb)
                 png_error(png, "image is larger than a PSB allows");
 
             const std::size_t row_bytes = png_get_rowbytes(png, info);
@@ -230,7 +229,7 @@ namespace ffpsd::detail
     Image DecodePng(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth)
     {
         CheckPictureMode(color_mode, depth, "PNG");
-        if (data == nullptr || size < kSignatureSize || png_sig_cmp(data, 0, kSignatureSize) != 0)
+        if (FindFormat(data, size) != Format::kPng)
             throw std::runtime_error("ffpsd: not a PNG");
 
         Reader reader;
@@ -254,7 +253,7 @@ namespace ffpsd::detail
 
     std::vector<std::uint8_t> EncodePng(const ImageView& image)
     {
-        if (image.width > kMaxSide || image.height > kMaxSide)
+        if (image.width > kMaxSidePsb || image.height > kMaxSidePsb)
             throw std::invalid_argument("ffpsd: image is larger than a PSB allows");
         CheckPicture(image, "PNG");
 

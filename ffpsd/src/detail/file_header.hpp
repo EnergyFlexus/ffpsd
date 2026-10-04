@@ -3,11 +3,17 @@
 
 #include "detail/io/big_endian_reader.hpp"
 #include "detail/io/big_endian_writer.hpp"
+#include "detail/io/fourcc.hpp"
 
 #include <cstdint>
 
 namespace ffpsd::detail
 {
+    constexpr std::uint16_t kVersionPsd = 1;
+    constexpr std::uint16_t kVersionPsb = 2;
+    constexpr std::uint16_t kMaxChannels = 56;
+    constexpr std::uint32_t kBlockSignature = Fourcc('8', 'B', 'I', 'M');
+
     constexpr std::uint32_t kMaxSidePsd = 30000;
     constexpr std::uint32_t kMaxSidePsb = 300000;
 

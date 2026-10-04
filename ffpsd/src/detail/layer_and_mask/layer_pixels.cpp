@@ -7,7 +7,6 @@
 #include "detail/pixel_data.hpp"
 
 #include <iterator>
-#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -71,16 +70,11 @@ namespace ffpsd::detail
 
     Image DecodeMask(const ChannelImageData& channel, const Rect& bounds, std::uint16_t depth, bool is_psb)
     {
-        Image mask;
-        mask.channel_count = 1;
-        mask.depth = depth;
-        mask.color_mode = ColorMode::kGrayscale;
         if (bounds.GetWidth() <= 0 || bounds.GetHeight() <= 0)
-            return mask;
+            return MakeImage(0, 0, 1, depth, ColorMode::kGrayscale);
 
-        mask.width = static_cast<std::uint32_t>(bounds.GetWidth());
-        mask.height = static_cast<std::uint32_t>(bounds.GetHeight());
-        mask.bytes.resize(mask.GetSizeBytes());
+        Image mask = MakeImage(
+            static_cast<std::uint32_t>(bounds.GetWidth()), static_cast<std::uint32_t>(bounds.GetHeight()), 1, depth, ColorMode::kGrayscale);
         channel.data.Decode(is_psb, mask.bytes.data());
         return mask;
     }
@@ -91,18 +85,10 @@ namespace ffpsd::detail
         if (id == 0)
             return std::nullopt;
 
-        const std::optional<Rect> bounds = FindMaskBounds(record.mask_data, id);
-        if (!bounds.has_value())
-            throw std::runtime_error("ffpsd: mask channel " + std::to_string(id) + " has no rectangle");
-
         LayerMask mask;
-        mask.bounds = *bounds;
+        mask.bounds = RequireMaskBounds(record.mask_data, id);
         mask.default_color = FindMaskDefaultColor(record.mask_data, id).value_or(0);
-        for (const ChannelImageData& channel : record.channels)
-        {
-            if (channel.id == id)
-                mask.image = DecodeMask(channel, mask.bounds, depth, is_psb);
-        }
+        mask.image = DecodeMask(*FindChannel(record, id), mask.bounds, depth, is_psb);
         return mask;
     }
 
@@ -113,17 +99,11 @@ namespace ffpsd::detail
         std::vector<std::uint8_t> mask_data = record.mask_data.empty() ? NewMaskData() : record.mask_data;
         SetMaskBounds(mask_data, kLayerMaskId, bounds);
         SetMaskDefaultColor(mask_data, kLayerMaskId, default_color);
-        ChannelImageData channel = EncodeChannelImageData(
-            kLayerMaskId, image.data, image.width, image.height, image.IsEmpty() ? 1 : image.GetBytesPerSample(), is_psb);
-
-        std::vector<ChannelImageData> channels;
-        for (ChannelImageData& kept : record.channels)
-        {
-            if (kept.id != kLayerMaskId)
-                channels.push_back(std::move(kept));
-        }
-        channels.push_back(std::move(channel));
-        record.channels = std::move(channels);
+        ChannelImageData channel = image.IsEmpty()
+                                       ? EmptyChannel(kLayerMaskId)
+                                       : EncodeChannelImageData(kLayerMaskId, image.data, image.width, image.height, image.depth, is_psb);
+        RemoveChannels(record, kLayerMaskId);
+        record.channels.push_back(std::move(channel));
         record.mask_data = std::move(mask_data);
     }
 
@@ -136,12 +116,14 @@ namespace ffpsd::detail
                 " pixels a side");
     }
 
-    void CheckLayerImage(const ImageView& image, ColorMode color_mode, std::uint16_t depth, bool is_psb)
+    ImageView CheckLayerImage(const ImageView& image, ColorMode color_mode, std::uint16_t depth, bool is_psb)
     {
         // First, so the size arithmetic below stays far from overflow.
         CheckLayerSides(image.width, image.height, is_psb);
+        ImageView view = image;
+        view.color_mode = color_mode;
         if (image.IsEmpty())
-            return;
+            return view;
 
         if (image.color_mode != color_mode)
             throw std::invalid_argument(
@@ -152,6 +134,7 @@ namespace ffpsd::detail
                 "ffpsd: a " + std::to_string(image.depth) + " bit image in a " + std::to_string(depth) + " bit document");
         CheckImage(image);
         CheckColorChannels(image);
+        return view;
     }
 
     std::vector<ChannelImageData> EncodeLayerPixels(const ImageView& image, bool is_background, bool is_psb)
@@ -161,9 +144,9 @@ namespace ffpsd::detail
         if (image.IsEmpty())
         {
             // Photoshop gives an empty layer every channel, each just a compression field.
-            channels.push_back(EncodeChannelImageData(kTransparencyId, nullptr, 0, 0, 1, is_psb));
+            channels.push_back(EmptyChannel(kTransparencyId));
             for (std::size_t i = 0; i < color_count; ++i)
-                channels.push_back(EncodeChannelImageData(static_cast<std::int16_t>(i), nullptr, 0, 0, 1, is_psb));
+                channels.push_back(EmptyChannel(static_cast<std::int16_t>(i)));
             return channels;
         }
 
@@ -173,12 +156,12 @@ namespace ffpsd::detail
 
         // Transparency is declared first, as Photoshop writes it; without it the bottom layer would become the background.
         if (image.channel_count > color_count)
-            channels.push_back(EncodeChannelImageData(kTransparencyId, plane(color_count), image.width, image.height, sample_size, is_psb));
+            channels.push_back(EncodeChannelImageData(kTransparencyId, plane(color_count), image.width, image.height, image.depth, is_psb));
         else if (!is_background)
             channels.push_back(EncodeOpaqueChannel(kTransparencyId, image.width, image.height, image.depth, is_psb));
         for (std::size_t i = 0; i < color_count; ++i)
             channels.push_back(
-                EncodeChannelImageData(static_cast<std::int16_t>(i), plane(i), image.width, image.height, sample_size, is_psb));
+                EncodeChannelImageData(static_cast<std::int16_t>(i), plane(i), image.width, image.height, image.depth, is_psb));
         return channels;
     }
 
@@ -186,27 +169,19 @@ namespace ffpsd::detail
     {
         if (image.IsEmpty())
             return {top, left, top, left};
-
-        const std::int64_t bottom = std::int64_t{top} + image.height;
-        const std::int64_t right = std::int64_t{left} + image.width;
-        if (bottom > std::numeric_limits<std::int32_t>::max() || right > std::numeric_limits<std::int32_t>::max())
-            throw std::invalid_argument("ffpsd: layer bounds do not fit in 32 bits");
-        return {top, left, static_cast<std::int32_t>(bottom), static_cast<std::int32_t>(right)};
+        return MakeRect(top, left, std::int64_t{top} + image.height, std::int64_t{left} + image.width);
     }
 
     Image DecodeLayerPixels(const LayerRecord& record, ColorMode color_mode, std::uint16_t depth, bool is_psb)
     {
-        if (depth != 8 && depth != 16 && depth != 32)
-            throw std::runtime_error("ffpsd: " + std::to_string(depth) + " bit layer pixels are not supported");
+        if (!IsSampleDepth(depth))
+            throw std::runtime_error(UnsupportedDepth(depth));
 
         const std::size_t color_count = ColorChannelCount(color_mode);
-        Image image;
-        image.depth = depth;
-        image.color_mode = color_mode;
-        const std::int64_t width = std::int64_t{record.bounds.right} - record.bounds.left;
-        const std::int64_t height = std::int64_t{record.bounds.bottom} - record.bounds.top;
+        const std::int64_t width = record.bounds.GetWidth();
+        const std::int64_t height = record.bounds.GetHeight();
         if (width <= 0 || height <= 0)
-            return image;
+            return MakeImage(0, 0, 0, depth, color_mode);
 
         const ChannelImageData* transparency = nullptr;
         std::vector<const ChannelImageData*> colors(color_count, nullptr);
@@ -225,10 +200,9 @@ namespace ffpsd::detail
         if (transparency != nullptr)
             colors.push_back(transparency);
 
-        image.width = static_cast<std::uint32_t>(width);
-        image.height = static_cast<std::uint32_t>(height);
-        image.channel_count = static_cast<std::uint16_t>(colors.size());
-        image.bytes.resize(image.GetSizeBytes());
+        Image image = MakeImage(
+            static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height), static_cast<std::uint16_t>(colors.size()), depth,
+            color_mode);
 
         const std::size_t plane = std::size_t{image.width} * image.height * image.GetBytesPerSample();
         for (std::size_t i = 0; i < colors.size(); ++i)

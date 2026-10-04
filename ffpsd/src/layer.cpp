@@ -7,11 +7,9 @@
 #include "detail/layer_and_mask/tagged_blocks/section_divider_setting.hpp"
 #include "detail/layer_and_mask/tagged_blocks/unicode_layer_name.hpp"
 
-#include <algorithm>
 #include <cstdint>
 #include <ffpsd/document.hpp>
 #include <ffpsd/layer.hpp>
-#include <limits>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -114,7 +112,7 @@ namespace ffpsd
     template <class T> void Layer::SetAdjustment(const T& value)
     {
         if (GetAdjustmentKey() != T::kKey)
-            throw std::invalid_argument("ffpsd: SetAdjustment needs an adjustment layer of the same kind");
+            throw std::logic_error("ffpsd: SetAdjustment needs an adjustment layer of the same kind");
 
         std::vector<std::uint8_t> data = detail::EncodeAdjustment(value);
         detail::FindOrAppendTaggedBlock(record_->blocks, T::kKey).data = std::move(data);
@@ -132,9 +130,7 @@ namespace ffpsd
 
     void Layer::SetPixels(const ImageView& image)
     {
-        detail::CheckLayerImage(image, document_->GetColorMode(), document_->GetDepth(), document_->IsPsb());
-        ImageView view = image;
-        view.color_mode = document_->GetColorMode(); // an empty image says nothing about its mode
+        const ImageView view = detail::CheckLayerImage(image, document_->GetColorMode(), document_->GetDepth(), document_->IsPsb());
 
         // Transparency would make it an ordinary layer, so it stays as AddBackgroundLayer made it.
         if (IsBackground() && (image.IsEmpty() || image.width != document_->GetWidth() || image.height != document_->GetHeight() ||
@@ -147,9 +143,8 @@ namespace ffpsd
     void Layer::CheckTransformable(const char* what) const
     {
         if (GetKind() != LayerKind::kRaster)
-            throw std::invalid_argument(std::string("ffpsd: ") + what + " needs a raster layer");
-        if (detail::HasVectorMask(*record_))
-            throw std::invalid_argument(std::string("ffpsd: ") + what + " of a layer with a vector mask is not supported yet");
+            throw std::logic_error(std::string("ffpsd: ") + what + " needs a raster layer");
+        detail::CheckCanvasBlocks(*record_, false);
     }
 
     void Layer::SetPosition(std::int32_t top, std::int32_t left)
@@ -159,41 +154,64 @@ namespace ffpsd
             return;
         CheckTransformable("SetPosition");
         if (IsBackground())
-            throw std::invalid_argument("ffpsd: the background stays at 0, 0");
+            throw std::logic_error("ffpsd: the background stays at 0, 0");
 
-        const std::int64_t bottom = std::int64_t{top} + bounds.GetHeight();
-        const std::int64_t right = std::int64_t{left} + bounds.GetWidth();
-        if (bottom > std::numeric_limits<std::int32_t>::max() || right > std::numeric_limits<std::int32_t>::max())
-            throw std::invalid_argument("ffpsd: layer bounds do not fit in 32 bits");
-
-        std::vector<std::uint8_t> mask_data = record_->mask_data;
-        detail::ShiftMaskBounds(mask_data, std::int64_t{top} - bounds.top, std::int64_t{left} - bounds.left);
-
-        record_->bounds = {top, left, static_cast<std::int32_t>(bottom), static_cast<std::int32_t>(right)};
-        record_->mask_data = std::move(mask_data);
-        document_->SetHasRealMergedData(false);
+        Apply(detail::Transform::Shift(static_cast<double>(left) - bounds.left, static_cast<double>(top) - bounds.top));
     }
 
     void Layer::Resize(std::uint32_t width, std::uint32_t height, ResampleFilter filter)
     {
         CheckTransformable("Resize");
         if (IsBackground())
-            throw std::invalid_argument("ffpsd: the background keeps the canvas size");
+            throw std::logic_error("ffpsd: the background keeps the canvas size");
         if (width == 0 || height == 0)
             throw std::invalid_argument("ffpsd: cannot resize a layer to " + std::to_string(width) + " x " + std::to_string(height));
         detail::CheckLayerSides(width, height, document_->IsPsb());
 
         const Rect bounds = record_->bounds;
         if (bounds.GetWidth() <= 0 || bounds.GetHeight() <= 0)
-            throw std::invalid_argument("ffpsd: an empty layer has nothing to resize");
+            throw std::logic_error("ffpsd: an empty layer has nothing to resize");
 
-        detail::ScaledLayer scaled = detail::ScaleLayer(
-            *record_, document_->GetColorMode(), document_->GetDepth(), document_->IsPsb(), false,
-            static_cast<double>(height) / bounds.GetHeight(), static_cast<double>(width) / bounds.GetWidth(), bounds.top, bounds.left,
+        Apply(
+            detail::Transform::Scale(
+                static_cast<double>(width) / bounds.GetWidth(), static_cast<double>(height) / bounds.GetHeight(), bounds.left, bounds.top),
             filter);
-        record_->bounds = scaled.bounds;
-        record_->channels = std::move(scaled.channels);
-        record_->mask_data = std::move(scaled.mask_data);
+    }
+
+    void Layer::Flip(FlipDirection direction)
+    {
+        CheckTransformable("Flip");
+        if (IsBackground())
+            throw std::logic_error("ffpsd: the background turns only with the canvas");
+
+        Apply(detail::Transform::Flip(direction, record_->bounds));
+    }
+
+    void Layer::Rotate(Rotation rotation)
+    {
+        CheckTransformable("Rotate");
+        if (IsBackground())
+            throw std::logic_error("ffpsd: the background turns only with the canvas");
+
+        const Rect bounds = record_->bounds;
+        detail::Transform transform = detail::Transform::Rotate(rotation, bounds);
+        if (transform.SwapsAxes())
+        {
+            // Back to the old center, which falls between pixels when the sides differ by an odd number.
+            const auto half_down = [](std::int64_t value) { return value >= 0 ? value / 2 : -((-value + 1) / 2); };
+            const std::int64_t width = bounds.GetWidth();
+            const std::int64_t height = bounds.GetHeight();
+            transform = transform.Then(
+                detail::Transform::Shift(static_cast<double>(half_down(width - height)), static_cast<double>(half_down(height - width))));
+        }
+        Apply(transform);
+    }
+
+    void Layer::Apply(const detail::Transform& transform, ResampleFilter filter)
+    {
+        detail::ApplyTransformed(
+            *record_,
+            detail::TransformLayer(*record_, document_->GetColorMode(), document_->GetDepth(), document_->IsPsb(), transform, filter));
         document_->SetHasRealMergedData(false);
     }
 
@@ -205,9 +223,9 @@ namespace ffpsd
     void Layer::SetMask(const ImageView& image, std::int32_t top, std::int32_t left, std::uint8_t default_color)
     {
         if (IsBackground())
-            throw std::invalid_argument("ffpsd: the background has no mask");
+            throw std::logic_error("ffpsd: the background has no mask");
         if (detail::HasVectorMask(*record_))
-            throw std::invalid_argument("ffpsd: the mask of a layer with a vector mask is not supported yet");
+            throw std::logic_error("ffpsd: the mask of a layer with a vector mask is not supported yet");
         if (default_color != 0 && default_color != 255)
             throw std::invalid_argument("ffpsd: a mask's default color is 0 or 255, not " + std::to_string(default_color));
         detail::CheckLayerSides(image.width, image.height, document_->IsPsb());
@@ -230,14 +248,9 @@ namespace ffpsd
         if (detail::FindPixelMaskId(*record_) == 0)
             return false;
         if (detail::HasVectorMask(*record_))
-            throw std::invalid_argument("ffpsd: the mask of a layer with a vector mask is not supported yet");
+            throw std::logic_error("ffpsd: the mask of a layer with a vector mask is not supported yet");
 
-        std::vector<detail::ChannelImageData>& channels = record_->channels;
-        channels.erase(
-            std::remove_if(
-                channels.begin(), channels.end(),
-                [](const detail::ChannelImageData& channel) { return channel.id == detail::kLayerMaskId; }),
-            channels.end());
+        detail::RemoveChannels(*record_, detail::kLayerMaskId);
         record_->mask_data.clear();
         document_->SetHasRealMergedData(false);
         return true;

@@ -19,6 +19,7 @@ namespace ffpsd
     namespace detail
     {
         struct LayerRecord;
+        struct Transform;
     } // namespace detail
 
     // A group takes two records; stored bottom to top, its end marker comes first.
@@ -101,6 +102,10 @@ namespace ffpsd
         // Keeps the top left corner; the mask scales from that corner too.
         FFPSD_EXPORT void Resize(std::uint32_t width, std::uint32_t height, ResampleFilter filter = ResampleFilter::kBicubic);
 
+        // About the layer's center, mask included; a quarter turn of odd side difference lands half a pixel up and left.
+        FFPSD_EXPORT void Flip(FlipDirection direction);
+        FFPSD_EXPORT void Rotate(Rotation rotation);
+
         // The rendering of a vector mask that Photoshop also stores is not a pixel mask.
         FFPSD_EXPORT std::optional<LayerMask> GetMask() const;
 
@@ -128,6 +133,8 @@ namespace ffpsd
 
         // Throws for what SetPosition and Resize cannot handle; what names the call.
         void CheckTransformable(const char* what) const;
+
+        void Apply(const detail::Transform& transform, ResampleFilter filter = ResampleFilter::kNearest);
 
         std::unique_ptr<detail::LayerRecord> record_;
         Document* document_ = nullptr;

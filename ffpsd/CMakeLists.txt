@@ -23,6 +23,7 @@ target_sources(ffpsd
         src/detail/pixel_data.hpp
         src/detail/resample.cpp
         src/detail/resample.hpp
+        src/detail/samples.hpp
         src/detail/file_header.hpp
         src/detail/io/big_endian_reader.cpp
         src/detail/io/big_endian_reader.hpp

@@ -50,6 +50,9 @@ namespace ffpsd::detail
 
         void WriteZeros(std::size_t count);
 
+        // A 4 byte length, then the bytes.
+        void WriteBlob(const std::vector<std::uint8_t>& data);
+
         // Pads with zeros until the distance from start is a multiple of it.
         void PadFrom(std::size_t start, std::size_t alignment);
 

@@ -33,6 +33,7 @@ namespace ffpsd
         FFPSD_EXPORT Document(Document&& other) noexcept;
         FFPSD_EXPORT Document& operator=(Document&& other) noexcept;
 
+        Document() = delete;
         Document(const Document& other) = delete;
         Document& operator=(const Document& other) = delete;
 
@@ -59,6 +60,10 @@ namespace ffpsd
 
         // Text, smart objects and shapes throw; layer effects keep their sizes.
         FFPSD_EXPORT void Resize(std::uint32_t width, std::uint32_t height, ResampleFilter filter = ResampleFilter::kBicubic);
+
+        // Every layer, mask and the composite, exactly; a quarter turn swaps the sides and the resolutions.
+        FFPSD_EXPORT void FlipCanvas(FlipDirection direction);
+        FFPSD_EXPORT void RotateCanvas(Rotation rotation);
 
         // Every layer and the composite, RGB to gray and back; any other pair throws std::invalid_argument.
         FFPSD_EXPORT void ConvertColorMode(ColorMode color_mode);
@@ -132,7 +137,7 @@ namespace ffpsd
         struct Impl;
         std::unique_ptr<Impl> impl_;
 
-        Document();
+        explicit Document(std::unique_ptr<Impl> impl) noexcept;
 
         // Repoints the layers at this document after a move.
         void RebindLayers() noexcept;
@@ -141,9 +146,9 @@ namespace ffpsd
 
         void DropMergedImage();
 
-        // The two conversions ConvertColorMode takes, called in the mode they convert from.
-        void ConvertRgbToGray();
-        void ConvertGrayToRgb();
+        void Apply(
+            const detail::Transform& transform, std::uint32_t width, std::uint32_t height,
+            ResampleFilter filter = ResampleFilter::kNearest);
 
         // The next id after resource 1044 and every layer's, written to both.
         void AssignLayerId(detail::LayerRecord& record);

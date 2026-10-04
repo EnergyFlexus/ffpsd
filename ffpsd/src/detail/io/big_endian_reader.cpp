@@ -46,6 +46,33 @@ namespace ffpsd::detail
             std::to_string(GetRemaining()) + " left");
     }
 
+    std::uint64_t BigEndianReader::ReadLength(bool wide)
+    {
+        return wide ? ReadU64() : ReadU32();
+    }
+
+    bool BigEndianReader::FitsLength(std::uint64_t length, std::size_t end) const noexcept
+    {
+        return end >= offset_ && length <= end - offset_;
+    }
+
+    std::size_t BigEndianReader::CheckLength(std::uint64_t length, std::size_t end, const char* what) const
+    {
+        if (!FitsLength(length, end))
+            throw std::runtime_error(
+                std::string("ffpsd: ") + what + " claims " + std::to_string(length) + " bytes, only " +
+                std::to_string(end > offset_ ? end - offset_ : 0) + " left");
+        return static_cast<std::size_t>(length);
+    }
+
+    std::vector<std::uint8_t> BigEndianReader::ReadBlob(std::size_t end, const char* what)
+    {
+        std::vector<std::uint8_t> blob(CheckLength(ReadU32(), end, what));
+        if (!blob.empty())
+            ReadU8Array(blob.data(), blob.size());
+        return blob;
+    }
+
     std::uint8_t BigEndianReader::ReadU8()
     {
         return Read<std::uint8_t>();
@@ -58,6 +85,13 @@ namespace ffpsd::detail
     {
         return Read<std::uint32_t>();
     }
+    std::optional<std::uint32_t> BigEndianReader::TryReadU32()
+    {
+        if (GetRemaining() < sizeof(std::uint32_t))
+            return std::nullopt;
+        return ReadU32();
+    }
+
     std::uint64_t BigEndianReader::ReadU64()
     {
         return Read<std::uint64_t>();

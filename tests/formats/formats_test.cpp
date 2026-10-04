@@ -57,7 +57,7 @@ TEST(FormatsTest, LoadPictureGoesByTheSignatureNotTheName)
         }
         else
         {
-            EXPECT_THROW(ffpsd::LoadPicture(path.u8string(), ffpsd::ColorMode::kRgb, 8), std::runtime_error) << c.file;
+            EXPECT_THROW(ffpsd::LoadPicture(path.u8string(), ffpsd::ColorMode::kRgb, 8), std::logic_error) << c.file;
         }
         std::filesystem::remove(path);
     }

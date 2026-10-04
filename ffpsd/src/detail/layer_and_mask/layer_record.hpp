@@ -1,6 +1,7 @@
 #ifndef FFPSD_DETAIL_LAYER_AND_MASK_LAYER_RECORD_HPP_
 #define FFPSD_DETAIL_LAYER_AND_MASK_LAYER_RECORD_HPP_
 
+#include "detail/file_header.hpp"
 #include "detail/io/big_endian_reader.hpp"
 #include "detail/io/big_endian_writer.hpp"
 #include "detail/io/fourcc.hpp"
@@ -28,7 +29,7 @@ namespace ffpsd::detail
 
         Rect bounds;
 
-        std::uint32_t blend_signature = Fourcc('8', 'B', 'I', 'M');
+        std::uint32_t blend_signature = kBlockSignature;
         std::uint32_t blend_key = Fourcc('n', 'o', 'r', 'm'); // 'mul ', 'scrn', ...
         std::uint8_t opacity = 255;
         std::uint8_t clipping = 0;
@@ -59,8 +60,14 @@ namespace ffpsd::detail
     // What Photoshop gives a copy of its background: an ordinary layer again, with opaque transparency when it had none.
     void UnmarkBackground(LayerRecord& record, std::uint16_t depth, bool is_psb);
 
+    // Throws when an edge leaves the 32 bit range.
+    Rect MakeRect(std::int64_t top, std::int64_t left, std::int64_t bottom, std::int64_t right);
+
     // The rectangle mask channel -2 or -3 covers, read from the mask data; none when the data has no such one.
     std::optional<Rect> FindMaskBounds(const std::vector<std::uint8_t>& mask_data, std::int16_t id);
+
+    // For a mask channel the record has: data without its rectangle is a damaged file.
+    Rect RequireMaskBounds(const std::vector<std::uint8_t>& mask_data, std::int16_t id);
 
     // Throws when the data has no rectangle for that mask.
     void SetMaskBounds(std::vector<std::uint8_t>& mask_data, std::int16_t id, const Rect& bounds);
@@ -71,6 +78,10 @@ namespace ffpsd::detail
 
     // Then -2 holds Photoshop's rendering of a vector mask, and the pixel mask is -3.
     bool IsRenderedMask(const std::vector<std::uint8_t>& mask_data) noexcept;
+
+    // Null when the record has no channel of that id.
+    const ChannelImageData* FindChannel(const LayerRecord& record, std::int16_t id) noexcept;
+    void RemoveChannels(LayerRecord& record, std::int16_t id);
 
     // Mask data with just a layer mask: its rectangle, default color, flags and padding.
     std::vector<std::uint8_t> NewMaskData();

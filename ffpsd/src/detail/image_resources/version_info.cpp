@@ -1,5 +1,6 @@
 #include "detail/image_resources/version_info.hpp"
 
+#include "detail/io/big_endian_reader.hpp"
 #include "detail/io/big_endian_writer.hpp"
 #include "detail/io/strings.hpp"
 
@@ -21,24 +22,16 @@ namespace ffpsd::detail
         // Zero when the block is too short to hold one.
         std::uint32_t BlockVersion(const std::vector<std::uint8_t>& data)
         {
-            if (data.size() < sizeof(std::uint32_t))
-                return 0;
-
-            BigEndianReader reader(data);
-            return reader.ReadU32();
+            return BigEndianReader(data).TryReadU32().value_or(0);
         }
 
         // False when the length does not fit: nothing after the name can be located.
         bool ReadName(BigEndianReader& reader, std::string& text)
         {
-            if (reader.GetRemaining() < sizeof(std::uint32_t))
+            std::optional<std::string> name = TryReadUnicodeString(reader);
+            if (!name.has_value())
                 return false;
-
-            const std::uint32_t count = reader.PeekU32();
-            if (count > (reader.GetRemaining() - sizeof(std::uint32_t)) / sizeof(std::uint16_t))
-                return false;
-
-            text = ReadUnicodeString(reader);
+            text = std::move(*name);
             return true;
         }
     } // namespace

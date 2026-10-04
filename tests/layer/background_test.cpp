@@ -277,10 +277,10 @@ TEST(LayerBackgroundTest, SetBackgroundLayerRefusesWhatCannotBeOne)
 
     ffpsd::Document levels = ffpsd::Document::Open(kRgbLevelsPsd);
     levels.UnsetBackgroundLayer();
-    EXPECT_THROW(levels.SetBackgroundLayer(1), std::invalid_argument);
+    EXPECT_THROW(levels.SetBackgroundLayer(1), std::logic_error);
 
     ffpsd::Document group = NewDocument();
     SetSectionDivider(*group.AddLayer("end"), 3);
-    EXPECT_THROW(group.SetBackgroundLayer(0), std::invalid_argument);
+    EXPECT_THROW(group.SetBackgroundLayer(0), std::logic_error);
     EXPECT_FALSE(group.GetLayerByIndex(0)->IsBackground());
 }

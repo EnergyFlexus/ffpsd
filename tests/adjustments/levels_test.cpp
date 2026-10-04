@@ -65,7 +65,7 @@ TEST(AdjustmentLevelsTest, OnlyALevelsLayerTakesRecordsInPhotoshopsRanges)
     // Only a Levels layer takes Levels.
     ffpsd::Layer* background = doc.GetLayerByIndex(0);
     EXPECT_FALSE(background->GetAdjustment<ffpsd::LevelsInfo>().has_value());
-    EXPECT_THROW(background->SetAdjustment(ffpsd::LevelsInfo()), std::invalid_argument);
+    EXPECT_THROW(background->SetAdjustment(ffpsd::LevelsInfo()), std::logic_error);
     EXPECT_EQ(background->GetTaggedBlockByKey(kLevelsKey), nullptr);
 
     const auto with = [](auto change) {

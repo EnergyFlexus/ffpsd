@@ -2,38 +2,17 @@
 
 #include "detail/color.hpp"
 #include "detail/image.hpp"
+#include "detail/samples.hpp"
 
 #include <algorithm>
 #include <cstring>
-#include <limits>
 #include <stdexcept>
-#include <string>
 #include <type_traits>
 
 namespace ffpsd::detail
 {
     namespace
     {
-        template <typename T> T Load(const std::uint8_t* at) noexcept
-        {
-            T value;
-            std::memcpy(&value, at, sizeof(T));
-            return value;
-        }
-
-        template <typename T> void Store(std::uint8_t* at, T value) noexcept
-        {
-            std::memcpy(at, &value, sizeof(T));
-        }
-
-        template <typename T> constexpr T Full() noexcept
-        {
-            if constexpr (std::is_floating_point_v<T>)
-                return T{1};
-            else
-                return std::numeric_limits<T>::max();
-        }
-
         // Integer samples round to nearest, so a fully opaque source comes through exactly.
         template <typename T> T Mix(T source, T target, T alpha) noexcept
         {
@@ -117,14 +96,10 @@ namespace ffpsd::detail
 
     Image MakeWhiteImage(std::uint32_t width, std::uint32_t height, ColorMode color_mode, std::uint16_t depth)
     {
-        Image image;
-        image.width = width;
-        image.height = height;
-        image.channel_count = ColorChannelCount(color_mode);
-        image.depth = depth;
-        image.color_mode = color_mode;
-        image.bytes.resize(image.GetSizeBytes());
+        if (!IsSampleDepth(depth))
+            throw std::invalid_argument(UnsupportedDepth(depth));
 
+        Image image = MakeImage(width, height, ColorChannelCount(color_mode), depth, color_mode);
         switch (depth)
         {
         case 8:
@@ -133,11 +108,9 @@ namespace ffpsd::detail
         case 16:
             WhiteChannels<std::uint16_t>(image, color_mode);
             break;
-        case 32:
+        default:
             WhiteChannels<float>(image, color_mode);
             break;
-        default:
-            throw std::invalid_argument("ffpsd: unsupported depth: " + std::to_string(depth));
         }
         return image;
     }

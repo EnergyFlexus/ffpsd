@@ -74,6 +74,21 @@ extern "C"
         FFPSD_ANCHOR_BOTTOM_RIGHT = 8
     } ffpsd_anchor_t;
 
+    /* Clockwise. */
+    typedef enum ffpsd_rotation_t
+    {
+        FFPSD_ROTATION_90 = 0,
+        FFPSD_ROTATION_180 = 1,
+        FFPSD_ROTATION_270 = 2
+    } ffpsd_rotation_t;
+
+    /* HORIZONTAL mirrors left and right. */
+    typedef enum ffpsd_flip_direction_t
+    {
+        FFPSD_FLIP_HORIZONTAL = 0,
+        FFPSD_FLIP_VERTICAL = 1
+    } ffpsd_flip_direction_t;
+
     typedef enum ffpsd_format_t
     {
         FFPSD_FORMAT_PNG = 0,
@@ -207,10 +222,12 @@ extern "C"
     FFPSD_EXPORT int ffpsd_document_is_psb(const ffpsd_document_t* doc);
     FFPSD_EXPORT int ffpsd_document_get_has_real_merged_data(const ffpsd_document_t* doc);
 
-    /* Text, smart objects and shapes are INVALID_ARGUMENT; so are vector masks for resize_canvas. */
+    /* Text, smart objects and shapes are INVALID_OPERATION; so are vector masks for resize_canvas. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_resize_canvas(ffpsd_document_t* doc, uint32_t width, uint32_t height, ffpsd_anchor_t anchor);
     FFPSD_EXPORT ffpsd_status_t
     ffpsd_document_resize(ffpsd_document_t* doc, uint32_t width, uint32_t height, ffpsd_resample_filter_t filter);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_flip_canvas(ffpsd_document_t* doc, ffpsd_flip_direction_t direction);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_rotate_canvas(ffpsd_document_t* doc, ffpsd_rotation_t rotation);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_psb(ffpsd_document_t* doc, int psb);
 
     /* RGB to gray and back; any other pair is INVALID_ARGUMENT. */
@@ -298,6 +315,8 @@ extern "C"
     /* A raster layer without a vector mask; the background does not move or resize. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_position(ffpsd_layer_t* layer, int32_t top, int32_t left);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_resize(ffpsd_layer_t* layer, uint32_t width, uint32_t height, ffpsd_resample_filter_t filter);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_flip(ffpsd_layer_t* layer, ffpsd_flip_direction_t direction);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_rotate(ffpsd_layer_t* layer, ffpsd_rotation_t rotation);
 
     /* Color planes by channel id, then transparency when the layer has one. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_get_pixels(const ffpsd_layer_t* layer, ffpsd_image_t** out);
@@ -307,7 +326,7 @@ extern "C"
     FFPSD_EXPORT ffpsd_status_t
     ffpsd_layer_get_mask(const ffpsd_layer_t* layer, ffpsd_image_t** image, ffpsd_rect_t* bounds, uint8_t* default_color);
 
-    /* The background and a layer with a vector mask are INVALID_ARGUMENT. */
+    /* The background and a layer with a vector mask are INVALID_OPERATION. */
     FFPSD_EXPORT ffpsd_status_t
     ffpsd_layer_set_mask(ffpsd_layer_t* layer, const ffpsd_image_view_t* image, int32_t top, int32_t left, uint8_t default_color);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_remove_mask(ffpsd_layer_t* layer);

@@ -44,6 +44,8 @@ namespace
     static_assert(static_cast<int>(ffpsd::ColorMode::kLab) == FFPSD_COLOR_MODE_LAB);
     static_assert(static_cast<int>(ffpsd::ResampleFilter::kBicubic) == FFPSD_RESAMPLE_FILTER_BICUBIC);
     static_assert(static_cast<int>(ffpsd::Anchor::kBottomRight) == FFPSD_ANCHOR_BOTTOM_RIGHT);
+    static_assert(static_cast<int>(ffpsd::Rotation::k270) == FFPSD_ROTATION_270);
+    static_assert(static_cast<int>(ffpsd::FlipDirection::kVertical) == FFPSD_FLIP_VERTICAL);
     static_assert(static_cast<int>(ffpsd::Compression::kRle) == FFPSD_COMPRESSION_RLE);
     static_assert(static_cast<int>(ffpsd::Compression::kRleOrRaw) == FFPSD_COMPRESSION_RLE_OR_RAW);
 
@@ -193,6 +195,14 @@ namespace
         out.size = resource.data.size();
     }
 
+    void Fill(const ffpsd::Rect& rect, ffpsd_rect_t& out) noexcept
+    {
+        out.top = rect.top;
+        out.left = rect.left;
+        out.bottom = rect.bottom;
+        out.right = rect.right;
+    }
+
     void Fill(const ffpsd::TaggedBlock& block, ffpsd_tagged_block_t& out) noexcept
     {
         out.signature = block.signature;
@@ -210,6 +220,18 @@ namespace
         result.key = block.key;
         if (block.size != 0)
             result.data.assign(data, data + block.size);
+        return result;
+    }
+
+    ffpsd::ImageResource ToResource(const ffpsd_image_resource_t& resource)
+    {
+        const std::uint8_t* data = NeedBytes(resource.data, resource.size);
+
+        ffpsd::ImageResource result;
+        result.id = resource.id;
+        result.name = ToString(resource.name);
+        if (resource.size != 0)
+            result.data.assign(data, data + resource.size);
         return result;
     }
 
@@ -503,6 +525,14 @@ extern "C"
     {
         return Guard([&] { Need(doc, "doc").value.Resize(width, height, static_cast<ffpsd::ResampleFilter>(filter)); });
     }
+    ffpsd_status_t ffpsd_document_flip_canvas(ffpsd_document_t* doc, ffpsd_flip_direction_t direction)
+    {
+        return Guard([&] { Need(doc, "doc").value.FlipCanvas(static_cast<ffpsd::FlipDirection>(direction)); });
+    }
+    ffpsd_status_t ffpsd_document_rotate_canvas(ffpsd_document_t* doc, ffpsd_rotation_t rotation)
+    {
+        return Guard([&] { Need(doc, "doc").value.RotateCanvas(static_cast<ffpsd::Rotation>(rotation)); });
+    }
     ffpsd_status_t ffpsd_document_convert_color_mode(ffpsd_document_t* doc, ffpsd_color_mode_t color_mode)
     {
         return Guard([&] { Need(doc, "doc").value.ConvertColorMode(static_cast<ffpsd::ColorMode>(color_mode)); });
@@ -578,17 +608,7 @@ extern "C"
     }
     ffpsd_status_t ffpsd_document_set_image_resource(ffpsd_document_t* doc, const ffpsd_image_resource_t* resource)
     {
-        return Guard([&] {
-            const ffpsd_image_resource_t& from = Need(resource, "resource");
-            const std::uint8_t* data = NeedBytes(from.data, from.size);
-
-            ffpsd::ImageResource value;
-            value.id = from.id;
-            value.name = ToString(from.name);
-            if (from.size != 0)
-                value.data.assign(data, data + from.size);
-            Need(doc, "doc").value.SetImageResource(value);
-        });
+        return Guard([&] { Need(doc, "doc").value.SetImageResource(ToResource(Need(resource, "resource"))); });
     }
     ffpsd_status_t ffpsd_document_remove_image_resource(ffpsd_document_t* doc, uint16_t id)
     {
@@ -716,14 +736,7 @@ extern "C"
     }
     ffpsd_status_t ffpsd_layer_get_bounds(const ffpsd_layer_t* layer, ffpsd_rect_t* out)
     {
-        return Guard([&] {
-            const ffpsd::Rect bounds = ToLayer(layer).GetBounds();
-            ffpsd_rect_t& target = Need(out, "out");
-            target.top = bounds.top;
-            target.left = bounds.left;
-            target.bottom = bounds.bottom;
-            target.right = bounds.right;
-        });
+        return Guard([&] { Fill(ToLayer(layer).GetBounds(), Need(out, "out")); });
     }
     ffpsd_status_t ffpsd_layer_get_name(const ffpsd_layer_t* layer, char* buffer, size_t capacity, size_t* length)
     {
@@ -803,6 +816,15 @@ extern "C"
         return Guard([&] { ToLayer(layer).Resize(width, height, static_cast<ffpsd::ResampleFilter>(filter)); });
     }
 
+    ffpsd_status_t ffpsd_layer_flip(ffpsd_layer_t* layer, ffpsd_flip_direction_t direction)
+    {
+        return Guard([&] { ToLayer(layer).Flip(static_cast<ffpsd::FlipDirection>(direction)); });
+    }
+    ffpsd_status_t ffpsd_layer_rotate(ffpsd_layer_t* layer, ffpsd_rotation_t rotation)
+    {
+        return Guard([&] { ToLayer(layer).Rotate(static_cast<ffpsd::Rotation>(rotation)); });
+    }
+
     ffpsd_status_t ffpsd_layer_get_pixels(const ffpsd_layer_t* layer, ffpsd_image_t** out)
     {
         return Guard([&] {
@@ -824,10 +846,7 @@ extern "C"
             std::optional<ffpsd::LayerMask> mask = ToLayer(layer).GetMask();
             if (!mask.has_value())
                 throw NotFound("ffpsd: the layer has no pixel mask");
-            rect.top = mask->bounds.top;
-            rect.left = mask->bounds.left;
-            rect.bottom = mask->bounds.bottom;
-            rect.right = mask->bounds.right;
+            Fill(mask->bounds, rect);
             color = mask->default_color;
             target = NewImage(std::move(mask->image));
         });

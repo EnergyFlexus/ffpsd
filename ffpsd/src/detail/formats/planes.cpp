@@ -1,10 +1,11 @@
 #include "detail/formats/planes.hpp"
 
+#include "detail/image.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
-#include <string>
 #include <vector>
 
 namespace ffpsd::detail
@@ -105,17 +106,10 @@ namespace ffpsd::detail
 
     Image MakePlanes(std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth)
     {
-        if (depth != 8 && depth != 16 && depth != 32)
-            throw std::invalid_argument("ffpsd: no planes of " + std::to_string(depth) + " bit samples");
+        if (!IsSampleDepth(depth))
+            throw std::invalid_argument(UnsupportedDepth(depth));
 
-        Image image;
-        image.width = width;
-        image.height = height;
-        image.channel_count = channel_count;
-        image.depth = depth;
-        image.color_mode = channel_count >= 3 ? ColorMode::kRgb : ColorMode::kGrayscale;
-        image.bytes.resize(image.GetSizeBytes());
-        return image;
+        return MakeImage(width, height, channel_count, depth, channel_count >= 3 ? ColorMode::kRgb : ColorMode::kGrayscale);
     }
 
     void DeinterleaveRow(const std::uint8_t* row, Image& image, std::uint32_t y)

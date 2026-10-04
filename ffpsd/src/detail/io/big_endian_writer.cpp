@@ -85,6 +85,14 @@ namespace ffpsd::detail
         WriteArray(src, count);
     }
 
+    void BigEndianWriter::WriteBlob(const std::vector<std::uint8_t>& data)
+    {
+        const std::size_t length = ReserveLength(false);
+        if (!data.empty())
+            WriteU8Array(data.data(), data.size());
+        PatchLength(length, false);
+    }
+
     void BigEndianWriter::WriteZeros(std::size_t count)
     {
         data_.insert(data_.end(), count, std::uint8_t{0});

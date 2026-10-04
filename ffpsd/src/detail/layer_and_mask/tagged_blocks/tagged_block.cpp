@@ -1,5 +1,6 @@
 #include "detail/layer_and_mask/tagged_blocks/tagged_block.hpp"
 
+#include "detail/file_header.hpp"
 #include "detail/io/fourcc.hpp"
 
 #include <algorithm>
@@ -11,7 +12,6 @@ namespace ffpsd::detail
 {
     namespace
     {
-        constexpr std::uint32_t kSignature = Fourcc('8', 'B', 'I', 'M');
         constexpr std::uint32_t kSignature64 = Fourcc('8', 'B', '6', '4');
 
         // A signature, a key and a 4 byte length.
@@ -31,7 +31,7 @@ namespace ffpsd::detail
             if (end - reader.Tell() < sizeof(std::uint32_t))
                 return false;
             const std::uint32_t signature = reader.PeekU32();
-            return signature == kSignature || signature == kSignature64;
+            return signature == kBlockSignature || signature == kSignature64;
         }
 
         bool UsesLongLength(std::uint32_t key) noexcept
@@ -67,7 +67,7 @@ namespace ffpsd::detail
     TaggedBlocks ParseTaggedBlocks(BigEndianReader& reader, std::size_t end, bool is_psb)
     {
         if (end < reader.Tell() || end > reader.GetSize())
-            throw std::out_of_range("ffpsd: tagged block end offset " + std::to_string(end) + " outside the file");
+            throw std::logic_error("ffpsd: tagged block end offset " + std::to_string(end) + " outside the file");
 
         TaggedBlocks blocks;
 
@@ -78,27 +78,18 @@ namespace ffpsd::detail
 
             auto block = std::make_unique<TaggedBlock>();
             block->signature = reader.ReadU32();
-            if (block->signature != kSignature && block->signature != kSignature64)
+            if (block->signature != kBlockSignature && block->signature != kSignature64)
                 throw std::runtime_error(
                     "ffpsd: expected 8BIM or 8B64 at offset " + std::to_string(block_start) + ", got '" + FourccString(block->signature) +
                     "'");
 
             block->key = reader.ReadU32();
 
-            const std::uint64_t length = is_psb && UsesLongLength(block->key) ? reader.ReadU64() : reader.ReadU32();
-
-            // The reader sees past the section end, so check the length field here.
-            if (reader.Tell() > end)
-                throw std::runtime_error(
-                    "ffpsd: tagged block at offset " + std::to_string(block_start) +
-                    " has a length field that runs past the end of the section");
-
-            const std::size_t left = end - reader.Tell();
-            if (length > left)
+            const std::uint64_t length = reader.ReadLength(is_psb && UsesLongLength(block->key));
+            if (!reader.FitsLength(length, end))
                 throw std::runtime_error(
                     "ffpsd: tagged block '" + FourccString(block->key) + "' at offset " + std::to_string(block_start) + " claims " +
-                    std::to_string(length) + " bytes, only " + std::to_string(left) + " left in the section");
-
+                    std::to_string(length) + " bytes, more than the section holds");
             block->data.resize(static_cast<std::size_t>(length));
             if (!block->data.empty())
                 reader.ReadU8Array(block->data.data(), block->data.size());
@@ -176,20 +167,5 @@ namespace ffpsd::detail
 
         blocks.erase(at);
         return true;
-    }
-
-    std::optional<std::uint32_t> DecodeU32(const std::vector<std::uint8_t>& data)
-    {
-        if (data.size() < sizeof(std::uint32_t))
-            return std::nullopt;
-        BigEndianReader reader(data);
-        return reader.ReadU32();
-    }
-
-    std::vector<std::uint8_t> EncodeU32(std::uint32_t value)
-    {
-        BigEndianWriter writer(sizeof(std::uint32_t));
-        writer.WriteU32(value);
-        return writer.Take();
     }
 } // namespace ffpsd::detail

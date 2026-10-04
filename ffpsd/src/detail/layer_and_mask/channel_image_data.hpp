@@ -30,9 +30,12 @@ namespace ffpsd::detail
     // Every sample at full coverage, 255, 65535 or 1.0: the transparency of an opaque layer.
     ChannelImageData EncodeOpaqueChannel(std::int16_t id, std::size_t width, std::size_t height, std::uint16_t depth, bool is_psb);
 
-    // Planar native samples, RLE when smaller; no samples give just the compression field.
+    // Planar native samples, RLE when smaller.
     ChannelImageData EncodeChannelImageData(
-        std::int16_t id, const std::uint8_t* samples, std::size_t width, std::size_t height, std::size_t bytes_per_sample, bool is_psb);
+        std::int16_t id, const std::uint8_t* samples, std::size_t width, std::size_t height, std::uint16_t depth, bool is_psb);
+
+    // Just the compression field, the same in PSD and PSB.
+    ChannelImageData EmptyChannel(std::int16_t id);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_LAYER_AND_MASK_CHANNEL_IMAGE_DATA_HPP_

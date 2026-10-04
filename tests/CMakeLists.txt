@@ -21,6 +21,7 @@ add_executable(ffpsd_tests
     layer/mask_test.cpp
     layer/pixels_test.cpp
     layer/resize_test.cpp
+    layer/turn_test.cpp
     smoke/read_psd_test.cpp
     smoke/rgb_levels_test.cpp
     support/test_support.hpp)

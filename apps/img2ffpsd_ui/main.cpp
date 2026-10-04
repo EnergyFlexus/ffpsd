@@ -165,15 +165,17 @@ namespace
         return extension == ".png" || extension == ".jpg" || extension == ".jpeg";
     }
 
-    // What the system leaves behind: Finder's .DS_Store and ._ files, Thumbs.db and the like.
+    // What the system leaves behind: Finder's .DS_Store and ._ files, which are no pictures, Thumbs.db and the like.
     bool IsHidden(const fs::path& path)
     {
         const std::string name = path.filename().u8string();
         return name.empty() || name[0] == '.' || name == "Thumbs.db" || name == "desktop.ini";
     }
 
-    bool HasVisibleFiles(const fs::path& folder)
+    // The regular files under the folder, hidden files and whatever hidden folders hold left out.
+    std::vector<fs::path> VisibleFiles(const fs::path& folder)
     {
+        std::vector<fs::path> files;
         for (auto entry = fs::recursive_directory_iterator(folder); entry != fs::recursive_directory_iterator(); ++entry)
         {
             if (IsHidden(entry->path()))
@@ -183,40 +185,41 @@ namespace
             }
             else if (entry->is_regular_file())
             {
-                return true;
+                files.push_back(entry->path());
             }
         }
-        return false;
+        return files;
     }
 
+    // Adds an error for each name that more than one picture of the folder has, 01.png and 01.jpg.
     Pictures FindPictures(const fs::path& folder, std::vector<std::string>& errors)
     {
         std::map<fs::path, std::vector<fs::path>> by_name;
-        for (auto entry = fs::recursive_directory_iterator(folder); entry != fs::recursive_directory_iterator(); ++entry)
+        for (const fs::path& file : VisibleFiles(folder))
         {
-            if (IsHidden(entry->path()))
-            {
-                if (entry->is_directory())
-                    entry.disable_recursion_pending();
-            }
-            else if (entry->is_regular_file() && IsPicture(entry->path()))
-            {
-                const fs::path relative = entry->path().lexically_relative(folder);
-                by_name[fs::path(relative).replace_extension()].push_back(relative);
-            }
+            if (!IsPicture(file))
+                continue;
+            const fs::path relative = file.lexically_relative(folder);
+            by_name[fs::path(relative).replace_extension()].push_back(relative);
         }
 
         Pictures pictures;
         for (const auto& [name, files] : by_name)
         {
             if (files.size() == 1)
+            {
                 pictures[name] = files[0];
-            else
-                errors.push_back(folder.u8string() + ": " + files[0].u8string() + " and " + files[1].u8string() + " have one name");
+                continue;
+            }
+            std::string error = folder.u8string() + ": " + files[0].u8string();
+            for (std::size_t i = 1; i < files.size(); ++i)
+                error += " and " + files[i].u8string();
+            errors.push_back(error + " have one name");
         }
         return pictures;
     }
 
+    // The pictures whose name the other folder lacks.
     std::vector<fs::path> OnlyIn(const Pictures& pictures, const Pictures& other)
     {
         std::vector<fs::path> only;
@@ -249,6 +252,7 @@ namespace
         }
     }
 
+    // Pages missing between the first and the last page of each folder.
     std::vector<std::string> FindGaps(const Pictures& pictures)
     {
         std::map<fs::path, std::set<long long>> pages_by_folder;
@@ -258,7 +262,9 @@ namespace
         std::vector<std::string> gaps;
         for (const auto& [folder, pages] : pages_by_folder)
         {
-            for (long long page = pages.empty() ? 0 : *pages.begin(); !pages.empty() && page < *pages.rbegin(); ++page)
+            if (pages.empty())
+                continue;
+            for (long long page = *pages.begin(); page < *pages.rbegin(); ++page)
             {
                 if (pages.count(page) == 0)
                     gaps.push_back((folder / std::to_string(page)).u8string());
@@ -319,7 +325,7 @@ namespace
         }
         for (const std::string& gap : FindGaps(bottoms))
             job.warnings.push_back("Possible miss: " + gap);
-        if (fs::is_directory(job.output) && HasVisibleFiles(job.output))
+        if (fs::is_directory(job.output) && !VisibleFiles(job.output).empty())
             job.warnings.push_back(settings.output + " is not empty: files there may be replaced");
 
         for (const auto& [name, file] : bottoms)
@@ -330,10 +336,12 @@ namespace
     void Convert(const Job& job, const fs::path& name)
     {
         const ffpsd::ColorMode color_mode = job.gray ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb;
+        const std::uint16_t color_count = job.gray ? 1 : 3;
         const ffpsd::ResampleFilter filter = job.bicubic ? ffpsd::ResampleFilter::kBicubic : ffpsd::ResampleFilter::kNearest;
 
+        // The bottom and the top pictures, then those of the further folders that have the file.
         std::vector<ffpsd::Image> images;
-        std::vector<std::size_t> folders;
+        std::vector<std::size_t> folders; // the folder of each picture, which names its layer
         for (std::size_t i = 0; i < job.folders.size(); ++i)
         {
             const auto picture = job.found[i].find(name);
@@ -350,6 +358,7 @@ namespace
         const std::uint32_t height = images[1].height;
 
         ffpsd::Document doc(width, height, color_mode);
+
         if (bottom.width == width && bottom.height == height)
         {
             doc.AddBackgroundLayer("Background", bottom);
@@ -362,21 +371,28 @@ namespace
 
         for (std::size_t i = 1; i < images.size(); ++i)
         {
+            // A layer loses its transparency, the plane after the color ones.
             ffpsd::Image& image = images[i];
-            image.channel_count = job.gray ? 1 : 3; // layers lose their transparency
+            image.channel_count = color_count;
             image.bytes.resize(image.GetSizeBytes());
+
             ffpsd::Layer* layer = doc.AddLayer(Label(folders[i]), image);
             const bool resized = image.width != width || image.height != height;
             if (resized)
                 layer->Resize(width, height, filter);
 
-            // The upper layer covers the rest, so it is the composite.
+            // The upper layer covers the rest, so it is the composite; a resized one is read back from its layer.
             if (i + 1 == images.size())
-                doc.SetMergedImage(resized ? layer->GetPixels() : image);
+            {
+                if (resized)
+                    doc.SetMergedImage(layer->GetPixels());
+                else
+                    doc.SetMergedImage(image); // a ternary would copy the picture
+            }
         }
 
         fs::path target = job.output / name;
-        target += ".psd";
+        target += ".psd"; // the name has no extension left to replace
         fs::create_directories(target.parent_path());
         doc.Save(target.u8string());
     }

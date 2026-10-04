@@ -1,5 +1,6 @@
 #include "detail/image_resources/image_resource.hpp"
 
+#include "detail/file_header.hpp"
 #include "detail/io/fourcc.hpp"
 #include "detail/io/strings.hpp"
 
@@ -11,16 +12,11 @@ namespace ffpsd::detail
 {
     namespace
     {
-        constexpr std::uint32_t kBlockSignature = Fourcc('8', 'B', 'I', 'M');
     } // namespace
 
     ImageResources ParseImageResources(BigEndianReader& reader)
     {
-        const std::uint32_t section_length = reader.ReadU32();
-        if (section_length > reader.GetRemaining())
-            throw std::runtime_error(
-                "ffpsd: image resources section claims " + std::to_string(section_length) + " bytes, only " +
-                std::to_string(reader.GetRemaining()) + " left");
+        const std::size_t section_length = reader.CheckLength(reader.ReadU32(), reader.GetSize(), "image resources section");
 
         const std::size_t section_end = reader.Tell() + section_length;
 
@@ -100,5 +96,25 @@ namespace ffpsd::detail
         auto created = std::make_unique<ImageResource>();
         created->id = id;
         return **image_resources.insert(at, std::move(created));
+    }
+
+    const ImageResource* ImageResourceAt(const ImageResources& image_resources, std::size_t index)
+    {
+        if (index >= image_resources.size())
+            throw std::out_of_range(
+                "ffpsd: image resource index " + std::to_string(index) + " of " + std::to_string(image_resources.size()));
+        return image_resources[index].get();
+    }
+
+    bool RemoveImageResource(ImageResources& image_resources, std::uint16_t id)
+    {
+        const auto at = std::find_if(image_resources.begin(), image_resources.end(), [id](const std::unique_ptr<ImageResource>& resource) {
+            return resource->id == id;
+        });
+        if (at == image_resources.end())
+            return false;
+
+        image_resources.erase(at);
+        return true;
     }
 } // namespace ffpsd::detail

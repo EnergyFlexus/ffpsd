@@ -1,6 +1,5 @@
 #include "detail/layer_and_mask/adjustments/adjustment_layer.hpp"
 
-#include "detail/io/big_endian_writer.hpp"
 #include "detail/io/fourcc.hpp"
 #include "detail/layer_and_mask/layer_pixels.hpp"
 
@@ -24,16 +23,6 @@ namespace ffpsd::detail
         // Bit 3 as on every layer, bit 4: the pixels do not affect the appearance.
         constexpr std::uint8_t kAdjustmentFlags = 0x18;
 
-        // An empty rectangle, a default color of 255, flags 0 and 2 bytes of padding.
-        std::vector<std::uint8_t> WhiteMaskData()
-        {
-            BigEndianWriter writer;
-            writer.WriteZeros(16);
-            writer.WriteU8(255);
-            writer.WriteU8(0);
-            writer.WriteZeros(2);
-            return writer.Take();
-        }
     } // namespace
 
     std::uint32_t FindAdjustmentKey(const TaggedBlocks& blocks) noexcept
@@ -52,8 +41,9 @@ namespace ffpsd::detail
         ImageView empty;
         empty.color_mode = color_mode;
         LayerRecord record = CreateLayerRecord(name, empty, 0, 0, false, false);
-        record.channels.push_back(EncodeChannelImageData(kLayerMaskId, nullptr, 0, 0, 1, false));
-        record.mask_data = WhiteMaskData();
+        record.channels.push_back(EmptyChannel(kLayerMaskId));
+        record.mask_data = NewMaskData();
+        SetMaskDefaultColor(record.mask_data, kLayerMaskId, 255);
         record.flags = kAdjustmentFlags;
 
         // Photoshop writes the settings first.

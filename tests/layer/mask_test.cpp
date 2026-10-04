@@ -8,17 +8,6 @@
 
 using namespace ffpsd_test;
 
-namespace
-{
-    void ExpectRect(const ffpsd::Rect& rect, std::int32_t top, std::int32_t left, std::int32_t bottom, std::int32_t right)
-    {
-        EXPECT_EQ(rect.top, top);
-        EXPECT_EQ(rect.left, left);
-        EXPECT_EQ(rect.bottom, bottom);
-        EXPECT_EQ(rect.right, right);
-    }
-} // namespace
-
 TEST(LayerMaskTest, PhotoshopsPixelMasksAreRead)
 {
     const ffpsd::Document doc = ffpsd::Document::Open(kRgbMasksPsd);
@@ -101,13 +90,13 @@ TEST(LayerMaskTest, AMaskMovesAndScalesWithItsLayer)
 TEST(LayerMaskTest, WhatAMaskCannotGoOnIsRefused)
 {
     ffpsd::Document doc = ffpsd::Document::Open(kRgbMasksPsd);
-    EXPECT_THROW(doc.GetLayerByIndex(0)->SetMask(Pattern(2, 2, 1), 0, 0), std::invalid_argument);
+    EXPECT_THROW(doc.GetLayerByIndex(0)->SetMask(Pattern(2, 2, 1), 0, 0), std::logic_error);
 
     ffpsd::Layer* vector = doc.GetLayerByIndex(3);
-    EXPECT_THROW(vector->SetMask(Pattern(2, 2, 1), 0, 0), std::invalid_argument);
-    EXPECT_THROW(vector->RemoveMask(), std::invalid_argument);
-    EXPECT_THROW(vector->SetPosition(1, 1), std::invalid_argument);
-    EXPECT_THROW(vector->Resize(10, 10), std::invalid_argument);
+    EXPECT_THROW(vector->SetMask(Pattern(2, 2, 1), 0, 0), std::logic_error);
+    EXPECT_THROW(vector->RemoveMask(), std::logic_error);
+    EXPECT_THROW(vector->SetPosition(1, 1), std::logic_error);
+    EXPECT_THROW(vector->Resize(10, 10), std::logic_error);
 
     ffpsd::Layer* layer = doc.GetLayerByIndex(1);
     EXPECT_THROW(layer->SetMask(Pattern(2, 2, 3), 0, 0), std::invalid_argument);

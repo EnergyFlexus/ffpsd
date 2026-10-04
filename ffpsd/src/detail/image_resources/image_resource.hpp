@@ -34,6 +34,11 @@ namespace ffpsd::detail
     // A missing id is inserted in ascending order, as Photoshop keeps them.
     ImageResource& FindOrInsertImageResource(ImageResources& image_resources, std::uint16_t id);
 
+    const ImageResource* ImageResourceAt(const ImageResources& image_resources, std::size_t index);
+
+    // The first with the id; false when there is none.
+    bool RemoveImageResource(ImageResources& image_resources, std::uint16_t id);
+
     // Specialized by each resource ffpsd interprets, for its struct with kId; empty when the data cannot be read.
     template <class T> std::optional<T> DecodeImageResource(const std::vector<std::uint8_t>& data);
     template <class T> std::vector<std::uint8_t> EncodeImageResource(const T& value);

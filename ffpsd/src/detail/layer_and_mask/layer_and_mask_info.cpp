@@ -5,7 +5,6 @@
 
 #include <memory>
 #include <stdexcept>
-#include <string>
 #include <utility>
 
 namespace ffpsd::detail
@@ -25,13 +24,8 @@ namespace ffpsd::detail
     {
         records.clear();
 
-        const std::uint64_t length = is_psb ? reader.ReadU64() : reader.ReadU32();
-        if (length > reader.GetRemaining())
-            throw std::runtime_error(
-                "ffpsd: layer and mask information claims " + std::to_string(length) + " bytes, only " +
-                std::to_string(reader.GetRemaining()) + " left");
-
-        const std::size_t end = reader.Tell() + static_cast<std::size_t>(length);
+        const std::size_t length = reader.CheckLength(reader.ReadLength(is_psb), reader.GetSize(), "layer and mask information");
+        const std::size_t end = reader.Tell() + length;
 
         LayerAndMaskInfo info;
         if (length == 0)
@@ -73,12 +67,7 @@ namespace ffpsd::detail
         deep.key = deep_key;
         if (deep_key != 0 && !layers.empty())
         {
-            // Room for every channel and a megabyte for the records, so the body is never copied as it grows.
-            std::size_t reserve_bytes = std::size_t{1} << 20;
-            for (const LayerToWrite& layer : layers)
-                for (const PixelData* channel : layer.channels)
-                    reserve_bytes += channel->GetBytes().size();
-            BigEndianWriter body(reserve_bytes);
+            BigEndianWriter body(PixelBytes(layers) + kWriteHeadroom);
             WriteLayerInfoBody(body, info.merged_alpha, layers, is_psb);
             deep.data = body.Take();
         }

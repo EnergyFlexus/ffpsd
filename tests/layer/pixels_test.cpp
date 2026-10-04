@@ -72,9 +72,9 @@ TEST(LayerPixelsTest, AddLayerRefusesWhatDoesNotFit)
     for (const ffpsd::ColorMode mode : {ffpsd::ColorMode::kBitmap, ffpsd::ColorMode::kIndexed})
     {
         ffpsd::Document none(4, 3, mode, mode == ffpsd::ColorMode::kBitmap ? 1 : 8);
-        EXPECT_THROW(none.AddLayer("none"), std::invalid_argument);
-        EXPECT_THROW(none.AddBackgroundLayer("none", Pattern(4, 3, 1)), std::invalid_argument);
-        EXPECT_THROW(none.AddAdjustmentLayer<ffpsd::LevelsInfo>("none"), std::invalid_argument);
+        EXPECT_THROW(none.AddLayer("none"), std::logic_error);
+        EXPECT_THROW(none.AddBackgroundLayer("none", Pattern(4, 3, 1)), std::logic_error);
+        EXPECT_THROW(none.AddAdjustmentLayer<ffpsd::LevelsInfo>("none"), std::logic_error);
         EXPECT_EQ(none.GetLayerCount(), 0u);
     }
 }
