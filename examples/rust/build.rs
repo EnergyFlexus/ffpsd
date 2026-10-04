@@ -4,9 +4,9 @@ use std::path::PathBuf;
 
 fn main() {
     println!("cargo:rerun-if-env-changed=FFPSD_DIR");
-    let dir = env::var("FFPSD_DIR").map(PathBuf::from).unwrap_or_else(|_| {
-        PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../../ffpsd-out")
-    });
+    let dir = env::var("FFPSD_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../../ffpsd-out"));
     let lib = dir.join("lib");
 
     println!("cargo:rustc-link-search=native={}", lib.display());

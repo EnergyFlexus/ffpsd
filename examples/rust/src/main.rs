@@ -11,7 +11,9 @@ fn check(status: ffi::ffpsd_status_t) -> Result<(), String> {
         return Ok(());
     }
     // SAFETY: ffpsd_last_error always returns a valid, null-terminated string.
-    Err(unsafe { CStr::from_ptr(ffi::ffpsd_last_error()) }.to_string_lossy().into_owned())
+    Err(unsafe { CStr::from_ptr(ffi::ffpsd_last_error()) }
+        .to_string_lossy()
+        .into_owned())
 }
 
 /// Owns the handle: the document, with its layers, is destroyed when this goes out of scope.
@@ -57,7 +59,12 @@ fn run(input: &str, output: &str) -> Result<(), String> {
         check(unsafe { ffi::ffpsd_document_get_layer(doc.0, index, &mut layer) })?;
         let mut bounds = ffi::ffpsd_rect_t::default();
         check(unsafe { ffi::ffpsd_layer_get_bounds(layer, &mut bounds) })?;
-        println!("  {index}: {}, {} x {}", layer_name(layer)?, bounds.right - bounds.left, bounds.bottom - bounds.top);
+        println!(
+            "  {index}: {}, {} x {}",
+            layer_name(layer)?,
+            bounds.right - bounds.left,
+            bounds.bottom - bounds.top
+        );
     }
 
     // Put a copy of the top layer on top; a group marker alone cannot be copied.
@@ -68,7 +75,11 @@ fn run(input: &str, output: &str) -> Result<(), String> {
 
     // Add a gradient over the canvas, planar as PSD keeps it: red grows to the right, green down, blue stays at half.
     let color_mode = unsafe { ffi::ffpsd_document_get_color_mode(doc.0) };
-    let channels: u16 = if color_mode == ffi::FFPSD_COLOR_MODE_GRAYSCALE { 1 } else { 3 };
+    let channels: u16 = if color_mode == ffi::FFPSD_COLOR_MODE_GRAYSCALE {
+        1
+    } else {
+        3
+    };
     let (columns, rows) = (width as usize, height as usize);
     let plane = columns * rows;
     let mut pixels = vec![128u8; plane * usize::from(channels)];
@@ -96,7 +107,9 @@ fn run(input: &str, output: &str) -> Result<(), String> {
 
     // Save, packed with RLE as Photoshop does.
     check(unsafe { ffi::ffpsd_document_save(doc.0, output_path.as_ptr(), ffi::FFPSD_COMPRESSION_RLE) })?;
-    println!("saved {} layers to {output}", unsafe { ffi::ffpsd_document_get_layer_count(doc.0) });
+    println!("saved {} layers to {output}", unsafe {
+        ffi::ffpsd_document_get_layer_count(doc.0)
+    });
     Ok(())
 }
 
