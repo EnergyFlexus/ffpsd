@@ -111,7 +111,6 @@ TEST(DocumentColorModeTest, RgbToGrayIsLumaWithTransparencyKept)
 
     // A composite's alpha channels stay as they are.
     ffpsd::Document channels = NewDocument();
-    channels.SetChannelCount(5);
     const ffpsd::Image five = Pattern(4, 3, 5);
     channels.SetMergedImage(five);
     channels.ConvertColorMode(ffpsd::ColorMode::kGrayscale);
@@ -169,7 +168,6 @@ TEST(DocumentColorModeTest, GrayToRgbCopiesThePlaneThreeTimes)
 
     // A composite's alpha channels stay as they are.
     ffpsd::Document channels = NewDocument(ffpsd::ColorMode::kGrayscale);
-    channels.SetChannelCount(3);
     const ffpsd::Image three = Pattern(4, 3, 3, 8, ffpsd::ColorMode::kGrayscale);
     channels.SetMergedImage(three);
     channels.ConvertColorMode(ffpsd::ColorMode::kRgb);

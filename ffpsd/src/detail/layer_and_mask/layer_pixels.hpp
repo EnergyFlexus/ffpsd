@@ -6,7 +6,9 @@
 
 #include <cstdint>
 #include <ffpsd/image.hpp>
+#include <ffpsd/layer.hpp>
 #include <ffpsd/types.hpp>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -14,6 +16,19 @@ namespace ffpsd::detail
 {
     // Channel -2 or -3 among the layer's channels.
     bool HasLayerMask(const LayerRecord& record) noexcept;
+
+    bool HasVectorMask(const LayerRecord& record) noexcept;
+
+    // The channel of the pixel mask, 0 when there is none; a -2 rendered from a vector mask is not one.
+    std::int16_t FindPixelMaskId(const LayerRecord& record) noexcept;
+
+    Image DecodeMask(const ChannelImageData& channel, const Rect& bounds, std::uint16_t depth, bool is_psb);
+
+    std::optional<LayerMask> DecodeLayerMask(const LayerRecord& record, std::uint16_t depth, bool is_psb);
+
+    // As layer -2; the caller checks the image and that there is no vector mask.
+    void ReplaceLayerMask(
+        LayerRecord& record, const ImageView& image, std::int32_t top, std::int32_t left, std::uint8_t default_color, bool is_psb);
 
     // A layer may be no wider or taller than the document could be.
     void CheckLayerSides(std::uint32_t width, std::uint32_t height, bool is_psb);

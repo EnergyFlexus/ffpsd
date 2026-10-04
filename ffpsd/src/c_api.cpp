@@ -43,6 +43,7 @@ namespace
     static_assert(static_cast<int>(ffpsd::LayerKind::kAdjustment) == FFPSD_LAYER_KIND_ADJUSTMENT);
     static_assert(static_cast<int>(ffpsd::ColorMode::kLab) == FFPSD_COLOR_MODE_LAB);
     static_assert(static_cast<int>(ffpsd::ResampleFilter::kBicubic) == FFPSD_RESAMPLE_FILTER_BICUBIC);
+    static_assert(static_cast<int>(ffpsd::Anchor::kBottomRight) == FFPSD_ANCHOR_BOTTOM_RIGHT);
     static_assert(static_cast<int>(ffpsd::Compression::kRle) == FFPSD_COMPRESSION_RLE);
     static_assert(static_cast<int>(ffpsd::Compression::kRleOrRaw) == FFPSD_COMPRESSION_RLE_OR_RAW);
 
@@ -427,10 +428,6 @@ extern "C"
         });
     }
 
-    ffpsd_status_t ffpsd_document_create(ffpsd_document_t** out)
-    {
-        return Guard([&] { NeedOut(out) = new ffpsd_document_t(); });
-    }
     ffpsd_status_t
     ffpsd_document_create_with(uint32_t width, uint32_t height, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_document_t** out)
     {
@@ -498,25 +495,13 @@ extern "C"
         return doc != nullptr && doc->value.HasRealMergedData() ? 1 : 0;
     }
 
-    ffpsd_status_t ffpsd_document_set_width(ffpsd_document_t* doc, uint32_t width)
+    ffpsd_status_t ffpsd_document_resize_canvas(ffpsd_document_t* doc, uint32_t width, uint32_t height, ffpsd_anchor_t anchor)
     {
-        return Guard([&] { Need(doc, "doc").value.SetWidth(width); });
+        return Guard([&] { Need(doc, "doc").value.ResizeCanvas(width, height, static_cast<ffpsd::Anchor>(anchor)); });
     }
-    ffpsd_status_t ffpsd_document_set_height(ffpsd_document_t* doc, uint32_t height)
+    ffpsd_status_t ffpsd_document_resize(ffpsd_document_t* doc, uint32_t width, uint32_t height, ffpsd_resample_filter_t filter)
     {
-        return Guard([&] { Need(doc, "doc").value.SetHeight(height); });
-    }
-    ffpsd_status_t ffpsd_document_set_channel_count(ffpsd_document_t* doc, uint16_t channel_count)
-    {
-        return Guard([&] { Need(doc, "doc").value.SetChannelCount(channel_count); });
-    }
-    ffpsd_status_t ffpsd_document_set_depth(ffpsd_document_t* doc, uint16_t depth)
-    {
-        return Guard([&] { Need(doc, "doc").value.SetDepth(depth); });
-    }
-    ffpsd_status_t ffpsd_document_set_color_mode(ffpsd_document_t* doc, ffpsd_color_mode_t color_mode)
-    {
-        return Guard([&] { Need(doc, "doc").value.SetColorMode(static_cast<ffpsd::ColorMode>(color_mode)); });
+        return Guard([&] { Need(doc, "doc").value.Resize(width, height, static_cast<ffpsd::ResampleFilter>(filter)); });
     }
     ffpsd_status_t ffpsd_document_convert_color_mode(ffpsd_document_t* doc, ffpsd_color_mode_t color_mode)
     {
@@ -828,6 +813,36 @@ extern "C"
     ffpsd_status_t ffpsd_layer_set_pixels(ffpsd_layer_t* layer, const ffpsd_image_view_t* image)
     {
         return Guard([&] { ToLayer(layer).SetPixels(ToView(Need(image, "image"))); });
+    }
+
+    ffpsd_status_t ffpsd_layer_get_mask(const ffpsd_layer_t* layer, ffpsd_image_t** image, ffpsd_rect_t* bounds, uint8_t* default_color)
+    {
+        return Guard([&] {
+            ffpsd_image_t*& target = NeedOut(image);
+            ffpsd_rect_t& rect = Need(bounds, "bounds");
+            std::uint8_t& color = Need(default_color, "default_color");
+            std::optional<ffpsd::LayerMask> mask = ToLayer(layer).GetMask();
+            if (!mask.has_value())
+                throw NotFound("ffpsd: the layer has no pixel mask");
+            rect.top = mask->bounds.top;
+            rect.left = mask->bounds.left;
+            rect.bottom = mask->bounds.bottom;
+            rect.right = mask->bounds.right;
+            color = mask->default_color;
+            target = NewImage(std::move(mask->image));
+        });
+    }
+    ffpsd_status_t
+    ffpsd_layer_set_mask(ffpsd_layer_t* layer, const ffpsd_image_view_t* image, int32_t top, int32_t left, uint8_t default_color)
+    {
+        return Guard([&] { ToLayer(layer).SetMask(ToView(Need(image, "image")), top, left, default_color); });
+    }
+    ffpsd_status_t ffpsd_layer_remove_mask(ffpsd_layer_t* layer)
+    {
+        return Guard([&] {
+            if (!ToLayer(layer).RemoveMask())
+                throw NotFound("ffpsd: the layer has no pixel mask");
+        });
     }
 
     size_t ffpsd_layer_get_tagged_block_count(const ffpsd_layer_t* layer)

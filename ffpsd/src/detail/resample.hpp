@@ -10,6 +10,9 @@ namespace ffpsd::detail
 {
     // Transparency, if any, premultiplies the color; the caller checks the arguments.
     Image Resample(const Image& image, std::uint32_t width, std::uint32_t height, ResampleFilter filter);
+
+    // Each plane alone, so alpha and spot channels do not count as transparency.
+    Image ResamplePlanes(const Image& image, std::uint32_t width, std::uint32_t height, ResampleFilter filter);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_RESAMPLE_HPP_

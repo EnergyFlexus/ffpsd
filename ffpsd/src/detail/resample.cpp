@@ -247,4 +247,32 @@ namespace ffpsd::detail
             return CubicImage<float>(image, std::move(result));
         }
     }
+
+    Image ResamplePlanes(const Image& image, std::uint32_t width, std::uint32_t height, ResampleFilter filter)
+    {
+        Image result;
+        result.width = width;
+        result.height = height;
+        result.channel_count = image.channel_count;
+        result.depth = image.depth;
+        result.color_mode = image.color_mode;
+        result.bytes.resize(result.GetSizeBytes());
+
+        Image plane;
+        plane.width = image.width;
+        plane.height = image.height;
+        plane.channel_count = 1;
+        plane.depth = image.depth;
+        plane.color_mode = ColorMode::kGrayscale;
+        const std::size_t in_plane = plane.GetSizeBytes();
+        const std::size_t out_plane = std::size_t{width} * height * image.GetBytesPerSample();
+        for (std::size_t channel = 0; channel < image.channel_count; ++channel)
+        {
+            const auto first = image.bytes.begin() + static_cast<std::ptrdiff_t>(channel * in_plane);
+            plane.bytes.assign(first, first + static_cast<std::ptrdiff_t>(in_plane));
+            const Image resized = Resample(plane, width, height, filter);
+            std::copy(resized.bytes.begin(), resized.bytes.end(), result.bytes.begin() + static_cast<std::ptrdiff_t>(channel * out_plane));
+        }
+        return result;
+    }
 } // namespace ffpsd::detail

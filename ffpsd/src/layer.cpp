@@ -1,12 +1,14 @@
 #include "detail/image.hpp"
 #include "detail/layer_and_mask/adjustments/adjustment_layer.hpp"
 #include "detail/layer_and_mask/adjustments/levels.hpp"
+#include "detail/layer_and_mask/layer_geometry.hpp"
 #include "detail/layer_and_mask/layer_pixels.hpp"
 #include "detail/layer_and_mask/layer_record.hpp"
 #include "detail/layer_and_mask/tagged_blocks/section_divider_setting.hpp"
 #include "detail/layer_and_mask/tagged_blocks/unicode_layer_name.hpp"
 #include "detail/resample.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <ffpsd/document.hpp>
 #include <ffpsd/layer.hpp>
@@ -147,8 +149,8 @@ namespace ffpsd
     {
         if (GetKind() != LayerKind::kRaster)
             throw std::invalid_argument(std::string("ffpsd: ") + what + " needs a raster layer");
-        if (detail::HasLayerMask(*record_))
-            throw std::invalid_argument(std::string("ffpsd: ") + what + " of a layer with a mask is not supported yet");
+        if (detail::HasVectorMask(*record_))
+            throw std::invalid_argument(std::string("ffpsd: ") + what + " of a layer with a vector mask is not supported yet");
     }
 
     void Layer::SetPosition(std::int32_t top, std::int32_t left)
@@ -165,7 +167,11 @@ namespace ffpsd
         if (bottom > std::numeric_limits<std::int32_t>::max() || right > std::numeric_limits<std::int32_t>::max())
             throw std::invalid_argument("ffpsd: layer bounds do not fit in 32 bits");
 
+        std::vector<std::uint8_t> mask_data = record_->mask_data;
+        detail::ShiftMaskBounds(mask_data, std::int64_t{top} - bounds.top, std::int64_t{left} - bounds.left);
+
         record_->bounds = {top, left, static_cast<std::int32_t>(bottom), static_cast<std::int32_t>(right)};
+        record_->mask_data = std::move(mask_data);
         document_->SetHasRealMergedData(false);
     }
 
@@ -178,13 +184,64 @@ namespace ffpsd
             throw std::invalid_argument("ffpsd: cannot resize a layer to " + std::to_string(width) + " x " + std::to_string(height));
         detail::CheckLayerSides(width, height, document_->IsPsb());
 
-        const Image pixels = GetPixels();
-        if (pixels.IsEmpty())
+        const Rect bounds = record_->bounds;
+        if (bounds.GetWidth() <= 0 || bounds.GetHeight() <= 0)
             throw std::invalid_argument("ffpsd: an empty layer has nothing to resize");
 
-        const Image resized = detail::Resample(pixels, width, height, filter);
-        detail::ReplaceLayerPixels(*record_, resized, false, document_->IsPsb());
+        detail::ScaledLayer scaled = detail::ScaleLayer(
+            *record_, document_->GetColorMode(), document_->GetDepth(), document_->IsPsb(), false,
+            static_cast<double>(height) / bounds.GetHeight(), static_cast<double>(width) / bounds.GetWidth(), bounds.top, bounds.left,
+            filter);
+        record_->bounds = scaled.bounds;
+        record_->channels = std::move(scaled.channels);
+        record_->mask_data = std::move(scaled.mask_data);
         document_->SetHasRealMergedData(false);
+    }
+
+    std::optional<LayerMask> Layer::GetMask() const
+    {
+        return detail::DecodeLayerMask(*record_, document_->GetDepth(), document_->IsPsb());
+    }
+
+    void Layer::SetMask(const ImageView& image, std::int32_t top, std::int32_t left, std::uint8_t default_color)
+    {
+        if (IsBackground())
+            throw std::invalid_argument("ffpsd: the background has no mask");
+        if (detail::HasVectorMask(*record_))
+            throw std::invalid_argument("ffpsd: the mask of a layer with a vector mask is not supported yet");
+        if (default_color != 0 && default_color != 255)
+            throw std::invalid_argument("ffpsd: a mask's default color is 0 or 255, not " + std::to_string(default_color));
+        detail::CheckLayerSides(image.width, image.height, document_->IsPsb());
+        if (!image.IsEmpty())
+        {
+            if (image.channel_count != 1 || image.color_mode != ColorMode::kGrayscale || image.depth != document_->GetDepth())
+                throw std::invalid_argument(
+                    "ffpsd: a mask is one gray plane of " + std::to_string(document_->GetDepth()) + " bit, not " +
+                    std::to_string(image.channel_count) + " of " + std::to_string(image.depth) + " bit in color mode " +
+                    std::to_string(static_cast<int>(image.color_mode)));
+            detail::CheckImage(image);
+        }
+
+        detail::ReplaceLayerMask(*record_, image, top, left, default_color, document_->IsPsb());
+        document_->SetHasRealMergedData(false);
+    }
+
+    bool Layer::RemoveMask()
+    {
+        if (detail::FindPixelMaskId(*record_) == 0)
+            return false;
+        if (detail::HasVectorMask(*record_))
+            throw std::invalid_argument("ffpsd: the mask of a layer with a vector mask is not supported yet");
+
+        std::vector<detail::ChannelImageData>& channels = record_->channels;
+        channels.erase(
+            std::remove_if(
+                channels.begin(), channels.end(),
+                [](const detail::ChannelImageData& channel) { return channel.id == detail::kLayerMaskId; }),
+            channels.end());
+        record_->mask_data.clear();
+        document_->SetHasRealMergedData(false);
+        return true;
     }
 
     std::size_t Layer::GetTaggedBlockCount() const noexcept

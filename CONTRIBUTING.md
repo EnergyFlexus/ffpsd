@@ -178,7 +178,7 @@ namespace ffpsd::detail
 | Namespace | `snake_case`, single top-level `ffpsd` | `ffpsd`, `ffpsd::detail` |
 | Class, struct, enum, alias | `CamelCase` | `BigEndianReader`, `ColorMode` |
 | Function, method | `CamelCase`, verb first | `ParseFileHeader()`, `ReadU32()` |
-| Accessor, mutator | `Get` / `Set` + `CamelCase` | `GetWidth()`, `SetWidth()` |
+| Accessor, mutator | `Get` / `Set` + `CamelCase` | `GetName()`, `SetName()` |
 | Predicate | `Is` / `Has` + `CamelCase` | `IsPsb()`, `IsEmpty()` |
 | Variable, parameter, struct member | `snake_case` | `channel_count`, `section_end` |
 | Class data member | `snake_case` with trailing `_` | `offset_`, `impl_` |

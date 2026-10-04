@@ -34,6 +34,10 @@ namespace ffpsd::detail
 
         constexpr std::size_t kRectSize = 16;
 
+        // Bit 3 of the mask flags.
+        constexpr std::uint8_t kMaskFromRender = 0x08;
+        constexpr std::size_t kMaskDataSize = 20;
+
         Rect ReadRect(BigEndianReader& reader)
         {
             Rect rect;
@@ -56,6 +60,50 @@ namespace ffpsd::detail
             if (length != 0)
                 reader.ReadU8Array(field.data(), field.size());
             return field;
+        }
+
+        std::optional<std::size_t> FindMaskRectOffset(const std::vector<std::uint8_t>& mask_data, std::int16_t id)
+        {
+            // The layer mask's rectangle, its default color and flags; the size of 20 pads them.
+            BigEndianReader reader(mask_data);
+            if (reader.GetRemaining() < kRectSize + 2)
+                return std::nullopt;
+            if (id == kLayerMaskId)
+                return 0;
+            if (id != kRealMaskId)
+                return std::nullopt;
+
+            reader.Skip(kRectSize + 1);
+            const std::uint8_t flags = reader.ReadU8();
+            if ((flags & kMaskHasParameters) != 0)
+            {
+                if (reader.GetRemaining() < 1)
+                    return std::nullopt;
+                const std::uint8_t parameters = reader.ReadU8();
+                std::size_t size = 0;
+                for (std::size_t bit = 0; bit < std::size(kMaskParameterSizes); ++bit)
+                {
+                    if ((parameters >> bit & 1) != 0)
+                        size += kMaskParameterSizes[bit];
+                }
+                if (reader.GetRemaining() < size)
+                    return std::nullopt;
+                reader.Skip(size);
+            }
+
+            // The real user mask's flags and background, then its rectangle.
+            if (reader.GetRemaining() < 2 + kRectSize)
+                return std::nullopt;
+            return reader.Tell() + 2;
+        }
+
+        // After the layer mask's rectangle, but before the real user mask's.
+        std::optional<std::size_t> FindMaskDefaultColorOffset(const std::vector<std::uint8_t>& mask_data, std::int16_t id)
+        {
+            const std::optional<std::size_t> rect = FindMaskRectOffset(mask_data, id);
+            if (!rect.has_value())
+                return std::nullopt;
+            return id == kLayerMaskId ? *rect + kRectSize : *rect - 1;
         }
 
         void WriteExtraField(BigEndianWriter& writer, const std::vector<std::uint8_t>& field)
@@ -185,39 +233,51 @@ namespace ffpsd::detail
 
     std::optional<Rect> FindMaskBounds(const std::vector<std::uint8_t>& mask_data, std::int16_t id)
     {
-        // The layer mask's rectangle, its default color and flags; the size of 20 pads them.
+        const std::optional<std::size_t> offset = FindMaskRectOffset(mask_data, id);
+        if (!offset.has_value())
+            return std::nullopt;
+
         BigEndianReader reader(mask_data);
-        if (reader.GetRemaining() < kRectSize + 2)
-            return std::nullopt;
-        const Rect layer_mask = ReadRect(reader);
-        reader.Skip(1);
-        const std::uint8_t flags = reader.ReadU8();
-        if (id == kLayerMaskId)
-            return layer_mask;
-        if (id != kRealMaskId)
-            return std::nullopt;
-
-        if ((flags & kMaskHasParameters) != 0)
-        {
-            if (reader.GetRemaining() < 1)
-                return std::nullopt;
-            const std::uint8_t parameters = reader.ReadU8();
-            std::size_t size = 0;
-            for (std::size_t bit = 0; bit < std::size(kMaskParameterSizes); ++bit)
-            {
-                if ((parameters >> bit & 1) != 0)
-                    size += kMaskParameterSizes[bit];
-            }
-            if (reader.GetRemaining() < size)
-                return std::nullopt;
-            reader.Skip(size);
-        }
-
-        // The real user mask's flags and background, then its rectangle.
-        if (reader.GetRemaining() < 2 + kRectSize)
-            return std::nullopt;
-        reader.Skip(2);
+        reader.Skip(*offset);
         return ReadRect(reader);
+    }
+
+    void SetMaskBounds(std::vector<std::uint8_t>& mask_data, std::int16_t id, const Rect& bounds)
+    {
+        const std::optional<std::size_t> offset = FindMaskRectOffset(mask_data, id);
+        if (!offset.has_value())
+            throw std::invalid_argument("ffpsd: the mask data has no rectangle for mask " + std::to_string(id));
+
+        BigEndianWriter writer(kRectSize);
+        writer.WriteI32(bounds.top);
+        writer.WriteI32(bounds.left);
+        writer.WriteI32(bounds.bottom);
+        writer.WriteI32(bounds.right);
+        std::copy(writer.GetBytes().begin(), writer.GetBytes().end(), mask_data.begin() + static_cast<std::ptrdiff_t>(*offset));
+    }
+
+    std::optional<std::uint8_t> FindMaskDefaultColor(const std::vector<std::uint8_t>& mask_data, std::int16_t id)
+    {
+        const std::optional<std::size_t> offset = FindMaskDefaultColorOffset(mask_data, id);
+        return offset.has_value() ? std::optional<std::uint8_t>(mask_data[*offset]) : std::nullopt;
+    }
+
+    void SetMaskDefaultColor(std::vector<std::uint8_t>& mask_data, std::int16_t id, std::uint8_t color)
+    {
+        const std::optional<std::size_t> offset = FindMaskDefaultColorOffset(mask_data, id);
+        if (!offset.has_value())
+            throw std::invalid_argument("ffpsd: the mask data has no default color for mask " + std::to_string(id));
+        mask_data[*offset] = color;
+    }
+
+    bool IsRenderedMask(const std::vector<std::uint8_t>& mask_data) noexcept
+    {
+        return mask_data.size() >= kRectSize + 2 && (mask_data[kRectSize + 1] & kMaskFromRender) != 0;
+    }
+
+    std::vector<std::uint8_t> NewMaskData()
+    {
+        return std::vector<std::uint8_t>(kMaskDataSize, 0);
     }
 
     void SetLayerName(LayerRecord& record, const std::string& name)

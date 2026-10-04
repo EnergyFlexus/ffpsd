@@ -69,10 +69,9 @@ TEST(LayerPixelsTest, AddLayerRefusesWhatDoesNotFit)
     EXPECT_EQ(doc.GetLayerCount(), 0u);
 
     // Photoshop keeps no layers in these modes, whatever the image.
-    for (const ffpsd::ColorMode mode : {ffpsd::ColorMode::kBitmap, ffpsd::ColorMode::kIndexed, ffpsd::ColorMode::kMultichannel})
+    for (const ffpsd::ColorMode mode : {ffpsd::ColorMode::kBitmap, ffpsd::ColorMode::kIndexed})
     {
-        ffpsd::Document none = NewDocument(ffpsd::ColorMode::kGrayscale);
-        none.SetColorMode(mode);
+        ffpsd::Document none(4, 3, mode, mode == ffpsd::ColorMode::kBitmap ? 1 : 8);
         EXPECT_THROW(none.AddLayer("none"), std::invalid_argument);
         EXPECT_THROW(none.AddBackgroundLayer("none", Pattern(4, 3, 1)), std::invalid_argument);
         EXPECT_THROW(none.AddAdjustmentLayer<ffpsd::LevelsInfo>("none"), std::invalid_argument);

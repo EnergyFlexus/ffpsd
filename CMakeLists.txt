@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.23)
 
 project(ffpsd
-    VERSION 0.3.5
+    VERSION 0.3.6
     DESCRIPTION "ffpsd library"
     LANGUAGES CXX)
 

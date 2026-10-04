@@ -17,12 +17,26 @@ namespace ffpsd
         kLab = 9
     };
 
-    // How Save writes pixel data. A PSD row too long for its 2 byte count leaves its channel raw whatever is asked.
+    // A PSD row too long for its 2 byte count leaves its channel raw whatever is asked.
     enum class Compression : std::uint16_t
     {
         kRaw = 0,
-        kRle = 1,      // everywhere, as Photoshop writes it, even where it comes out larger than raw
-        kRleOrRaw = 2, // channel by channel, whichever of the two is smaller
+        kRle = 1,      // even where it comes out larger than raw
+        kRleOrRaw = 2, // per channel, whichever is smaller
+    };
+
+    // Where Document::ResizeCanvas keeps the old canvas within the new one.
+    enum class Anchor : std::uint8_t
+    {
+        kTopLeft,
+        kTop,
+        kTopRight,
+        kLeft,
+        kCenter,
+        kRight,
+        kBottomLeft,
+        kBottom,
+        kBottomRight
     };
 
     // Signed: a layer may extend past the canvas.

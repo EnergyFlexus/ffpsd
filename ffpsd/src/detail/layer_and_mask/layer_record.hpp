@@ -62,6 +62,19 @@ namespace ffpsd::detail
     // The rectangle mask channel -2 or -3 covers, read from the mask data; none when the data has no such one.
     std::optional<Rect> FindMaskBounds(const std::vector<std::uint8_t>& mask_data, std::int16_t id);
 
+    // Throws when the data has no rectangle for that mask.
+    void SetMaskBounds(std::vector<std::uint8_t>& mask_data, std::int16_t id, const Rect& bounds);
+
+    // The value everywhere outside the rectangle, 0 or 255.
+    std::optional<std::uint8_t> FindMaskDefaultColor(const std::vector<std::uint8_t>& mask_data, std::int16_t id);
+    void SetMaskDefaultColor(std::vector<std::uint8_t>& mask_data, std::int16_t id, std::uint8_t color);
+
+    // Then -2 holds Photoshop's rendering of a vector mask, and the pixel mask is -3.
+    bool IsRenderedMask(const std::vector<std::uint8_t>& mask_data) noexcept;
+
+    // Mask data with just a layer mask: its rectangle, default color, flags and padding.
+    std::vector<std::uint8_t> NewMaskData();
+
     // The 'luni' block and the legacy Pascal copy, which is cut to 255 bytes on writing.
     void SetLayerName(LayerRecord& record, const std::string& name);
 

@@ -23,7 +23,7 @@ namespace
 
 TEST(DocumentResourcesTest, ResolutionIsCheckedWholeAndStoredInItsResource)
 {
-    ffpsd::Document doc;
+    ffpsd::Document doc = NewDocument();
     for (const double bad : {0.0, -1.0, 32768.0, std::numeric_limits<double>::quiet_NaN()})
     {
         ffpsd::ResolutionInfo info;
@@ -50,7 +50,7 @@ TEST(DocumentResourcesTest, ResolutionIsCheckedWholeAndStoredInItsResource)
 
 TEST(DocumentResourcesTest, VersionInfoHoldsTheCompositeFlag)
 {
-    ffpsd::Document doc;
+    ffpsd::Document doc = NewDocument();
     ffpsd::VersionInfo info;
     info.has_real_merged_data = false;
     info.writer_name = "ffpsd";
@@ -77,7 +77,7 @@ TEST(DocumentResourcesTest, VersionInfoHoldsTheCompositeFlag)
 
 TEST(DocumentResourcesTest, ResourcesAreARawDoorInIdOrder)
 {
-    ffpsd::Document doc;
+    ffpsd::Document doc = NewDocument();
     doc.SetImageResource(Resource(1000, {1}));
     doc.SetImageResource(Resource(3000, {3}));
     doc.SetImageResource(Resource(2000, {2}));

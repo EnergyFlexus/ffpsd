@@ -3,6 +3,7 @@
 #include "detail/color.hpp"
 #include "detail/file_header.hpp"
 #include "detail/image.hpp"
+#include "detail/io/fourcc.hpp"
 #include "detail/pixel_data.hpp"
 
 #include <iterator>
@@ -15,6 +16,8 @@ namespace ffpsd::detail
 {
     namespace
     {
+        constexpr std::uint32_t kVectorMaskKeys[] = {Fourcc('v', 'm', 's', 'k'), Fourcc('v', 's', 'm', 's')};
+
         // Bit 3, written by Photoshop 5.0 and later: Photoshop sets it on every layer.
         constexpr std::uint8_t kFlagsPhotoshop5 = 0x08;
 
@@ -42,6 +45,86 @@ namespace ffpsd::detail
                 return true;
         }
         return false;
+    }
+
+    bool HasVectorMask(const LayerRecord& record) noexcept
+    {
+        for (const std::uint32_t key : kVectorMaskKeys)
+        {
+            if (FindTaggedBlock(record.blocks, key) != nullptr)
+                return true;
+        }
+        return false;
+    }
+
+    std::int16_t FindPixelMaskId(const LayerRecord& record) noexcept
+    {
+        bool has_layer_mask = false;
+        for (const ChannelImageData& channel : record.channels)
+        {
+            if (channel.id == kRealMaskId)
+                return kRealMaskId;
+            has_layer_mask = has_layer_mask || channel.id == kLayerMaskId;
+        }
+        return has_layer_mask && !IsRenderedMask(record.mask_data) ? kLayerMaskId : 0;
+    }
+
+    Image DecodeMask(const ChannelImageData& channel, const Rect& bounds, std::uint16_t depth, bool is_psb)
+    {
+        Image mask;
+        mask.channel_count = 1;
+        mask.depth = depth;
+        mask.color_mode = ColorMode::kGrayscale;
+        if (bounds.GetWidth() <= 0 || bounds.GetHeight() <= 0)
+            return mask;
+
+        mask.width = static_cast<std::uint32_t>(bounds.GetWidth());
+        mask.height = static_cast<std::uint32_t>(bounds.GetHeight());
+        mask.bytes.resize(mask.GetSizeBytes());
+        channel.data.Decode(is_psb, mask.bytes.data());
+        return mask;
+    }
+
+    std::optional<LayerMask> DecodeLayerMask(const LayerRecord& record, std::uint16_t depth, bool is_psb)
+    {
+        const std::int16_t id = FindPixelMaskId(record);
+        if (id == 0)
+            return std::nullopt;
+
+        const std::optional<Rect> bounds = FindMaskBounds(record.mask_data, id);
+        if (!bounds.has_value())
+            throw std::runtime_error("ffpsd: mask channel " + std::to_string(id) + " has no rectangle");
+
+        LayerMask mask;
+        mask.bounds = *bounds;
+        mask.default_color = FindMaskDefaultColor(record.mask_data, id).value_or(0);
+        for (const ChannelImageData& channel : record.channels)
+        {
+            if (channel.id == id)
+                mask.image = DecodeMask(channel, mask.bounds, depth, is_psb);
+        }
+        return mask;
+    }
+
+    void ReplaceLayerMask(
+        LayerRecord& record, const ImageView& image, std::int32_t top, std::int32_t left, std::uint8_t default_color, bool is_psb)
+    {
+        const Rect bounds = BoundsAt(image, top, left);
+        std::vector<std::uint8_t> mask_data = record.mask_data.empty() ? NewMaskData() : record.mask_data;
+        SetMaskBounds(mask_data, kLayerMaskId, bounds);
+        SetMaskDefaultColor(mask_data, kLayerMaskId, default_color);
+        ChannelImageData channel = EncodeChannelImageData(
+            kLayerMaskId, image.data, image.width, image.height, image.IsEmpty() ? 1 : image.GetBytesPerSample(), is_psb);
+
+        std::vector<ChannelImageData> channels;
+        for (ChannelImageData& kept : record.channels)
+        {
+            if (kept.id != kLayerMaskId)
+                channels.push_back(std::move(kept));
+        }
+        channels.push_back(std::move(channel));
+        record.channels = std::move(channels);
+        record.mask_data = std::move(mask_data);
     }
 
     void CheckLayerSides(std::uint32_t width, std::uint32_t height, bool is_psb)

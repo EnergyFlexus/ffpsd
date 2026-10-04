@@ -45,6 +45,8 @@ target_sources(ffpsd
         src/detail/layer_and_mask/global_layer_mask_info.hpp
         src/detail/layer_and_mask/layer_and_mask_info.cpp
         src/detail/layer_and_mask/layer_and_mask_info.hpp
+        src/detail/layer_and_mask/layer_geometry.cpp
+        src/detail/layer_and_mask/layer_geometry.hpp
         src/detail/layer_and_mask/layer_info.cpp
         src/detail/layer_and_mask/layer_info.hpp
         src/detail/layer_and_mask/layer_pixels.cpp

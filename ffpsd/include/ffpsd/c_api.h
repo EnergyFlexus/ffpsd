@@ -61,6 +61,19 @@ extern "C"
         FFPSD_RESAMPLE_FILTER_BICUBIC = 1
     } ffpsd_resample_filter_t;
 
+    typedef enum ffpsd_anchor_t
+    {
+        FFPSD_ANCHOR_TOP_LEFT = 0,
+        FFPSD_ANCHOR_TOP = 1,
+        FFPSD_ANCHOR_TOP_RIGHT = 2,
+        FFPSD_ANCHOR_LEFT = 3,
+        FFPSD_ANCHOR_CENTER = 4,
+        FFPSD_ANCHOR_RIGHT = 5,
+        FFPSD_ANCHOR_BOTTOM_LEFT = 6,
+        FFPSD_ANCHOR_BOTTOM = 7,
+        FFPSD_ANCHOR_BOTTOM_RIGHT = 8
+    } ffpsd_anchor_t;
+
     typedef enum ffpsd_format_t
     {
         FFPSD_FORMAT_PNG = 0,
@@ -175,9 +188,6 @@ extern "C"
     /* Past the end, the records in between are added as the identity. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_levels_set_channel(ffpsd_levels_t* levels, size_t index, const ffpsd_levels_channel_t* channel);
 
-    /* Paths are passed to the C++ API as they are, in the system's narrow encoding. */
-    FFPSD_EXPORT ffpsd_status_t ffpsd_document_create(ffpsd_document_t** out);
-
     /* Channels by the mode, as the C++ constructor; a multichannel document is INVALID_ARGUMENT. */
     FFPSD_EXPORT ffpsd_status_t
     ffpsd_document_create_with(uint32_t width, uint32_t height, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_document_t** out);
@@ -197,12 +207,10 @@ extern "C"
     FFPSD_EXPORT int ffpsd_document_is_psb(const ffpsd_document_t* doc);
     FFPSD_EXPORT int ffpsd_document_get_has_real_merged_data(const ffpsd_document_t* doc);
 
-    /* INVALID_OPERATION for the size under a background and for the rest once there are layers. */
-    FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_width(ffpsd_document_t* doc, uint32_t width);
-    FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_height(ffpsd_document_t* doc, uint32_t height);
-    FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_channel_count(ffpsd_document_t* doc, uint16_t channel_count);
-    FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_depth(ffpsd_document_t* doc, uint16_t depth);
-    FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_color_mode(ffpsd_document_t* doc, ffpsd_color_mode_t color_mode);
+    /* Text, smart objects and shapes are INVALID_ARGUMENT; so are vector masks for resize_canvas. */
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_resize_canvas(ffpsd_document_t* doc, uint32_t width, uint32_t height, ffpsd_anchor_t anchor);
+    FFPSD_EXPORT ffpsd_status_t
+    ffpsd_document_resize(ffpsd_document_t* doc, uint32_t width, uint32_t height, ffpsd_resample_filter_t filter);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_psb(ffpsd_document_t* doc, int psb);
 
     /* RGB to gray and back; any other pair is INVALID_ARGUMENT. */
@@ -287,13 +295,22 @@ extern "C"
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_get_levels(const ffpsd_layer_t* layer, ffpsd_levels_t** out);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_levels(ffpsd_layer_t* layer, const ffpsd_levels_t* levels);
 
-    /* A raster layer without a mask; the background does not move or resize. */
+    /* A raster layer without a vector mask; the background does not move or resize. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_position(ffpsd_layer_t* layer, int32_t top, int32_t left);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_resize(ffpsd_layer_t* layer, uint32_t width, uint32_t height, ffpsd_resample_filter_t filter);
 
     /* Color planes by channel id, then transparency when the layer has one. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_get_pixels(const ffpsd_layer_t* layer, ffpsd_image_t** out);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_pixels(ffpsd_layer_t* layer, const ffpsd_image_view_t* image);
+
+    /* NOT_FOUND without a pixel mask; Photoshop's rendering of a vector mask is not one. */
+    FFPSD_EXPORT ffpsd_status_t
+    ffpsd_layer_get_mask(const ffpsd_layer_t* layer, ffpsd_image_t** image, ffpsd_rect_t* bounds, uint8_t* default_color);
+
+    /* The background and a layer with a vector mask are INVALID_ARGUMENT. */
+    FFPSD_EXPORT ffpsd_status_t
+    ffpsd_layer_set_mask(ffpsd_layer_t* layer, const ffpsd_image_view_t* image, int32_t top, int32_t left, uint8_t default_color);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_remove_mask(ffpsd_layer_t* layer);
 
     /* Unchecked; keys may repeat, so a get or remove by key finds the first. */
     FFPSD_EXPORT size_t ffpsd_layer_get_tagged_block_count(const ffpsd_layer_t* layer);

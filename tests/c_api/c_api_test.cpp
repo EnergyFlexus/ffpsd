@@ -307,6 +307,31 @@ TEST(CApiTest, ABackgroundThroughC)
     ffpsd_document_destroy(doc);
 }
 
+TEST(CApiTest, MasksAndSizesThroughC)
+{
+    OpenDocument file(kRgbMasksPsd);
+    ffpsd_image_t* image = nullptr;
+    ffpsd_rect_t bounds = {};
+    std::uint8_t color = 0;
+    ASSERT_EQ(ffpsd_layer_get_mask(Layer(file.doc, 2), &image, &bounds, &color), FFPSD_STATUS_OK) << ffpsd_last_error();
+    EXPECT_EQ(bounds.left, 935);
+    EXPECT_EQ(color, 255);
+    ffpsd_image_destroy(image);
+    EXPECT_EQ(ffpsd_layer_get_mask(Layer(file.doc, 1), &image, &bounds, &color), FFPSD_STATUS_NOT_FOUND);
+    EXPECT_EQ(image, nullptr);
+
+    const ffpsd::Image mask = Pattern(2, 2, 1);
+    const ffpsd_image_view_t view = View(mask);
+    EXPECT_EQ(ffpsd_layer_set_mask(Layer(file.doc, 1), &view, 5, 6, 0), FFPSD_STATUS_OK) << ffpsd_last_error();
+    EXPECT_EQ(ffpsd_layer_remove_mask(Layer(file.doc, 1)), FFPSD_STATUS_OK);
+    EXPECT_EQ(ffpsd_layer_remove_mask(Layer(file.doc, 1)), FFPSD_STATUS_NOT_FOUND);
+    EXPECT_EQ(ffpsd_layer_set_mask(Layer(file.doc, 3), &view, 0, 0, 255), FFPSD_STATUS_INVALID_ARGUMENT);
+
+    EXPECT_EQ(ffpsd_document_resize_canvas(file.doc, 2000, 1500, FFPSD_ANCHOR_CENTER), FFPSD_STATUS_INVALID_ARGUMENT);
+    ASSERT_EQ(ffpsd_document_resize(file.doc, 945, 709, FFPSD_RESAMPLE_FILTER_BICUBIC), FFPSD_STATUS_OK) << ffpsd_last_error();
+    EXPECT_EQ(ffpsd_document_get_width(file.doc), 945u);
+}
+
 TEST(CApiTest, ColorModeConvertsThroughC)
 {
     ffpsd_document_t* doc = NewRgbDocument();
@@ -377,16 +402,9 @@ TEST(CApiTest, EveryFailureIsAStatusWithAMessage)
     EXPECT_EQ(ffpsd_document_get_image_resource_by_id(file.doc, 9999, &resource), FFPSD_STATUS_NOT_FOUND);
     EXPECT_EQ(ffpsd_document_get_image_resource_by_id(file.doc, 9999, nullptr), FFPSD_STATUS_INVALID_ARGUMENT);
     EXPECT_EQ(ffpsd_document_set_background_layer(file.doc, 1), FFPSD_STATUS_INVALID_OPERATION);
-    EXPECT_EQ(ffpsd_document_set_width(file.doc, 0), FFPSD_STATUS_INVALID_ARGUMENT);
-    EXPECT_EQ(ffpsd_document_set_width(file.doc, 100), FFPSD_STATUS_INVALID_OPERATION);
-    EXPECT_EQ(ffpsd_document_set_depth(file.doc, 16), FFPSD_STATUS_INVALID_OPERATION);
+    EXPECT_EQ(ffpsd_document_resize_canvas(file.doc, 0, 100, FFPSD_ANCHOR_CENTER), FFPSD_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(ffpsd_document_resize(nullptr, 100, 100, FFPSD_RESAMPLE_FILTER_BICUBIC), FFPSD_STATUS_INVALID_ARGUMENT);
     EXPECT_EQ(ffpsd_document_create_with(4, 3, FFPSD_COLOR_MODE_MULTICHANNEL, 8, &doc), FFPSD_STATUS_INVALID_ARGUMENT);
-
-    // An empty document has no size to save.
-    ffpsd_buffer_t* saved = nullptr;
-    ASSERT_EQ(ffpsd_document_create(&doc), FFPSD_STATUS_OK);
-    EXPECT_EQ(ffpsd_document_save_memory(doc, FFPSD_COMPRESSION_RLE, &saved), FFPSD_STATUS_INVALID_OPERATION);
-    ffpsd_document_destroy(doc);
     EXPECT_EQ(ffpsd_layer_set_levels(Layer(file.doc, 0), nullptr), FFPSD_STATUS_INVALID_ARGUMENT);
 
     // A call that succeeds leaves no message behind.

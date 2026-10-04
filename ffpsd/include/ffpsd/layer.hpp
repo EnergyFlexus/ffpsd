@@ -38,6 +38,14 @@ namespace ffpsd
         kBicubic  // Catmull-Rom; shrinking averages every source pixel under an output one
     };
 
+    // One gray plane at the document's depth over bounds; default_color, 0 or 255, is everywhere else.
+    struct LayerMask
+    {
+        Image image;
+        Rect bounds;
+        std::uint8_t default_color = 255;
+    };
+
     // Created by Document::AddLayer; not copyable or movable, so a pointer to it stays valid.
     class Layer
     {
@@ -87,11 +95,20 @@ namespace ffpsd
         // Replaces color and transparency at the same top left corner; masks stay, the composite goes stale.
         FFPSD_EXPORT void SetPixels(const ImageView& image);
 
-        // Both need a raster layer without a mask; the background keeps 0, 0 and the canvas size.
+        // Both need a raster layer without a vector mask; the background keeps 0, 0 and the canvas size.
         FFPSD_EXPORT void SetPosition(std::int32_t top, std::int32_t left);
 
-        // Resamples the pixels, transparency included, keeping the top left corner.
+        // Keeps the top left corner; the mask scales from that corner too.
         FFPSD_EXPORT void Resize(std::uint32_t width, std::uint32_t height, ResampleFilter filter = ResampleFilter::kBicubic);
+
+        // The rendering of a vector mask that Photoshop also stores is not a pixel mask.
+        FFPSD_EXPORT std::optional<LayerMask> GetMask() const;
+
+        // The background and a layer with a vector mask throw; an empty image leaves only default_color.
+        FFPSD_EXPORT void SetMask(const ImageView& image, std::int32_t top, std::int32_t left, std::uint8_t default_color = 255);
+
+        // False when there is no pixel mask; a layer with a vector mask throws.
+        FFPSD_EXPORT bool RemoveMask();
 
         // Raw door to this layer's blocks, unchecked; pointers live until the block is removed.
         FFPSD_EXPORT std::size_t GetTaggedBlockCount() const noexcept;
