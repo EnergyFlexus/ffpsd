@@ -1,6 +1,6 @@
 # ffpsd
 
-A PSD/PSB library with two APIs from one build:
+Read and write Photoshop PSD and PSB files, with two APIs from one build:
 
 * `ffpsd/ffpsd.hpp` - C++
 * `ffpsd/c_api.h` - C, for other languages and toolchains
