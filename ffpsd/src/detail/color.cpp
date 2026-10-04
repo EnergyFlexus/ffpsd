@@ -144,7 +144,7 @@ namespace ffpsd::detail
         return rgb;
     }
 
-    Image ConvertColorMode(const Image& image, ColorMode color_mode)
+    Image ConvertColorMode(Image image, ColorMode color_mode)
     {
         if (image.color_mode == color_mode)
             return image;

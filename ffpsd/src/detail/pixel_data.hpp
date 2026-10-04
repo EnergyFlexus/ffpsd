@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <ffpsd/types.hpp>
 #include <vector>
 
 namespace ffpsd::detail
@@ -32,10 +33,10 @@ namespace ffpsd::detail
         // Stored bytes, the rows they hold and the size of a sample in them.
         PixelData(std::vector<std::uint8_t> bytes, std::size_t rows, std::size_t row_bytes, std::size_t sample_size);
 
-        // Native rows; RLE falls back to raw when it is not smaller or a row's count does not fit its field.
+        // Native rows; a row whose count does not fit its field leaves the channel raw.
         static PixelData Encode(
             const std::uint8_t* data, std::size_t rows, std::size_t row_bytes, std::size_t sample_size, bool is_psb,
-            std::uint16_t compression);
+            Compression compression);
 
         const std::vector<std::uint8_t>& GetBytes() const noexcept;
         bool IsEmpty() const noexcept;
@@ -47,16 +48,19 @@ namespace ffpsd::detail
         void Decode(bool is_psb, std::uint8_t* out) const;
 
         // Whether Converted gives other bytes: RLE changing format, or rows packed another way.
-        bool NeedsConversion(bool from_psb, bool to_psb, std::uint16_t compression) const noexcept;
+        bool NeedsConversion(bool from_psb, bool to_psb, Compression compression) const noexcept;
 
         // RLE changing format rewrites only the counts.
-        PixelData Converted(bool from_psb, bool to_psb, std::uint16_t compression) const;
+        PixelData Converted(bool from_psb, bool to_psb, Compression compression) const;
 
     private:
         std::vector<std::uint8_t> bytes_;
         std::size_t rows_ = 0;
         std::size_t row_bytes_ = 0;
         std::size_t sample_size_ = 1;
+
+        // Raw because RLE came out no smaller, so an RLE save would only pack it again for nothing.
+        bool rle_loses_ = false;
     };
 } // namespace ffpsd::detail
 

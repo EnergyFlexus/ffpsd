@@ -1,5 +1,5 @@
-#ifndef FFPSD_FORMATS_EXIF_HPP_
-#define FFPSD_FORMATS_EXIF_HPP_
+#ifndef FFPSD_DETAIL_FORMATS_EXIF_HPP_
+#define FFPSD_DETAIL_FORMATS_EXIF_HPP_
 
 #include <cstddef>
 #include <cstdint>
@@ -23,4 +23,4 @@ namespace ffpsd::detail
     Orientation DecodeExifOrientation(const std::uint8_t* data, std::size_t size) noexcept;
 } // namespace ffpsd::detail
 
-#endif // FFPSD_FORMATS_EXIF_HPP_
+#endif // FFPSD_DETAIL_FORMATS_EXIF_HPP_

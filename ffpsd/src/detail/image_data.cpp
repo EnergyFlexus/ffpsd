@@ -45,16 +45,17 @@ namespace ffpsd::detail
         CheckImage(image);
 
         const std::size_t rows = std::size_t{image.height} * image.channel_count;
-        return PixelData::Encode(image.data, rows, RowBytes(image.width, image.depth), image.GetBytesPerSample(), is_psb, kCompressionRle);
+        return PixelData::Encode(
+            image.data, rows, RowBytes(image.width, image.depth), image.GetBytesPerSample(), is_psb, Compression::kRleOrRaw);
     }
 
     PixelData EncodeBlankImageData(
-        std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, bool is_psb, std::uint16_t compression)
+        std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, bool is_psb, Compression compression)
     {
         const std::size_t row_bytes = RowBytes(width, depth);
         const std::size_t sample_size = SampleBytes(depth);
         const std::size_t rows = std::size_t{height} * channel_count;
-        if (compression == kCompressionRaw)
+        if (compression == Compression::kRaw)
             return PixelData(std::vector<std::uint8_t>(sizeof(std::uint16_t) + rows * row_bytes, 0), rows, row_bytes, sample_size);
 
         std::vector<std::uint8_t> packed;

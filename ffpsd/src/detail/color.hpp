@@ -17,7 +17,7 @@ namespace ffpsd::detail
     Image GrayToRgb(const Image& gray);
 
     // The image as it is in its own mode, otherwise through RgbToGray or GrayToRgb, which refuse anything else.
-    Image ConvertColorMode(const Image& image, ColorMode color_mode);
+    Image ConvertColorMode(Image image, ColorMode color_mode);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_COLOR_HPP_

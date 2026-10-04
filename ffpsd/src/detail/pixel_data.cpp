@@ -79,7 +79,7 @@ namespace ffpsd::detail
     }
 
     PixelData PixelData::Encode(
-        const std::uint8_t* data, std::size_t rows, std::size_t row_bytes, std::size_t sample_size, bool is_psb, std::uint16_t compression)
+        const std::uint8_t* data, std::size_t rows, std::size_t row_bytes, std::size_t sample_size, bool is_psb, Compression compression)
     {
         const std::size_t total = rows * row_bytes;
         const std::size_t count_size = is_psb ? sizeof(std::uint32_t) : sizeof(std::uint16_t);
@@ -90,7 +90,10 @@ namespace ffpsd::detail
         // Room for the row counts, then the packed rows straight after.
         std::vector<std::uint8_t> out(header + table, 0);
         out[1] = static_cast<std::uint8_t>(kCompressionRle);
-        bool packs = compression == kCompressionRle && total != 0;
+        const bool smallest = compression == Compression::kRleOrRaw;
+        bool packs = compression != Compression::kRaw && total != 0;
+        bool fits = true;
+        const std::size_t checkpoint = std::max<std::size_t>(rows / 8, 1);
 
         // One row at a time goes big endian, so the samples are never copied whole.
         std::vector<std::uint8_t> swapped(sample_size > 1 ? row_bytes : 0);
@@ -113,15 +116,22 @@ namespace ffpsd::detail
                 field[i] = static_cast<std::uint8_t>(count >> (8 * (count_size - 1 - i)));
 
             // Stops as soon as RLE cannot win or a count does not fit its field.
-            packs = count <= count_max && out.size() < header + total;
+            fits = count <= count_max;
+            packs = fits && (!smallest || out.size() < header + total);
+
+            // A channel no smaller after its first eighth, noise mostly, would rarely win in the end: raw saves the rest.
+            if (smallest && packs && row + 1 == checkpoint)
+                packs = out.size() - header - table < checkpoint * row_bytes;
         }
-        if (!packs)
-        {
-            out.assign(header, 0);
-            out.insert(out.end(), data, data + total);
-            SwapSampleBytes(out.data() + header, total, sample_size);
-        }
-        return PixelData(std::move(out), rows, row_bytes, sample_size);
+        if (packs)
+            return PixelData(std::move(out), rows, row_bytes, sample_size);
+
+        out.assign(header, 0);
+        out.insert(out.end(), data, data + total);
+        SwapSampleBytes(out.data() + header, total, sample_size);
+        PixelData raw(std::move(out), rows, row_bytes, sample_size);
+        raw.rle_loses_ = smallest && total != 0 && fits;
+        return raw;
     }
 
     const std::vector<std::uint8_t>& PixelData::GetBytes() const noexcept
@@ -179,7 +189,7 @@ namespace ffpsd::detail
         SwapSampleBytes(out, total, sample_size_);
     }
 
-    bool PixelData::NeedsConversion(bool from_psb, bool to_psb, std::uint16_t compression) const noexcept
+    bool PixelData::NeedsConversion(bool from_psb, bool to_psb, Compression compression) const noexcept
     {
         // Just a compression field: no rows, the same in both formats.
         if (bytes_.size() <= sizeof(std::uint16_t))
@@ -188,18 +198,38 @@ namespace ffpsd::detail
         const std::uint16_t current = GetCompression();
         if (current == kCompressionRle && from_psb != to_psb)
             return true;
-        return current != compression && rows_ * row_bytes_ != 0 && IsRawOrRle(current) && IsRawOrRle(compression);
+        if (!IsRawOrRle(current) || rows_ * row_bytes_ == 0)
+            return false;
+
+        switch (compression)
+        {
+        case Compression::kRaw:
+            return current != kCompressionRaw;
+        case Compression::kRle:
+            return current != kCompressionRle;
+        default:
+            // RLE stays as it is; raw is tried once, unless RLE has already lost on these very bytes.
+            return current == kCompressionRaw && !rle_loses_;
+        }
     }
 
-    PixelData PixelData::Converted(bool from_psb, bool to_psb, std::uint16_t compression) const
+    PixelData PixelData::Converted(bool from_psb, bool to_psb, Compression compression) const
     {
         if (!NeedsConversion(from_psb, to_psb, compression))
             return *this;
 
-        if (GetCompression() == kCompressionRle && compression == kCompressionRle)
+        if (GetCompression() == kCompressionRle && compression != Compression::kRaw)
         {
             if (std::optional<std::vector<std::uint8_t>> bytes = RewriteRowCounts(bytes_, rows_, from_psb, to_psb))
                 return PixelData(std::move(*bytes), rows_, row_bytes_, sample_size_);
+        }
+
+        // Raw bytes are big endian as the file wants them, so they pack as they are; short ones go to Decode, which reports them.
+        if (GetCompression() == kCompressionRaw && bytes_.size() >= sizeof(std::uint16_t) + rows_ * row_bytes_)
+        {
+            PixelData packed = Encode(bytes_.data() + sizeof(std::uint16_t), rows_, row_bytes_, 1, to_psb, compression);
+            packed.sample_size_ = sample_size_;
+            return packed;
         }
 
         std::vector<std::uint8_t> samples(rows_ * row_bytes_);

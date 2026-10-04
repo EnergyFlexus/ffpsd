@@ -55,7 +55,7 @@ namespace ffpsd::detail
             return channel;
         }
 
-        channel.data = PixelData::Encode(samples, height, width * bytes_per_sample, bytes_per_sample, is_psb, kCompressionRle);
+        channel.data = PixelData::Encode(samples, height, width * bytes_per_sample, bytes_per_sample, is_psb, Compression::kRleOrRaw);
         return channel;
     }
 } // namespace ffpsd::detail

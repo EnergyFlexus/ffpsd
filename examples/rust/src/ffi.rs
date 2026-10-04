@@ -19,7 +19,7 @@ pub type ffpsd_compression_t = c_int;
 pub type ffpsd_color_mode_t = c_int;
 
 pub const FFPSD_STATUS_OK: ffpsd_status_t = 0;
-pub const FFPSD_COMPRESSION_RLE: ffpsd_compression_t = 1;
+pub const FFPSD_COMPRESSION_RLE_OR_RAW: ffpsd_compression_t = 2;
 pub const FFPSD_COLOR_MODE_GRAYSCALE: ffpsd_color_mode_t = 1;
 
 #[repr(C)]

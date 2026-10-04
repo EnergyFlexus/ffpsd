@@ -15,13 +15,6 @@
 
 namespace ffpsd
 {
-    // The values of the compression field; RLE falls back to raw where it is not smaller.
-    enum class Compression : std::uint16_t
-    {
-        kRaw = 0,
-        kRle = 1
-    };
-
     class Document
     {
     public:
@@ -31,8 +24,8 @@ namespace ffpsd
         FFPSD_EXPORT static Document Parse(const std::uint8_t* data, std::size_t size);
 
         // Unknown blocks, masks and ZIP data are written as read; without a composite, section 5 gets zeros.
-        FFPSD_EXPORT void Save(const std::string& path, Compression compression = Compression::kRle) const;
-        FFPSD_EXPORT std::vector<std::uint8_t> Save(Compression compression = Compression::kRle) const;
+        FFPSD_EXPORT void Save(const std::string& path, Compression compression = Compression::kRleOrRaw) const;
+        FFPSD_EXPORT std::vector<std::uint8_t> Save(Compression compression = Compression::kRleOrRaw) const;
 
         // No size and no channels yet: set them before adding layers.
         FFPSD_EXPORT Document();

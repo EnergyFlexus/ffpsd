@@ -1,5 +1,5 @@
-#ifndef FFPSD_FORMATS_FORMATS_HPP_
-#define FFPSD_FORMATS_FORMATS_HPP_
+#ifndef FFPSD_DETAIL_FORMATS_PICTURE_HPP_
+#define FFPSD_DETAIL_FORMATS_PICTURE_HPP_
 
 #include <cstddef>
 #include <cstdint>
@@ -20,4 +20,4 @@ namespace ffpsd::detail
     void CheckPicture(const ImageView& image, const char* format);
 } // namespace ffpsd::detail
 
-#endif // FFPSD_FORMATS_FORMATS_HPP_
+#endif // FFPSD_DETAIL_FORMATS_PICTURE_HPP_

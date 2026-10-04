@@ -73,7 +73,12 @@ namespace ffpsd::detail
         deep.key = deep_key;
         if (deep_key != 0 && !layers.empty())
         {
-            BigEndianWriter body;
+            // Room for every channel and a megabyte for the records, so the body is never copied as it grows.
+            std::size_t reserve_bytes = std::size_t{1} << 20;
+            for (const LayerToWrite& layer : layers)
+                for (const PixelData* channel : layer.channels)
+                    reserve_bytes += channel->GetBytes().size();
+            BigEndianWriter body(reserve_bytes);
             WriteLayerInfoBody(body, info.merged_alpha, layers, is_psb);
             deep.data = body.Take();
         }

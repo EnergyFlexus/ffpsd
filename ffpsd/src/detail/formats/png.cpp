@@ -1,21 +1,23 @@
+#include "detail/formats/png.hpp"
+
 #include "detail/color.hpp"
+#include "detail/formats/picture.hpp"
+#include "detail/formats/planes.hpp"
 #include "detail/image.hpp"
 #include "detail/io/byte_order.hpp"
-#include "detail/io/file.hpp"
-#include "formats/formats.hpp"
-#include "formats/planes.hpp"
 
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <ffpsd/formats.hpp>
+#include <memory>
 #include <new>
 #include <png.h>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
-namespace ffpsd
+namespace ffpsd::detail
 {
     namespace
     {
@@ -52,8 +54,14 @@ namespace ffpsd
             std::uint32_t width = 0;
             std::uint32_t height = 0;
             std::uint8_t channels = 0;
-            std::vector<std::uint8_t> bytes;
+
+            // Rows of a progressive picture come in passes, so it is read whole, without zeros first, then split.
+            std::unique_ptr<std::uint8_t[]> bytes;
             std::vector<png_bytep> rows;
+
+            // Any other goes row by row straight into its planes.
+            std::vector<std::uint8_t> row;
+            Image planes;
         };
 
         void ReadData(png_structp png, png_bytep out, png_size_t count)
@@ -67,7 +75,7 @@ namespace ffpsd
         }
 
         // The error pointer is the char[kErrorSize] of a Reader or a Writer.
-        void OnError(png_structp png, png_const_charp message)
+        [[noreturn]] void OnError(png_structp png, png_const_charp message)
         {
             std::snprintf(static_cast<char*>(png_get_error_ptr(png)), kErrorSize, "%s", message);
             png_longjmp(png, 1);
@@ -106,7 +114,7 @@ namespace ffpsd
                 png_set_expand_16(png);
 
             // PNG stores 16 bit samples big endian, Image keeps native order.
-            if (depth == 16 && detail::kNativeLittle)
+            if (depth == 16 && kNativeLittle)
                 png_set_swap(png);
 
             png_set_interlace_handling(png);
@@ -119,12 +127,24 @@ namespace ffpsd
                 png_error(png, "image is larger than a PSB allows");
 
             const std::size_t row_bytes = png_get_rowbytes(png, info);
-            out.bytes.resize(row_bytes * out.height);
-            out.rows.resize(out.height);
-            for (std::size_t y = 0; y < out.height; ++y)
-                out.rows[y] = out.bytes.data() + y * row_bytes;
-
-            png_read_image(png, out.rows.data());
+            if (png_get_interlace_type(png, info) == PNG_INTERLACE_NONE)
+            {
+                out.row.resize(row_bytes);
+                out.planes = MakePlanes(out.width, out.height, out.channels, depth);
+                for (std::uint32_t y = 0; y < out.height; ++y)
+                {
+                    png_read_row(png, out.row.data(), nullptr);
+                    DeinterleaveRow(out.row.data(), out.planes, y);
+                }
+            }
+            else
+            {
+                out.bytes.reset(new std::uint8_t[row_bytes * out.height]);
+                out.rows.resize(out.height);
+                for (std::size_t y = 0; y < out.height; ++y)
+                    out.rows[y] = out.bytes.get() + y * row_bytes;
+                png_read_image(png, out.rows.data());
+            }
             png_read_end(png, nullptr);
             return true;
         }
@@ -187,7 +207,7 @@ namespace ffpsd
                 PNG_FILTER_TYPE_DEFAULT);
             png_write_info(png, info);
 
-            if (image.bit_depth == 16 && detail::kNativeLittle)
+            if (image.bit_depth == 16 && kNativeLittle)
                 png_set_swap(png);
 
             png_write_image(png, image.rows.data());
@@ -200,16 +220,16 @@ namespace ffpsd
 
         int ColorType(const ImageView& image)
         {
-            const bool has_alpha = detail::HasTransparency(image);
+            const bool has_alpha = HasTransparency(image);
             if (image.color_mode == ColorMode::kGrayscale)
                 return has_alpha ? PNG_COLOR_TYPE_GRAY_ALPHA : PNG_COLOR_TYPE_GRAY;
             return has_alpha ? PNG_COLOR_TYPE_RGB_ALPHA : PNG_COLOR_TYPE_RGB;
         }
     } // namespace
 
-    Image LoadPng(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth)
+    Image DecodePng(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth)
     {
-        detail::CheckPictureMode(color_mode, depth, "PNG");
+        CheckPictureMode(color_mode, depth, "PNG");
         if (data == nullptr || size < kSignatureSize || png_sig_cmp(data, 0, kSignatureSize) != 0)
             throw std::runtime_error("ffpsd: not a PNG");
 
@@ -227,28 +247,23 @@ namespace ffpsd
         if (!Decode(reader, depth, decoded))
             throw std::runtime_error(std::string("ffpsd: PNG: ") + reader.error);
 
-        const Image image = detail::Deinterleave(decoded.bytes.data(), decoded.width, decoded.height, decoded.channels, depth);
-        return detail::ConvertColorMode(image, color_mode);
-    }
-
-    Image LoadPng(const std::string& path, ColorMode color_mode, std::uint16_t depth)
-    {
-        const std::vector<std::uint8_t> data = detail::ReadFile(path);
-        return LoadPng(data.data(), data.size(), color_mode, depth);
+        if (decoded.bytes)
+            decoded.planes = Deinterleave(decoded.bytes.get(), decoded.width, decoded.height, decoded.channels, depth);
+        return ConvertColorMode(std::move(decoded.planes), color_mode);
     }
 
     std::vector<std::uint8_t> EncodePng(const ImageView& image)
     {
         if (image.width > kMaxSide || image.height > kMaxSide)
             throw std::invalid_argument("ffpsd: image is larger than a PSB allows");
-        detail::CheckPicture(image, "PNG");
+        CheckPicture(image, "PNG");
 
         Interleaved interleaved;
         interleaved.width = image.width;
         interleaved.height = image.height;
         interleaved.bit_depth = image.depth;
         interleaved.color_type = ColorType(image);
-        interleaved.bytes = detail::Interleave(image, image.channel_count);
+        interleaved.bytes = Interleave(image, image.channel_count);
 
         const std::size_t row_bytes = std::size_t{image.width} * image.channel_count * image.GetBytesPerSample();
         interleaved.rows.resize(image.height);
@@ -269,9 +284,4 @@ namespace ffpsd
             throw std::runtime_error(std::string("ffpsd: PNG: ") + writer.error);
         return out;
     }
-
-    void SavePng(const ImageView& image, const std::string& path)
-    {
-        detail::WriteFile(path, EncodePng(image));
-    }
-} // namespace ffpsd
+} // namespace ffpsd::detail

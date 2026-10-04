@@ -39,6 +39,24 @@ TEST(DocumentCompressionTest, RawAndRleGiveTheSamePixels)
         EXPECT_EQ(masks_back.GetLayerByIndex(i)->GetPixels().bytes, masks.GetLayerByIndex(i)->GetPixels().bytes);
 }
 
+TEST(DocumentCompressionTest, RleIsWrittenEvenWhereRawIsSmaller)
+{
+    // Every byte differs from its neighbour, so RLE only grows the layer and the composite; kRle writes it all the same.
+    ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kRgb, 8, 64, 64);
+    ffpsd::Image noise = Pattern(64, 64, 4);
+    for (std::size_t i = 0; i < noise.bytes.size(); ++i)
+        noise.bytes[i] = static_cast<std::uint8_t>((i * 2654435761u) >> 13);
+    doc.AddLayer("noise", noise);
+    doc.SetMergedImage(Pattern(64, 64, 3));
+
+    const std::vector<std::uint8_t> rle = doc.Save(ffpsd::Compression::kRle);
+    EXPECT_GT(rle.size(), doc.Save(ffpsd::Compression::kRleOrRaw).size());
+
+    const ffpsd::Document back = ffpsd::Document::Parse(rle);
+    EXPECT_EQ(back.GetLayerByIndex(0)->GetPixels().bytes, noise.bytes);
+    EXPECT_EQ(back.GetMergedImage().bytes, Pattern(64, 64, 3).bytes);
+}
+
 TEST(DocumentCompressionTest, RleIsKeptOnlyWhereItPacks)
 {
     // Flat rows of 1000 bytes are 8 runs of 2 bytes plus a 2 byte count: 7000 rows of 18, against 7 MB raw.

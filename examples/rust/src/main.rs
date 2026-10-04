@@ -105,8 +105,8 @@ fn run(input: &str, output: &str) -> Result<(), String> {
     let mut gradient = ptr::null_mut();
     check(unsafe { ffi::ffpsd_document_add_layer(doc.0, name.as_ptr(), &view, 0, 0, &mut gradient) })?;
 
-    // Save, packed with RLE as Photoshop does.
-    check(unsafe { ffi::ffpsd_document_save(doc.0, output_path.as_ptr(), ffi::FFPSD_COMPRESSION_RLE) })?;
+    // Save, each channel RLE or raw, whichever is smaller.
+    check(unsafe { ffi::ffpsd_document_save(doc.0, output_path.as_ptr(), ffi::FFPSD_COMPRESSION_RLE_OR_RAW) })?;
     println!("saved {} layers to {output}", unsafe {
         ffi::ffpsd_document_get_layer_count(doc.0)
     });

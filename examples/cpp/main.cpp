@@ -63,7 +63,7 @@ int main(int argc, char** argv)
         }
         doc.AddLayer("Gradient", gradient);
 
-        // Save, packed with RLE as Photoshop does.
+        // Save, each channel RLE or raw, whichever is smaller.
         doc.Save(argv[2]);
         std::cout << "saved " << doc.GetLayerCount() << " layers to " << argv[2] << "\n";
     }

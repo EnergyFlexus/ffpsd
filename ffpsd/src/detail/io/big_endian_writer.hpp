@@ -81,18 +81,27 @@ namespace ffpsd::detail
             if (count > (data_.max_size() - data_.size()) / sizeof(T))
                 throw std::length_error("ffpsd: array too large to write");
 
-            const std::size_t at = data_.size();
-            data_.resize(at + count * sizeof(T));
-            std::memcpy(data_.data() + at, src, count * sizeof(T));
-
-            if constexpr (kNativeLittle && sizeof(T) > 1)
+            // Bytes go in with one copy; resize would write zeros first.
+            if constexpr (sizeof(T) == 1)
             {
-                for (std::size_t i = 0; i < count; ++i)
+                const auto* first = reinterpret_cast<const std::uint8_t*>(src);
+                data_.insert(data_.end(), first, first + count);
+            }
+            else
+            {
+                const std::size_t at = data_.size();
+                data_.resize(at + count * sizeof(T));
+                std::memcpy(data_.data() + at, src, count * sizeof(T));
+
+                if constexpr (kNativeLittle)
                 {
-                    T value;
-                    std::memcpy(&value, data_.data() + at + i * sizeof(T), sizeof(T));
-                    value = Swapped(value);
-                    std::memcpy(data_.data() + at + i * sizeof(T), &value, sizeof(T));
+                    for (std::size_t i = 0; i < count; ++i)
+                    {
+                        T value;
+                        std::memcpy(&value, data_.data() + at + i * sizeof(T), sizeof(T));
+                        value = Swapped(value);
+                        std::memcpy(data_.data() + at + i * sizeof(T), &value, sizeof(T));
+                    }
                 }
             }
         }

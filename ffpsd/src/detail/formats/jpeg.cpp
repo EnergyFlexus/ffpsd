@@ -1,8 +1,9 @@
+#include "detail/formats/jpeg.hpp"
+
 #include "detail/color.hpp"
-#include "detail/io/file.hpp"
-#include "formats/exif.hpp"
-#include "formats/formats.hpp"
-#include "formats/planes.hpp"
+#include "detail/formats/exif.hpp"
+#include "detail/formats/picture.hpp"
+#include "detail/formats/planes.hpp"
 
 #include <csetjmp>
 #include <cstddef>
@@ -10,14 +11,14 @@
 #include <cstdio> // jpeglib.h uses FILE and size_t without including them
 #include <cstdlib>
 #include <cstring>
-#include <ffpsd/formats.hpp>
 #include <jpeglib.h>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-namespace ffpsd
+namespace ffpsd::detail
 {
     namespace
     {
@@ -79,8 +80,8 @@ namespace ffpsd
             std::uint32_t height = 0;
             std::uint16_t channels = 0;
             bool adobe = false; // Adobe's CMYK is stored inverted
-            detail::Orientation orientation = detail::Orientation::kNormal;
-            std::vector<std::uint8_t> bytes;
+            Orientation orientation = Orientation::kNormal;
+            std::unique_ptr<std::uint8_t[]> bytes; // not zeroed first: libjpeg writes every byte
         };
 
         struct Compressor
@@ -122,8 +123,8 @@ namespace ffpsd
             // XMP shares APP1 and decodes as normal, so the first turned one wins.
             for (jpeg_saved_marker_ptr marker = info->marker_list; marker != nullptr; marker = marker->next)
             {
-                if (out.orientation == detail::Orientation::kNormal)
-                    out.orientation = detail::DecodeExifOrientation(marker->data, marker->data_length);
+                if (out.orientation == Orientation::kNormal)
+                    out.orientation = DecodeExifOrientation(marker->data, marker->data_length);
             }
 
             switch (info->jpeg_color_space)
@@ -147,10 +148,10 @@ namespace ffpsd
             out.adobe = info->saw_Adobe_marker != 0;
 
             const std::size_t row_bytes = std::size_t{out.width} * out.channels;
-            out.bytes.resize(row_bytes * out.height);
+            out.bytes.reset(new std::uint8_t[row_bytes * out.height]);
             while (info->output_scanline < info->output_height)
             {
-                JSAMPROW row = out.bytes.data() + std::size_t{info->output_scanline} * row_bytes;
+                JSAMPROW row = out.bytes.get() + std::size_t{info->output_scanline} * row_bytes;
                 jpeg_read_scanlines(info, &row, 1);
             }
             jpeg_finish_decompress(info);
@@ -193,7 +194,7 @@ namespace ffpsd
         void CmykToRgb(Decoded& decoded)
         {
             const std::size_t pixels = std::size_t{decoded.width} * decoded.height;
-            std::uint8_t* bytes = decoded.bytes.data();
+            std::uint8_t* bytes = decoded.bytes.get();
             for (std::size_t i = 0; i < pixels; ++i)
             {
                 unsigned light[4];
@@ -202,8 +203,7 @@ namespace ffpsd
                 for (std::size_t color = 0; color < 3; ++color)
                     bytes[i * 3 + color] = static_cast<std::uint8_t>((light[color] * light[3] + 127) / 255);
             }
-            decoded.bytes.resize(pixels * 3);
-            decoded.channels = 3;
+            decoded.channels = 3; // the bytes past three a pixel stay unused
         }
 
         Image WidenTo16(const Image& image)
@@ -233,9 +233,9 @@ namespace ffpsd
         }
     } // namespace
 
-    Image LoadJpeg(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth, bool apply_orientation)
+    Image DecodeJpeg(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth, bool apply_orientation)
     {
-        detail::CheckPictureMode(color_mode, depth, "JPEG");
+        CheckPictureMode(color_mode, depth, "JPEG");
         if (data == nullptr || size < 3 || data[0] != 0xFF || data[1] != 0xD8 || data[2] != 0xFF)
             throw std::runtime_error("ffpsd: not a JPEG");
         if (size > std::numeric_limits<unsigned long>::max())
@@ -248,16 +248,12 @@ namespace ffpsd
         if (decoded.channels == 4)
             CmykToRgb(decoded);
 
-        const detail::Orientation orientation = apply_orientation ? decoded.orientation : detail::Orientation::kNormal;
-        const Image image = detail::Deinterleave(decoded.bytes.data(), decoded.width, decoded.height, decoded.channels, 8, orientation);
-        const Image converted = detail::ConvertColorMode(image, color_mode);
-        return depth == 16 ? WidenTo16(converted) : converted;
-    }
-
-    Image LoadJpeg(const std::string& path, ColorMode color_mode, std::uint16_t depth, bool apply_orientation)
-    {
-        const std::vector<std::uint8_t> data = detail::ReadFile(path);
-        return LoadJpeg(data.data(), data.size(), color_mode, depth, apply_orientation);
+        const Orientation orientation = apply_orientation ? decoded.orientation : Orientation::kNormal;
+        Image image = ConvertColorMode(
+            Deinterleave(decoded.bytes.get(), decoded.width, decoded.height, decoded.channels, 8, orientation), color_mode);
+        if (depth == 16)
+            return WidenTo16(image);
+        return image;
     }
 
     std::vector<std::uint8_t> EncodeJpeg(const ImageView& image, int quality)
@@ -266,10 +262,10 @@ namespace ffpsd
             throw std::invalid_argument("ffpsd: JPEG quality is 1 to 100, not " + std::to_string(quality));
         if (image.width > JPEG_MAX_DIMENSION || image.height > JPEG_MAX_DIMENSION)
             throw std::invalid_argument("ffpsd: a JPEG side is at most " + std::to_string(JPEG_MAX_DIMENSION) + " pixels");
-        detail::CheckPicture(image, "JPEG");
+        CheckPicture(image, "JPEG");
 
-        const std::uint16_t colors = detail::ColorChannelCount(image.color_mode);
-        std::vector<std::uint8_t> pixels = detail::Interleave(image, colors);
+        const std::uint16_t colors = ColorChannelCount(image.color_mode);
+        std::vector<std::uint8_t> pixels = Interleave(image, colors);
         if (image.depth == 16)
             pixels = NarrowTo8(pixels);
 
@@ -278,9 +274,4 @@ namespace ffpsd
             throw std::runtime_error(std::string("ffpsd: JPEG: ") + compressor.error.message);
         return std::vector<std::uint8_t>(compressor.buffer, compressor.buffer + compressor.size);
     }
-
-    void SaveJpeg(const ImageView& image, const std::string& path, int quality)
-    {
-        detail::WriteFile(path, EncodeJpeg(image, quality));
-    }
-} // namespace ffpsd
+} // namespace ffpsd::detail

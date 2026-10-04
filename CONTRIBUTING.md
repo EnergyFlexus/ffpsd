@@ -31,7 +31,6 @@ is rejected whole.
 ffpsd/include/ffpsd/   the public API, flat
 ffpsd/src/             the library
 ffpsd/src/detail/      everything not in the public API
-ffpsd/src/formats/     PNG, JPEG and LoadPicture, which picks between them
 apps/                  the apps, a folder each: img2ffpsd
 docs/                  PSD.md, the format reference
 vendor/                libpng, zlib-ng, libjpeg-turbo, imgui, SDL, googletest, benchmark: submodules pinned to tags
@@ -103,6 +102,7 @@ section needs more than one file:
 detail/io/                 byte order, readers, writers, files, fourcc, fixed, strings, compression
 detail/color.*             RGB to gray and back
 detail/composite.*         the white canvas, normal blending
+detail/formats/            PNG and JPEG behind formats.cpp; planes, EXIF, signatures and checks
 detail/file_header.*       section 1
 detail/color_mode_data.*   section 2
 detail/image_resources/    section 3
@@ -112,11 +112,14 @@ detail/pixel_data.*        PixelData: raw and RLE rows, which sections 4 and 5 s
 detail/resample.*          resizing layers: nearest and bicubic
 ```
 
-`ffpsd/src/formats/` holds what reads and writes other formats: a `.cpp` per
-format behind its `FFPSD_WITH_*` option, `formats.cpp` with `LoadPicture`, and
-their helpers in `ffpsd::detail` (`planes.*` interleaving, `exif.*`). A new format
-is a file here, a block in `formats.hpp` under its `FFPSD_HAS_*`, a signature in
-`LoadPicture`, a `Format` value and a C entry point.
+`ffpsd/src/formats.cpp` is the public side of other formats: `LoadPicture` and
+the `Load*`, `Encode*` and `Save*` of each format, which hand the work to
+`ffpsd/src/detail/formats/`. There a `.cpp` per format behind its `FFPSD_WITH_*`
+option decodes and encodes; `planes.*` interleaves, `exif.*` reads the
+orientation, `picture.*` holds the signatures and the checks every format shares.
+A new format is a file there, a block in `formats.hpp` and `formats.cpp` under
+its `FFPSD_HAS_*`, a signature in `FindFormat`, a `Format` value and a C entry
+point.
 
 * **`detail/io/` knows nothing about PSD** and never includes another `detail/`
   subdirectory.
@@ -190,7 +193,7 @@ namespace ffpsd::detail
 * `k` is for constants fixed for the whole program, `constexpr` or `const` at
   namespace or class scope; a local `const` is an ordinary `snake_case` variable.
 * Everything outside the public API lives in `namespace ffpsd::detail` under
-  `ffpsd/src/detail/` or `ffpsd/src/formats/`.
+  `ffpsd/src/detail/`.
 
 ### Comments
 

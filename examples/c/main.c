@@ -97,8 +97,8 @@ int main(int argc, char** argv)
     if (failed(ffpsd_document_add_layer(doc, "Gradient", &view, 0, 0, &gradient)))
         goto done;
 
-    /* Save, packed with RLE as Photoshop does. */
-    if (failed(ffpsd_document_save(doc, argv[2], FFPSD_COMPRESSION_RLE)))
+    /* Save, each channel RLE or raw, whichever is smaller. */
+    if (failed(ffpsd_document_save(doc, argv[2], FFPSD_COMPRESSION_RLE_OR_RAW)))
         goto done;
     printf("saved %u layers to %s\n", (unsigned)ffpsd_document_get_layer_count(doc), argv[2]);
     result = 0;

@@ -24,8 +24,7 @@ namespace ffpsd::detail
 
     // Zeros for a file without a composite; in RLE a large document costs a few bytes a row.
     PixelData EncodeBlankImageData(
-        std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, bool is_psb,
-        std::uint16_t compression);
+        std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, bool is_psb, Compression compression);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_IMAGE_DATA_HPP_

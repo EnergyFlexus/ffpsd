@@ -47,11 +47,12 @@ extern "C"
         FFPSD_LAYER_KIND_ADJUSTMENT = 4
     } ffpsd_layer_kind_t;
 
-    /* How a save writes pixel data; RLE is what Photoshop writes. */
+    /* How a save writes pixel data: RLE everywhere, as Photoshop writes it, or for each channel the smaller of RLE and raw. */
     typedef enum ffpsd_compression_t
     {
         FFPSD_COMPRESSION_RAW = 0,
-        FFPSD_COMPRESSION_RLE = 1
+        FFPSD_COMPRESSION_RLE = 1,
+        FFPSD_COMPRESSION_RLE_OR_RAW = 2
     } ffpsd_compression_t;
 
     typedef enum ffpsd_resample_filter_t

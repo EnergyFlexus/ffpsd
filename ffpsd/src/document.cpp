@@ -40,6 +40,9 @@ namespace ffpsd
         constexpr std::uint16_t kVersionPsb = 2;
         constexpr std::uint16_t kMaxChannels = 56;
 
+        // What a file holds besides pixel data, generously: headers, resources, records, blocks.
+        constexpr std::size_t kSaveHeadroom = std::size_t{1} << 20;
+
         // Resource 1005 stores signed 16.16, which cannot hold 32768.
         constexpr double kMaxResolution = 32767.0;
 
@@ -420,8 +423,9 @@ namespace ffpsd
         const bool from_psb = IsPsb();
         std::vector<std::pair<detail::PixelData*, detail::PixelData>> converted;
         const auto convert = [&](detail::PixelData& data) {
-            if (data.NeedsConversion(from_psb, psb, data.GetCompression()))
-                converted.emplace_back(&data, data.Converted(from_psb, psb, data.GetCompression()));
+            const Compression kept = data.GetCompression() == detail::kCompressionRaw ? Compression::kRaw : Compression::kRle;
+            if (data.NeedsConversion(from_psb, psb, kept))
+                converted.emplace_back(&data, data.Converted(from_psb, psb, kept));
         };
         for (const std::unique_ptr<Layer>& layer : impl_->layers)
         {
@@ -761,12 +765,11 @@ namespace ffpsd
         header.color_mode = static_cast<std::uint16_t>(impl_->color_mode);
 
         // Only data in another compression is packed again; a deque keeps the pointers to it valid.
-        const auto target = static_cast<std::uint16_t>(compression);
         std::deque<detail::PixelData> repacked;
         const auto choose = [&](const detail::PixelData& data) {
-            if (!data.NeedsConversion(IsPsb(), IsPsb(), target))
+            if (!data.NeedsConversion(IsPsb(), IsPsb(), compression))
                 return &data;
-            return static_cast<const detail::PixelData*>(&repacked.emplace_back(data.Converted(IsPsb(), IsPsb(), target)));
+            return static_cast<const detail::PixelData*>(&repacked.emplace_back(data.Converted(IsPsb(), IsPsb(), compression)));
         };
 
         std::vector<detail::LayerToWrite> layers;
@@ -783,11 +786,16 @@ namespace ffpsd
         detail::PixelData blank;
         const detail::PixelData* composite = &blank;
         if (impl_->image_data.IsEmpty())
-            blank = detail::EncodeBlankImageData(impl_->width, impl_->height, impl_->channel_count, impl_->depth, IsPsb(), target);
+            blank = detail::EncodeBlankImageData(impl_->width, impl_->height, impl_->channel_count, impl_->depth, IsPsb(), compression);
         else
             composite = choose(impl_->image_data);
 
-        detail::BigEndianWriter writer;
+        // Room for every byte of pixel data and the rest besides, so the buffer is never copied as it grows.
+        std::size_t pixel_bytes = composite->GetBytes().size();
+        for (const detail::LayerToWrite& entry : layers)
+            for (const detail::PixelData* channel : entry.channels)
+                pixel_bytes += channel->GetBytes().size();
+        detail::BigEndianWriter writer(pixel_bytes + kSaveHeadroom);
         detail::WriteFileHeader(writer, header);
         detail::WriteColorModeData(writer, impl_->color_mode_data);
         detail::WriteImageResources(writer, impl_->image_resources);

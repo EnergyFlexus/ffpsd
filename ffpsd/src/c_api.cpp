@@ -1,5 +1,5 @@
+#include "detail/formats/picture.hpp"
 #include "detail/io/file.hpp"
-#include "formats/formats.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -44,6 +44,7 @@ namespace
     static_assert(static_cast<int>(ffpsd::ColorMode::kLab) == FFPSD_COLOR_MODE_LAB);
     static_assert(static_cast<int>(ffpsd::ResampleFilter::kBicubic) == FFPSD_RESAMPLE_FILTER_BICUBIC);
     static_assert(static_cast<int>(ffpsd::Compression::kRle) == FFPSD_COMPRESSION_RLE);
+    static_assert(static_cast<int>(ffpsd::Compression::kRleOrRaw) == FFPSD_COMPRESSION_RLE_OR_RAW);
 
     thread_local std::string g_last_error;
 
