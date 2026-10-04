@@ -1,18 +1,30 @@
 name: CI
 
+# Lint and tests run side by side; the packages wait for both, and a tag such as v0.2.0 releases them.
 on:
   push:
     branches: [main]
+    tags: ["v*.*.*"]
   pull_request:
 
 jobs:
-  # Debug with the tests, static and shared, on every platform.
+  # The same checks as the pre-commit hooks: clang-format and the file names.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install pre-commit
+      - run: pre-commit run --all-files --show-diff-on-failure
+
+  # Debug with the tests, static and then shared.
   test:
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
-        kind: [static, shared]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -29,20 +41,30 @@ jobs:
         run: brew install ninja
 
       # Configures, builds and runs ctest; on Windows it sets up MSVC itself, as build.py does.
-      - run: python scripts/run_tests.py ${{ matrix.kind == 'shared' && '--shared' || '' }}
+      - name: Static
+        run: python scripts/run_tests.py
+      - name: Shared
+        run: python scripts/run_tests.py --shared
 
-  # The Release package the way build.py makes it, installed but not uploaded yet.
+  # Three archives per system: the shared library, the static one, and the apps alone.
   package:
+    needs: [lint, test]
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-        kind: [shared, static]
-    runs-on: ${{ matrix.os }}
+        target:
+          - { os: windows-latest, name: windows-x64 }
+          - { os: ubuntu-22.04, name: linux-x64 } # glibc 2.35, so older distributions run it too
+          - { os: macos-latest, name: macos-arm64 }
+    runs-on: ${{ matrix.target.os }}
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
 
       # SDL3 opens its windows through X11 or Wayland, found when it runs; it needs their headers to build.
       - name: Ninja and the headers SDL3 builds against (Linux)
@@ -57,15 +79,88 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install ninja
 
-      - run: python build.py ${{ matrix.kind == 'static' && '--static' || '' }}
+      - name: Shared library
+        shell: bash
+        run: |
+          python build.py --no-apps
+          cp -R ffpsd-out "ffpsd-shared-$GITHUB_REF_NAME-${{ matrix.target.name }}"
 
-  # The same checks as the pre-commit hooks: clang-format and the file names.
-  lint:
+      # With the dynamic C runtime on Windows, /MD, as most programs that link it use.
+      - name: Static library
+        shell: bash
+        run: |
+          python build.py --static --crt dynamic --no-apps
+          cp -R ffpsd-out "ffpsd-static-$GITHUB_REF_NAME-${{ matrix.target.name }}"
+
+      # /MT on Windows, so the apps need no Visual C++ runtime; clean, as the static library shares the build directory.
+      - name: Apps
+        shell: bash
+        run: |
+          python build.py --static --clean
+          name="img2ffpsd-$GITHUB_REF_NAME-${{ matrix.target.name }}"
+          mkdir "$name"
+          cp ffpsd-out/bin/img2ffpsd* "$name"/
+          cp -R ffpsd-out/share/ffpsd/licenses "$name"/licenses
+
+      # tar keeps the executable bit and the symlinks of a .so or .dylib.
+      - name: Archive
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          mkdir archives
+          for name in ffpsd-shared-* ffpsd-static-* img2ffpsd-*; do
+            if [ "$RUNNER_OS" = Windows ]; then
+              7z a "archives/$name.zip" "$name" > /dev/null
+            else
+              tar -czf "archives/$name.tar.gz" "$name"
+            fi
+          done
+
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: archives-${{ matrix.target.name }}
+          path: archives/
+          retention-days: 1
+
+  # A tag pushed again starts its release over, keeping the tag, so old archives and notes do not stay behind.
+  release:
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # to create the release and attach the archives
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+
+      # The tag must name the version in CMakeLists.txt.
+      - name: Tag matches VERSION
+        run: |
+          version=$(sed -nE 's/^[[:space:]]*VERSION[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt | head -n 1)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME, but CMakeLists.txt has VERSION $version"
+            exit 1
+          fi
+
+      - uses: actions/download-artifact@v4
         with:
-          python-version: "3.12"
-      - run: pip install pre-commit
-      - run: pre-commit run --all-files --show-diff-on-failure
+          pattern: archives-*
+          path: archives
+          merge-multiple: true
+
+      - name: Release
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release delete "$GITHUB_REF_NAME" --yes
+          fi
+          gh release create "$GITHUB_REF_NAME" archives/* --title "$GITHUB_REF_NAME" --generate-notes --notes \
+          "- \`ffpsd-shared-*\`: the shared library, its headers and CMake package.
+          - \`ffpsd-static-*\`: the static library, its headers and CMake package.
+          - \`img2ffpsd-*\`: the app, img2ffpsd for the command line and img2ffpsd_ui with a window.
+
+          macOS builds are for Apple Silicon and unsigned: run \`xattr -d com.apple.quarantine\` on them once.
+
+          Linux builds need glibc 2.35 or later."
