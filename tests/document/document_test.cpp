@@ -89,7 +89,7 @@ TEST(DocumentTest, LayersPinWhatTheyWerePackedFor)
     EXPECT_EQ(doc.GetDepth(), 8u);
     EXPECT_EQ(doc.GetChannelCount(), 3u);
     EXPECT_EQ(doc.GetColorMode(), ffpsd::ColorMode::kRgb);
-    EXPECT_EQ(doc.GetLayerByIndex(0)->GetPixels().bytes, Pattern(2, 2, 3).bytes);
+    EXPECT_EQ(doc.GetLayerByIndex(0)->GetPixels().bytes, WithOpaqueAlpha(Pattern(2, 2, 3)).bytes);
 
     // The same value is no change, and a layer does not tie the canvas size: it may reach past it.
     doc.SetDepth(8);
@@ -115,10 +115,12 @@ TEST(DocumentTest, TheCompositeMatchesTheHeaderOrGoes)
     EXPECT_THROW(doc.SetMergedImage(Pattern(4, 2, 3)), std::invalid_argument);
     EXPECT_THROW(doc.SetMergedImage(Pattern(4, 3, 4)), std::invalid_argument);
     EXPECT_THROW(doc.SetMergedImage(Pattern(4, 3, 3, 16)), std::invalid_argument);
+    EXPECT_THROW(doc.SetMergedImage(Pattern(4, 3, 3, 8, ffpsd::ColorMode::kLab)), std::invalid_argument);
     EXPECT_TRUE(doc.GetMergedImage().bytes.empty());
 
     doc.SetMergedImage(Pattern(4, 3, 3));
     EXPECT_EQ(doc.GetMergedImage().bytes, Pattern(4, 3, 3).bytes);
+    EXPECT_EQ(doc.GetMergedImage().color_mode, ffpsd::ColorMode::kRgb);
     EXPECT_TRUE(doc.HasRealMergedData());
 
     // The same size is no change; a new one drops the composite.
@@ -146,7 +148,7 @@ TEST(DocumentTest, LayersFollowTheDocumentWhenItMoves)
 
     // SetPixels reaches the document it now belongs to, not the emptied one.
     EXPECT_FALSE(moved.HasRealMergedData());
-    EXPECT_EQ(moved.GetLayerByIndex(0)->GetPixels().bytes, Pattern(1, 1, 3).bytes);
+    EXPECT_EQ(moved.GetLayerByIndex(0)->GetPixels().bytes, WithOpaqueAlpha(Pattern(1, 1, 3)).bytes);
 }
 
 TEST(DocumentTest, SectionBlocksAreARawDoor)

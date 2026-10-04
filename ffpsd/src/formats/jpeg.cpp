@@ -1,7 +1,8 @@
 #include "detail/color.hpp"
-#include "detail/exif.hpp"
 #include "detail/io/file.hpp"
-#include "detail/planes.hpp"
+#include "formats/exif.hpp"
+#include "formats/formats.hpp"
+#include "formats/planes.hpp"
 
 #include <csetjmp>
 #include <cstddef>
@@ -9,8 +10,7 @@
 #include <cstdio> // jpeglib.h uses FILE and size_t without including them
 #include <cstdlib>
 #include <cstring>
-#include <ffpsd/jpeg.hpp>
-#include <ffpsd/layer.hpp>
+#include <ffpsd/formats.hpp>
 #include <jpeglib.h>
 #include <limits>
 #include <stdexcept>
@@ -235,11 +235,7 @@ namespace ffpsd
 
     Image LoadJpeg(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth, bool apply_orientation)
     {
-        if (color_mode != ColorMode::kGrayscale && color_mode != ColorMode::kRgb)
-            throw std::invalid_argument(
-                "ffpsd: a JPEG loads into grayscale or RGB, not color mode " + std::to_string(static_cast<int>(color_mode)));
-        if (depth != 8 && depth != 16)
-            throw std::invalid_argument("ffpsd: a JPEG loads at 8 or 16 bit, not " + std::to_string(depth));
+        detail::CheckPictureMode(color_mode, depth, "JPEG");
         if (data == nullptr || size < 3 || data[0] != 0xFF || data[1] != 0xD8 || data[2] != 0xFF)
             throw std::runtime_error("ffpsd: not a JPEG");
         if (size > std::numeric_limits<unsigned long>::max())
@@ -253,14 +249,9 @@ namespace ffpsd
             CmykToRgb(decoded);
 
         const detail::Orientation orientation = apply_orientation ? decoded.orientation : detail::Orientation::kNormal;
-        Image image = detail::Deinterleave(decoded.bytes.data(), decoded.width, decoded.height, decoded.channels, 8, orientation);
-
-        const bool is_rgb = image.channel_count == 3;
-        if (color_mode == ColorMode::kGrayscale && is_rgb)
-            image = detail::RgbToGray(image);
-        else if (color_mode == ColorMode::kRgb && !is_rgb)
-            image = detail::GrayToRgb(image);
-        return depth == 16 ? WidenTo16(image) : image;
+        const Image image = detail::Deinterleave(decoded.bytes.data(), decoded.width, decoded.height, decoded.channels, 8, orientation);
+        const Image converted = detail::ConvertColorMode(image, color_mode);
+        return depth == 16 ? WidenTo16(converted) : converted;
     }
 
     Image LoadJpeg(const std::string& path, ColorMode color_mode, std::uint16_t depth, bool apply_orientation)
@@ -269,24 +260,15 @@ namespace ffpsd
         return LoadJpeg(data.data(), data.size(), color_mode, depth, apply_orientation);
     }
 
-    std::vector<std::uint8_t> EncodeJpeg(const Image& image, int quality)
+    std::vector<std::uint8_t> EncodeJpeg(const ImageView& image, int quality)
     {
-        if (image.IsEmpty())
-            throw std::invalid_argument("ffpsd: an empty image makes no JPEG");
-        if (image.channel_count > 4)
-            throw std::invalid_argument("ffpsd: a JPEG is made of 1 to 4 channels, not " + std::to_string(image.channel_count));
-        if (image.depth != 8 && image.depth != 16)
-            throw std::invalid_argument("ffpsd: a JPEG is made of 8 or 16 bit, not " + std::to_string(image.depth));
         if (quality < 1 || quality > 100)
             throw std::invalid_argument("ffpsd: JPEG quality is 1 to 100, not " + std::to_string(quality));
         if (image.width > JPEG_MAX_DIMENSION || image.height > JPEG_MAX_DIMENSION)
             throw std::invalid_argument("ffpsd: a JPEG side is at most " + std::to_string(JPEG_MAX_DIMENSION) + " pixels");
-        if (image.bytes.size() != image.GetSizeBytes())
-            throw std::invalid_argument(
-                "ffpsd: image holds " + std::to_string(image.bytes.size()) + " bytes, its geometry needs " +
-                std::to_string(image.GetSizeBytes()));
+        detail::CheckPicture(image, "JPEG");
 
-        const std::uint16_t colors = image.channel_count >= 3 ? 3 : 1;
+        const std::uint16_t colors = detail::ColorChannelCount(image.color_mode);
         std::vector<std::uint8_t> pixels = detail::Interleave(image, colors);
         if (image.depth == 16)
             pixels = NarrowTo8(pixels);
@@ -297,22 +279,8 @@ namespace ffpsd
         return std::vector<std::uint8_t>(compressor.buffer, compressor.buffer + compressor.size);
     }
 
-    void SaveJpeg(const Image& image, const std::string& path, int quality)
+    void SaveJpeg(const ImageView& image, const std::string& path, int quality)
     {
         detail::WriteFile(path, EncodeJpeg(image, quality));
-    }
-
-    std::vector<std::uint8_t> Layer::EncodeJpeg(int quality) const
-    {
-        const ColorMode color_mode = document_->GetColorMode();
-        if (color_mode != ColorMode::kGrayscale && color_mode != ColorMode::kRgb)
-            throw std::invalid_argument(
-                "ffpsd: a JPEG takes a gray or RGB layer, not color mode " + std::to_string(static_cast<int>(color_mode)));
-        return ffpsd::EncodeJpeg(GetPixels(), quality);
-    }
-
-    void Layer::SaveJpeg(const std::string& path, int quality) const
-    {
-        detail::WriteFile(path, EncodeJpeg(quality));
     }
 } // namespace ffpsd

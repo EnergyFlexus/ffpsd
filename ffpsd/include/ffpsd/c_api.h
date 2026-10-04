@@ -60,6 +60,12 @@ extern "C"
         FFPSD_RESAMPLE_FILTER_BICUBIC = 1
     } ffpsd_resample_filter_t;
 
+    typedef enum ffpsd_format_t
+    {
+        FFPSD_FORMAT_PNG = 0,
+        FFPSD_FORMAT_JPEG = 1
+    } ffpsd_format_t;
+
     /* Owned by the caller, released with its _destroy. */
     typedef struct ffpsd_document_t ffpsd_document_t;
     typedef struct ffpsd_image_t ffpsd_image_t;
@@ -85,6 +91,7 @@ extern "C"
         uint32_t height;
         uint16_t channel_count;
         uint16_t depth;
+        ffpsd_color_mode_t color_mode;
         const uint8_t* data;
         size_t size;
     } ffpsd_image_view_t;
@@ -173,6 +180,7 @@ extern "C"
     /* Channels by the mode, as the C++ constructor; a multichannel document is INVALID_ARGUMENT. */
     FFPSD_EXPORT ffpsd_status_t
     ffpsd_document_create_with(uint32_t width, uint32_t height, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_document_t** out);
+    /* Paths are UTF-8 on every system, here and in the PNG, JPEG and picture calls. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_open(const char* path, ffpsd_document_t** out);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_open_memory(const uint8_t* data, size_t size, ffpsd_document_t** out);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_save(const ffpsd_document_t* doc, const char* path, ffpsd_compression_t compression);
@@ -266,6 +274,7 @@ extern "C"
     FFPSD_EXPORT int ffpsd_layer_is_visible(const ffpsd_layer_t* layer);
     FFPSD_EXPORT int ffpsd_layer_is_background(const ffpsd_layer_t* layer);
     FFPSD_EXPORT uint32_t ffpsd_layer_get_blend_key(const ffpsd_layer_t* layer);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_name(ffpsd_layer_t* layer, const char* name);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_opacity(ffpsd_layer_t* layer, uint8_t opacity);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_visible(ffpsd_layer_t* layer, int visible);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_blend_key(ffpsd_layer_t* layer, uint32_t blend_key);
@@ -292,9 +301,13 @@ extern "C"
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_tagged_block(ffpsd_layer_t* layer, const ffpsd_tagged_block_t* block);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_remove_tagged_block(ffpsd_layer_t* layer, uint32_t key);
 
-    /* The layer's pixels at its own size; gray and RGB documents only. */
-    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_save_as_png(const ffpsd_layer_t* layer, const char* path);
-    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_save_as_png_memory(const ffpsd_layer_t* layer, ffpsd_buffer_t** out);
+    /* Nonzero when this build reads and writes the format. */
+    FFPSD_EXPORT int ffpsd_format_is_supported(ffpsd_format_t format);
+
+    /* PNG or JPEG by the signature, a JPEG turned upright by EXIF; UNSUPPORTED for one this build lacks. */
+    FFPSD_EXPORT ffpsd_status_t ffpsd_picture_load(const char* path, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_image_t** out);
+    FFPSD_EXPORT ffpsd_status_t
+    ffpsd_picture_load_memory(const uint8_t* data, size_t size, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_image_t** out);
 
     /* Every PNG call is UNSUPPORTED in a build without PNG. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_png_load(const char* path, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_image_t** out);
@@ -305,17 +318,13 @@ extern "C"
     FFPSD_EXPORT ffpsd_status_t ffpsd_png_save(const ffpsd_image_view_t* image, const char* path);
     FFPSD_EXPORT ffpsd_status_t ffpsd_png_save_memory(const ffpsd_image_view_t* image, ffpsd_buffer_t** out);
 
-    /* Every JPEG call is UNSUPPORTED in a build without JPEG; quality is 1 to 100. */
-    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_save_as_jpeg(const ffpsd_layer_t* layer, const char* path, int quality);
-    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_save_as_jpeg_memory(const ffpsd_layer_t* layer, int quality, ffpsd_buffer_t** out);
-
-    /* Gray or RGB, 8 or 16 bit; a nonzero apply_orientation turns the pixels upright by the EXIF Orientation tag. */
+    /* Every JPEG call is UNSUPPORTED in a build without JPEG; a nonzero apply_orientation turns the pixels upright by EXIF. */
     FFPSD_EXPORT ffpsd_status_t
     ffpsd_jpeg_load(const char* path, ffpsd_color_mode_t color_mode, uint16_t depth, int apply_orientation, ffpsd_image_t** out);
     FFPSD_EXPORT ffpsd_status_t ffpsd_jpeg_load_memory(
         const uint8_t* data, size_t size, ffpsd_color_mode_t color_mode, uint16_t depth, int apply_orientation, ffpsd_image_t** out);
 
-    /* Gray from 1 or 2 channels, RGB from 3 or 4; alpha is dropped and 16 bit narrowed to 8. */
+    /* Gray from 1 or 2 channels, RGB from 3 or 4; alpha is dropped and 16 bit narrowed to 8; quality is 1 to 100. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_jpeg_save(const ffpsd_image_view_t* image, const char* path, int quality);
     FFPSD_EXPORT ffpsd_status_t ffpsd_jpeg_save_memory(const ffpsd_image_view_t* image, int quality, ffpsd_buffer_t** out);
 

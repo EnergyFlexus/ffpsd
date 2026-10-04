@@ -1,4 +1,4 @@
-#include "detail/color.hpp"
+#include "detail/image.hpp"
 #include "detail/layer_and_mask/adjustments/adjustment_layer.hpp"
 #include "detail/layer_and_mask/adjustments/levels.hpp"
 #include "detail/layer_and_mask/layer_pixels.hpp"
@@ -70,13 +70,18 @@ namespace ffpsd
     }
     bool Layer::IsBackground() const noexcept
     {
-        return detail::IsBackground(*record_);
+        return document_->GetLayerCount() != 0 && document_->GetLayerByIndex(0) == this && GetKind() == LayerKind::kRaster &&
+               detail::HasBackgroundMarks(*record_);
     }
     std::uint32_t Layer::GetBlendKey() const noexcept
     {
         return record_->blend_key;
     }
 
+    void Layer::SetName(const std::string& name)
+    {
+        detail::SetLayerName(*record_, name);
+    }
     void Layer::SetOpacity(std::uint8_t opacity) noexcept
     {
         record_->opacity = opacity;
@@ -121,22 +126,20 @@ namespace ffpsd
 
     Image Layer::GetPixels() const
     {
-        return detail::DecodeLayerPixels(
-            *record_, detail::ColorChannelCount(document_->GetColorMode()), document_->GetDepth(), document_->IsPsb());
+        return detail::DecodeLayerPixels(*record_, document_->GetColorMode(), document_->GetDepth(), document_->IsPsb());
     }
 
-    void Layer::SetPixels(const Image& image)
+    void Layer::SetPixels(const ImageView& image)
     {
-        const std::uint16_t depth = document_->GetDepth();
-        if (!image.IsEmpty() && image.depth != depth)
-            throw std::invalid_argument(
-                "ffpsd: a " + std::to_string(image.depth) + " bit image in a " + std::to_string(depth) + " bit document");
-        detail::CheckLayerSides(image.width, image.height, document_->IsPsb());
+        detail::CheckLayerImage(image, document_->GetColorMode(), document_->GetDepth(), document_->IsPsb());
+        ImageView view = image;
+        view.color_mode = document_->GetColorMode(); // an empty image says nothing about its mode
 
-        detail::SamplesView samples = detail::ViewOf(image);
-        samples.depth = depth; // an empty image says nothing about its depth
-
-        detail::ReplaceLayerPixels(*record_, samples, detail::ColorChannelCount(document_->GetColorMode()), document_->IsPsb());
+        // Transparency would make it an ordinary layer, so it stays as AddBackgroundLayer made it.
+        if (IsBackground() && (image.IsEmpty() || image.width != document_->GetWidth() || image.height != document_->GetHeight() ||
+                               detail::HasTransparency(view)))
+            throw std::invalid_argument("ffpsd: the background takes an opaque image of the canvas size");
+        detail::ReplaceLayerPixels(*record_, view, IsBackground(), document_->IsPsb());
         document_->SetHasRealMergedData(false);
     }
 
@@ -179,9 +182,8 @@ namespace ffpsd
         if (pixels.IsEmpty())
             throw std::invalid_argument("ffpsd: an empty layer has nothing to resize");
 
-        const std::size_t color_count = detail::ColorChannelCount(document_->GetColorMode());
-        const Image resized = detail::Resample(pixels, width, height, color_count, filter);
-        detail::ReplaceLayerPixels(*record_, detail::ViewOf(resized), color_count, document_->IsPsb());
+        const Image resized = detail::Resample(pixels, width, height, filter);
+        detail::ReplaceLayerPixels(*record_, resized, false, document_->IsPsb());
         document_->SetHasRealMergedData(false);
     }
 

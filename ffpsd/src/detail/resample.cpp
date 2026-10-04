@@ -1,5 +1,8 @@
 #include "detail/resample.hpp"
 
+#include "detail/color.hpp"
+#include "detail/image.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -142,11 +145,12 @@ namespace ffpsd::detail
             }
         }
 
-        template <typename T> Image CubicImage(const Image& image, Image result, std::size_t color_count)
+        template <typename T> Image CubicImage(const Image& image, Image result)
         {
             const std::size_t in_plane = std::size_t{image.width} * image.height;
             const std::size_t out_plane = std::size_t{result.width} * result.height;
-            const bool has_alpha = image.channel_count > color_count;
+            const std::size_t color_count = ColorChannelCount(image.color_mode);
+            const bool has_alpha = HasTransparency(image);
             const float full = Full<T>();
 
             // Color times alpha, so a clear pixel adds no color to its neighbours.
@@ -214,7 +218,7 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    Image Resample(const Image& image, std::uint32_t width, std::uint32_t height, std::size_t color_count, ResampleFilter filter)
+    Image Resample(const Image& image, std::uint32_t width, std::uint32_t height, ResampleFilter filter)
     {
         if (image.width == width && image.height == height)
             return image;
@@ -224,6 +228,7 @@ namespace ffpsd::detail
         result.height = height;
         result.channel_count = image.channel_count;
         result.depth = image.depth;
+        result.color_mode = image.color_mode;
         result.bytes.resize(result.GetSizeBytes());
 
         if (filter == ResampleFilter::kNearest)
@@ -235,11 +240,11 @@ namespace ffpsd::detail
         switch (image.depth)
         {
         case 8:
-            return CubicImage<std::uint8_t>(image, std::move(result), color_count);
+            return CubicImage<std::uint8_t>(image, std::move(result));
         case 16:
-            return CubicImage<std::uint16_t>(image, std::move(result), color_count);
+            return CubicImage<std::uint16_t>(image, std::move(result));
         default:
-            return CubicImage<float>(image, std::move(result), color_count);
+            return CubicImage<float>(image, std::move(result));
         }
     }
 } // namespace ffpsd::detail

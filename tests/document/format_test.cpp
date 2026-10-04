@@ -38,8 +38,8 @@ TEST(DocumentFormatTest, APsbKeepsEveryPixel)
 
 TEST(DocumentFormatTest, SwitchingTheFormatAndBackGivesTheSameFile)
 {
-    // Only the width of the row counts changes, so Photoshop's packed rows come back byte for byte.
-    for (const std::string& path : {kRgbPsd, kGrayscalePsd, kRgbLevelsPsd})
+    // Only the width of the row counts changes, so Photoshop's packed rows come back byte for byte; masks too.
+    for (const std::string& path : {kRgbPsd, kGrayscalePsd, kRgbLevelsPsd, kRgbMasksPsd})
     {
         const std::vector<std::uint8_t> original = ffpsd::Document::Open(path).Save();
         ffpsd::Document doc = ffpsd::Document::Open(path);
@@ -62,6 +62,7 @@ TEST(DocumentFormatTest, APsbRowCountTooBigForAPsdIsPackedAgain)
     image.height = 1;
     image.channel_count = 1;
     image.depth = 32;
+    image.color_mode = ffpsd::ColorMode::kGrayscale;
     image.bytes.assign(image.GetSizeBytes(), 0);
     std::uint32_t state = 1;
     for (std::size_t i = 0; i < image.bytes.size() / 4 * 3; ++i)
@@ -74,5 +75,5 @@ TEST(DocumentFormatTest, APsbRowCountTooBigForAPsdIsPackedAgain)
     doc.SetPsb(false);
     const ffpsd::Document back = ffpsd::Document::Parse(doc.Save());
 
-    EXPECT_EQ(back.GetLayerByIndex(0)->GetPixels().bytes, image.bytes);
+    EXPECT_EQ(back.GetLayerByIndex(0)->GetPixels().bytes, WithOpaqueAlpha(image).bytes);
 }

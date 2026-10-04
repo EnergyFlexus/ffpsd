@@ -42,7 +42,7 @@ namespace
     }
 } // namespace
 
-TEST(PngTest, LoadsWhatTheFileHoldsIntoPlanes)
+TEST(FormatsPngTest, LoadsWhatTheFileHoldsIntoPlanes)
 {
     const ffpsd::Image rgba = ffpsd::LoadPng(kRgbaPng, ffpsd::ColorMode::kRgb, 8);
     EXPECT_EQ(rgba.width, 3u);
@@ -60,11 +60,12 @@ TEST(PngTest, LoadsWhatTheFileHoldsIntoPlanes)
     EXPECT_EQ(palette.bytes, (std::vector<std::uint8_t>{10, 200, 20, 100, 30, 50, 255, 0}));
 }
 
-TEST(PngTest, LoadsIntoTheModeAndDepthAskedFor)
+TEST(FormatsPngTest, LoadsIntoTheModeAndDepthAskedFor)
 {
     // 0.2126, 0.7152 and 0.0722 of 255, rounded.
     const ffpsd::Image gray = ffpsd::LoadPng(kRgbaPng, ffpsd::ColorMode::kGrayscale, 8);
     ASSERT_EQ(gray.channel_count, 2u);
+    EXPECT_EQ(gray.color_mode, ffpsd::ColorMode::kGrayscale);
     EXPECT_EQ(gray.bytes, (std::vector<std::uint8_t>{54, 182, 18, 255, 0, 128, 255, 128, 0, 255, 255, 64}));
 
     const ffpsd::Image wide = ffpsd::LoadPng(kRgbaPng, ffpsd::ColorMode::kRgb, 16);
@@ -76,6 +77,7 @@ TEST(PngTest, LoadsIntoTheModeAndDepthAskedFor)
 
     const ffpsd::Image narrow = ffpsd::LoadPng(kGray16Png, ffpsd::ColorMode::kRgb, 8);
     ASSERT_EQ(narrow.channel_count, 3u);
+    EXPECT_EQ(narrow.color_mode, ffpsd::ColorMode::kRgb);
     const std::vector<std::uint8_t> plane = {0, 255, 128, 18};
     std::vector<std::uint8_t> expected;
     for (int i = 0; i < 3; ++i)
@@ -83,7 +85,7 @@ TEST(PngTest, LoadsIntoTheModeAndDepthAskedFor)
     EXPECT_EQ(narrow.bytes, expected);
 }
 
-TEST(PngTest, LoadingRefusesWhatItCannotDo)
+TEST(FormatsPngTest, LoadingRefusesWhatItCannotDo)
 {
     const std::vector<std::uint8_t> png = ReadFile(kRgbaPng);
     const std::vector<std::uint8_t> garbage(64, 0x42);
@@ -97,7 +99,7 @@ TEST(PngTest, LoadingRefusesWhatItCannotDo)
     EXPECT_THROW(ffpsd::LoadPng(DataFile("no_such_file.png"), ffpsd::ColorMode::kRgb, 8), std::filesystem::filesystem_error);
 }
 
-TEST(PngTest, EncodeThenLoadGivesTheSamePlanes)
+TEST(FormatsPngTest, EncodeThenLoadGivesTheSamePlanes)
 {
     // Gray, gray with alpha, RGB and RGBA are color types 0, 4, 2 and 6.
     const int color_types[] = {0, 4, 2, 6};
@@ -114,9 +116,14 @@ TEST(PngTest, EncodeThenLoadGivesTheSamePlanes)
             EXPECT_EQ(ffpsd::LoadPng(png.data(), png.size(), color_mode, depth).bytes, image.bytes) << channels << " x " << depth;
         }
     }
+
+    const std::filesystem::path path = std::filesystem::path(testing::TempDir()) / "ffpsd_image.png";
+    ffpsd::SavePng(Pattern(5, 3, 4), path.string());
+    EXPECT_EQ(ReadFile(path.string()), ffpsd::EncodePng(Pattern(5, 3, 4)));
+    std::filesystem::remove(path);
 }
 
-TEST(PngTest, EncodingRefusesWhatPngCannotHold)
+TEST(FormatsPngTest, EncodingRefusesWhatPngCannotHold)
 {
     ffpsd::Image cut = Pattern(2, 2, 3);
     cut.bytes.pop_back();
@@ -125,36 +132,8 @@ TEST(PngTest, EncodingRefusesWhatPngCannotHold)
     EXPECT_THROW(ffpsd::EncodePng(Pattern(2, 2, 3, 32)), std::invalid_argument);
     EXPECT_THROW(ffpsd::EncodePng(Pattern(2, 2, 5)), std::invalid_argument);
     EXPECT_THROW(ffpsd::EncodePng(cut), std::invalid_argument);
-}
 
-TEST(PngTest, AGrayOrRgbLayerSavesAsWhatGetPixelsGives)
-{
-    const ffpsd::Document rgb = ffpsd::Document::Open(kRgbPsd);
-    const ffpsd::Document gray = ffpsd::Document::Open(kGrayscalePsd);
-    for (const auto& [doc, color_mode] :
-         {std::make_pair(&rgb, ffpsd::ColorMode::kRgb), std::make_pair(&gray, ffpsd::ColorMode::kGrayscale)})
-    {
-        for (std::size_t i = 0; i < doc->GetLayerCount(); ++i)
-        {
-            const ffpsd::Layer* layer = doc->GetLayerByIndex(i);
-            const std::vector<std::uint8_t> png = layer->EncodePng();
-            EXPECT_EQ(ffpsd::LoadPng(png.data(), png.size(), color_mode, 8).bytes, layer->GetPixels().bytes) << layer->GetName();
-        }
-    }
-
-    ffpsd::Document deep = NewDocument(ffpsd::ColorMode::kRgb, 16);
-    const std::vector<std::uint8_t> deep_png = deep.AddLayer("deep", Pattern(3, 2, 4, 16))->EncodePng();
-    EXPECT_EQ(std::get<2>(Header(deep_png)), 16);
-    EXPECT_EQ(ffpsd::LoadPng(deep_png.data(), deep_png.size(), ffpsd::ColorMode::kRgb, 16).bytes, Pattern(3, 2, 4, 16).bytes);
-
-    const std::filesystem::path path = std::filesystem::path(testing::TempDir()) / "ffpsd_layer.png";
-    rgb.GetLayerByIndex(1)->SavePng(path.string());
-    EXPECT_EQ(ReadFile(path.string()), rgb.GetLayerByIndex(1)->EncodePng());
-    std::filesystem::remove(path);
-
-    // A layer without pixels, or of another mode, makes no PNG.
-    const ffpsd::Document levels = ffpsd::Document::Open(kRgbLevelsPsd);
-    ffpsd::Document cmyk = NewDocument(ffpsd::ColorMode::kCmyk);
-    EXPECT_THROW(levels.GetLayerByIndex(1)->EncodePng(), std::invalid_argument);
-    EXPECT_THROW(cmyk.AddLayer("cmyk", Pattern(2, 2, 4))->EncodePng(), std::invalid_argument);
+    // Channels alone would pass for RGBA and RGB.
+    EXPECT_THROW(ffpsd::EncodePng(Pattern(2, 2, 4, 8, ffpsd::ColorMode::kCmyk)), std::invalid_argument);
+    EXPECT_THROW(ffpsd::EncodePng(Pattern(2, 2, 3, 8, ffpsd::ColorMode::kLab)), std::invalid_argument);
 }

@@ -1,5 +1,7 @@
 #include "detail/color.hpp"
 
+#include "detail/image.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -51,26 +53,25 @@ namespace ffpsd::detail
             }
         }
 
-        void CheckImage(const Image& image, std::uint16_t fewest, std::uint16_t most, const char* what)
+        // A composite may hold more than one plane past the colors, so only the fewest and the most are fixed.
+        void CheckSource(const Image& image, ColorMode color_mode, std::uint16_t most, const char* what)
         {
-            if (image.channel_count < fewest || image.channel_count > most)
+            const std::uint16_t fewest = ColorChannelCount(color_mode);
+            if (image.color_mode != color_mode || image.channel_count < fewest || image.channel_count > most)
                 throw std::invalid_argument(
-                    std::string("ffpsd: ") + what + " takes " + std::to_string(fewest) + " to " + std::to_string(most) + " channels, not " +
-                    std::to_string(image.channel_count));
-            if (image.depth != 8 && image.depth != 16 && image.depth != 32)
-                throw std::invalid_argument("ffpsd: unsupported depth: " + std::to_string(image.depth));
-            if (image.bytes.size() != image.GetSizeBytes())
-                throw std::invalid_argument(
-                    "ffpsd: image holds " + std::to_string(image.bytes.size()) + " bytes, its geometry needs " +
-                    std::to_string(image.GetSizeBytes()));
+                    std::string("ffpsd: ") + what + " takes color mode " + std::to_string(static_cast<int>(color_mode)) + " with " +
+                    std::to_string(fewest) + " to " + std::to_string(most) + " channels, not color mode " +
+                    std::to_string(static_cast<int>(image.color_mode)) + " with " + std::to_string(image.channel_count));
+            CheckImage(image);
         }
 
-        Image MakeImage(const Image& source, std::uint16_t channel_count)
+        Image MakeImage(const Image& source, ColorMode color_mode, std::uint16_t channel_count)
         {
             Image result;
             result.width = source.width;
             result.height = source.height;
             result.depth = source.depth;
+            result.color_mode = color_mode;
             result.channel_count = channel_count;
             result.bytes.resize(result.GetSizeBytes());
             return result;
@@ -99,8 +100,8 @@ namespace ffpsd::detail
 
     Image RgbToGray(const Image& rgb)
     {
-        CheckImage(rgb, 3, std::numeric_limits<std::uint16_t>::max(), "RGB to gray");
-        Image gray = MakeImage(rgb, static_cast<std::uint16_t>(rgb.channel_count - 2));
+        CheckSource(rgb, ColorMode::kRgb, std::numeric_limits<std::uint16_t>::max(), "RGB to gray");
+        Image gray = MakeImage(rgb, ColorMode::kGrayscale, static_cast<std::uint16_t>(rgb.channel_count - 2));
 
         const std::size_t pixels = std::size_t{rgb.width} * rgb.height;
         const std::size_t plane = pixels * rgb.GetBytesPerSample();
@@ -126,8 +127,8 @@ namespace ffpsd::detail
 
     Image GrayToRgb(const Image& gray)
     {
-        CheckImage(gray, 1, std::numeric_limits<std::uint16_t>::max() - 2, "gray to RGB");
-        Image rgb = MakeImage(gray, static_cast<std::uint16_t>(gray.channel_count + 2));
+        CheckSource(gray, ColorMode::kGrayscale, std::numeric_limits<std::uint16_t>::max() - 2, "gray to RGB");
+        Image rgb = MakeImage(gray, ColorMode::kRgb, static_cast<std::uint16_t>(gray.channel_count + 2));
 
         const std::size_t plane = std::size_t{gray.width} * gray.height * gray.GetBytesPerSample();
         if (plane == 0)
@@ -141,5 +142,12 @@ namespace ffpsd::detail
         if (extra != 0)
             std::memcpy(rgb.bytes.data() + 3 * plane, gray.bytes.data() + plane, extra * plane);
         return rgb;
+    }
+
+    Image ConvertColorMode(const Image& image, ColorMode color_mode)
+    {
+        if (image.color_mode == color_mode)
+            return image;
+        return color_mode == ColorMode::kGrayscale ? RgbToGray(image) : GrayToRgb(image);
     }
 } // namespace ffpsd::detail

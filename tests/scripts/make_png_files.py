@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Writes the PNG test files into tests/data/generated/ with zlib alone, so libpng is checked against an
-independent encoder. The pixel values here are the ones tests/png/ expects."""
+independent encoder. The pixel values here are the ones tests/formats/png_test.cpp expects."""
 
 import struct
 import zlib

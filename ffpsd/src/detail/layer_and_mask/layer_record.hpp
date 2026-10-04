@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <ffpsd/types.hpp>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -49,12 +50,20 @@ namespace ffpsd::detail
         TaggedBlocks blocks;
     };
 
-    // Photoshop's background: transparency locked, 'lnsr' of 'bgnd' and position locked in 'lspf'.
-    bool IsBackground(const LayerRecord& record) noexcept;
+    // Any one makes Photoshop take a bottom raster layer for the background: locked transparency, an 'lspf' lock, no -1.
+    bool HasBackgroundMarks(const LayerRecord& record) noexcept;
+
+    // Marked: transparency locked, 'lnsr' of 'bgnd' and position locked in 'lspf', as Photoshop marks it.
     void MarkAsBackground(LayerRecord& record);
 
-    // What Photoshop gives a copy of its background: an ordinary layer again.
-    void UnmarkBackground(LayerRecord& record);
+    // What Photoshop gives a copy of its background: an ordinary layer again, with opaque transparency when it had none.
+    void UnmarkBackground(LayerRecord& record, std::uint16_t depth, bool is_psb);
+
+    // The rectangle mask channel -2 or -3 covers, read from the mask data; none when the data has no such one.
+    std::optional<Rect> FindMaskBounds(const std::vector<std::uint8_t>& mask_data, std::int16_t id);
+
+    // The 'luni' block and the legacy Pascal copy, which is cut to 255 bytes on writing.
+    void SetLayerName(LayerRecord& record, const std::string& name);
 
     // A deep copy, blocks included; a new LayerRecord field has to be added here too.
     LayerRecord CopyLayerRecord(const LayerRecord& source);

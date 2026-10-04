@@ -9,18 +9,15 @@
 #include <exception>
 #include <ffpsd/ffpsd.hpp>
 #include <filesystem>
-#include <fstream>
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
 #include <imgui_stdlib.h>
-#include <iterator>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <set>
 #include <sstream>
-#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -330,17 +327,6 @@ namespace
         return job;
     }
 
-    ffpsd::Image LoadPicture(const fs::path& path, ffpsd::ColorMode color_mode)
-    {
-        std::ifstream file(path, std::ios::binary);
-        if (!file)
-            throw std::runtime_error("cannot open " + path.u8string());
-        const std::vector<std::uint8_t> data((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-        if (Extension(path) == ".png")
-            return ffpsd::LoadPng(data.data(), data.size(), color_mode, 8);
-        return ffpsd::LoadJpeg(data.data(), data.size(), color_mode, 8);
-    }
-
     void Convert(const Job& job, const fs::path& name)
     {
         const ffpsd::ColorMode color_mode = job.gray ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb;
@@ -353,7 +339,7 @@ namespace
             const auto picture = job.found[i].find(name);
             if (picture != job.found[i].end())
             {
-                images.push_back(LoadPicture(job.folders[i] / picture->second, color_mode));
+                images.push_back(ffpsd::LoadPicture((job.folders[i] / picture->second).u8string(), color_mode, 8));
                 folders.push_back(i);
             }
         }
@@ -392,11 +378,7 @@ namespace
         fs::path target = job.output / name;
         target += ".psd";
         fs::create_directories(target.parent_path());
-        const std::vector<std::uint8_t> bytes = doc.Save();
-        std::ofstream file(target, std::ios::binary);
-        file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-        if (!file)
-            throw std::runtime_error("cannot write " + target.u8string());
+        doc.Save(target.u8string());
     }
 
     // Shared by the window and the threads that convert.

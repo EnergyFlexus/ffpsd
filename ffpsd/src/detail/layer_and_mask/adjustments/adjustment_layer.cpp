@@ -46,10 +46,12 @@ namespace ffpsd::detail
         return 0;
     }
 
-    LayerRecord CreateAdjustmentLayerRecord(const std::string& name, std::unique_ptr<TaggedBlock> settings, std::size_t color_count)
+    LayerRecord CreateAdjustmentLayerRecord(const std::string& name, std::unique_ptr<TaggedBlock> settings, ColorMode color_mode)
     {
         // No pixels: each channel is just its compression field, the same in PSD and PSB.
-        LayerRecord record = CreateLayerRecord(name, SamplesView(), 0, 0, color_count, false);
+        ImageView empty;
+        empty.color_mode = color_mode;
+        LayerRecord record = CreateLayerRecord(name, empty, 0, 0, false, false);
         record.channels.push_back(EncodeChannelImageData(kLayerMaskId, nullptr, 0, 0, 1, false));
         record.mask_data = WhiteMaskData();
         record.flags = kAdjustmentFlags;

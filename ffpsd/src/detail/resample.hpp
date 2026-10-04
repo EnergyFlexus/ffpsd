@@ -8,8 +8,8 @@
 
 namespace ffpsd::detail
 {
-    // Plane color_count, if any, is alpha and premultiplies the color; the caller checks the arguments.
-    Image Resample(const Image& image, std::uint32_t width, std::uint32_t height, std::size_t color_count, ResampleFilter filter);
+    // Transparency, if any, premultiplies the color; the caller checks the arguments.
+    Image Resample(const Image& image, std::uint32_t width, std::uint32_t height, ResampleFilter filter);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_RESAMPLE_HPP_

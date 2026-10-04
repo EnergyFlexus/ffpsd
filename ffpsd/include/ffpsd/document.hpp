@@ -8,24 +8,13 @@
 #include <ffpsd/image_resources.hpp>
 #include <ffpsd/layer.hpp>
 #include <ffpsd/tagged_block.hpp>
+#include <ffpsd/types.hpp>
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace ffpsd
 {
-    enum class ColorMode : std::uint16_t
-    {
-        kBitmap = 0,
-        kGrayscale = 1,
-        kIndexed = 2,
-        kRgb = 3,
-        kCmyk = 4,
-        kMultichannel = 7,
-        kDuotone = 8,
-        kLab = 9
-    };
-
     // The values of the compression field; RLE falls back to raw where it is not smaller.
     enum class Compression : std::uint16_t
     {
@@ -36,6 +25,7 @@ namespace ffpsd
     class Document
     {
     public:
+        // Paths are UTF-8 on every system, here and in formats.hpp.
         FFPSD_EXPORT static Document Open(const std::string& path);
         FFPSD_EXPORT static Document Parse(const std::vector<std::uint8_t>& data);
         FFPSD_EXPORT static Document Parse(const std::uint8_t* data, std::size_t size);
@@ -114,15 +104,11 @@ namespace ffpsd
         FFPSD_EXPORT const Layer* GetLayerByIndex(std::size_t index) const;
 
         // Adds a raster layer on top. One image plane beyond the color channels is transparency.
-        FFPSD_EXPORT Layer* AddLayer(const std::string& name, const Image& image = Image(), std::int32_t top = 0, std::int32_t left = 0);
-
-        // The same from a planar buffer at the document's depth; it only has to live for the call.
-        FFPSD_EXPORT Layer* AddLayer(
-            const std::string& name, const std::uint8_t* data, std::size_t size, std::uint32_t width, std::uint32_t height,
-            std::uint16_t channel_count, std::int32_t top = 0, std::int32_t left = 0);
+        FFPSD_EXPORT Layer*
+        AddLayer(const std::string& name, const ImageView& image = ImageView(), std::int32_t top = 0, std::int32_t left = 0);
 
         // Photoshop's locked background: at the bottom, the document's size, one at most; alpha goes onto white.
-        FFPSD_EXPORT Layer* AddBackgroundLayer(const std::string& name, const Image& image);
+        FFPSD_EXPORT Layer* AddBackgroundLayer(const std::string& name, const ImageView& image);
 
         // A raster layer without a mask becomes the background: over white, fitted to the canvas, moved down.
         FFPSD_EXPORT void SetBackgroundLayer(std::size_t index);
@@ -153,7 +139,7 @@ namespace ffpsd
         FFPSD_EXPORT Image GetMergedImage() const;
 
         // Must match the document's size, channels and depth; sets has_real_merged_data.
-        FFPSD_EXPORT void SetMergedImage(const Image& image);
+        FFPSD_EXPORT void SetMergedImage(const ImageView& image);
 
     private:
         struct Impl;

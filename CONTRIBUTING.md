@@ -31,6 +31,7 @@ is rejected whole.
 ffpsd/include/ffpsd/   the public API, flat
 ffpsd/src/             the library
 ffpsd/src/detail/      everything not in the public API
+ffpsd/src/formats/     PNG, JPEG and LoadPicture, which picks between them
 apps/                  the apps, a folder each: img2ffpsd
 docs/                  PSD.md, the format reference
 vendor/                libpng, zlib-ng, libjpeg-turbo, imgui, SDL, googletest, benchmark: submodules pinned to tags
@@ -111,6 +112,12 @@ detail/pixel_data.*        PixelData: raw and RLE rows, which sections 4 and 5 s
 detail/resample.*          resizing layers: nearest and bicubic
 ```
 
+`ffpsd/src/formats/` holds what reads and writes other formats: a `.cpp` per
+format behind its `FFPSD_WITH_*` option, `formats.cpp` with `LoadPicture`, and
+their helpers in `ffpsd::detail` (`planes.*` interleaving, `exif.*`). A new format
+is a file here, a block in `formats.hpp` under its `FFPSD_HAS_*`, a signature in
+`LoadPicture`, a `Format` value and a C entry point.
+
 * **`detail/io/` knows nothing about PSD** and never includes another `detail/`
   subdirectory.
 * A newly interpreted resource is a struct with its `kId` in a file of
@@ -130,7 +137,7 @@ detail/resample.*          resizing layers: nearest and bicubic
 ### Include guards
 
 `FFPSD_<FILE>_H_` for `.h`, `FFPSD_<FILE>_HPP_` for `.hpp`, no `#pragma once`.
-Under `detail/` the guard carries the directories:
+Under `ffpsd/src/` the guard carries the directories:
 `detail/io/strings.hpp` guards with `FFPSD_DETAIL_IO_STRINGS_HPP_`.
 
 ```cpp
@@ -183,7 +190,7 @@ namespace ffpsd::detail
 * `k` is for constants fixed for the whole program, `constexpr` or `const` at
   namespace or class scope; a local `const` is an ordinary `snake_case` variable.
 * Everything outside the public API lives in `namespace ffpsd::detail` under
-  `ffpsd/src/detail/`.
+  `ffpsd/src/detail/` or `ffpsd/src/formats/`.
 
 ### Comments
 
@@ -289,8 +296,8 @@ Tests, `tests/README.md` has the folders:
 ## Public API changes
 
 * The public headers: `document.hpp`, `image_resources.hpp`, `adjustments.hpp`,
-  `tagged_block.hpp`, `types.hpp`, `image.hpp`, `layer.hpp`, `png.hpp` (with
-  `FFPSD_WITH_PNG`), `jpeg.hpp` (with `FFPSD_WITH_JPEG`), `c_api.h`, `export.h`,
+  `tagged_block.hpp`, `types.hpp`, `image.hpp`, `layer.hpp`, `formats.hpp` (PNG
+  with `FFPSD_WITH_PNG`, JPEG with `FFPSD_WITH_JPEG`), `c_api.h`, `export.h`,
   and the `ffpsd.hpp` umbrella, which includes everything.
 * A new one goes into `ffpsd/include/ffpsd/` and `FILE_SET HEADERS`, or it is not
   installed.

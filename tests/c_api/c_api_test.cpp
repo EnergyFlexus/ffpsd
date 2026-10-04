@@ -67,7 +67,8 @@ namespace
 
     ffpsd_image_view_t View(const ffpsd::Image& image)
     {
-        return {image.width, image.height, image.channel_count, image.depth, image.bytes.data(), image.bytes.size()};
+        return {image.width,        image.height,      image.channel_count, image.depth, static_cast<ffpsd_color_mode_t>(image.color_mode),
+                image.bytes.data(), image.bytes.size()};
     }
 
     ffpsd_document_t* NewRgbDocument()
@@ -175,6 +176,9 @@ TEST(CApiTest, ADocumentBuiltInCSavesAndOpensAgain)
     const ffpsd::Image image = Pattern(3, 2, 4);
     const ffpsd_image_view_t view = View(image);
     ffpsd_layer_t* layer = nullptr;
+    ffpsd_image_view_t lab = view;
+    lab.color_mode = FFPSD_COLOR_MODE_LAB;
+    EXPECT_EQ(ffpsd_document_add_layer(doc, "lab", &lab, 0, 0, &layer), FFPSD_STATUS_INVALID_ARGUMENT);
     ASSERT_EQ(ffpsd_document_add_layer(doc, "one", &view, 1, 2, &layer), FFPSD_STATUS_OK) << ffpsd_last_error();
 
     ffpsd_levels_t* levels = nullptr;
@@ -246,11 +250,14 @@ TEST(CApiTest, StackAndLayerEditsThroughC)
     ASSERT_EQ(ffpsd_document_move_layer(file.doc, 2, 1), FFPSD_STATUS_OK);
     EXPECT_EQ(Layer(file.doc, 1), copy);
     EXPECT_EQ(ffpsd_document_move_layer(file.doc, 1, 0), FFPSD_STATUS_INVALID_ARGUMENT);
+    ASSERT_EQ(ffpsd_layer_set_name(copy, "copy"), FFPSD_STATUS_OK);
+    EXPECT_EQ(ffpsd_layer_set_name(copy, nullptr), FFPSD_STATUS_INVALID_ARGUMENT);
     ASSERT_EQ(ffpsd_layer_set_opacity(copy, 10), FFPSD_STATUS_OK);
     ASSERT_EQ(ffpsd_layer_set_visible(copy, 0), FFPSD_STATUS_OK);
     ASSERT_EQ(ffpsd_document_remove_layer(file.doc, 2), FFPSD_STATUS_OK);
 
     ASSERT_EQ(ffpsd_document_get_layer_count(file.doc), 2u);
+    EXPECT_EQ(Name(copy), "copy");
     EXPECT_EQ(ffpsd_layer_get_opacity(copy), 10u);
     EXPECT_EQ(ffpsd_layer_is_visible(copy), 0);
     EXPECT_EQ(ffpsd_document_get_has_real_merged_data(file.doc), 0);
@@ -391,8 +398,13 @@ TEST(CApiTest, PngAndJpegThroughC)
 {
     OpenDocument file(kRgbPsd);
     const ffpsd_layer_t* layer = Layer(file.doc, 1);
+    ffpsd_image_t* pixels = nullptr;
+    ASSERT_EQ(ffpsd_layer_get_pixels(layer, &pixels), FFPSD_STATUS_OK);
+    ffpsd_image_view_t pixels_view = {};
+    ASSERT_EQ(ffpsd_image_get_view(pixels, &pixels_view), FFPSD_STATUS_OK);
+
     ffpsd_buffer_t* png = nullptr;
-    const ffpsd_status_t status = ffpsd_layer_save_as_png_memory(layer, &png);
+    const ffpsd_status_t status = ffpsd_png_save_memory(&pixels_view, &png);
 
 #if defined(FFPSD_HAS_PNG)
     ASSERT_EQ(status, FFPSD_STATUS_OK) << ffpsd_last_error();
@@ -408,7 +420,7 @@ TEST(CApiTest, PngAndJpegThroughC)
 #endif
 
     ffpsd_buffer_t* jpeg = nullptr;
-    const ffpsd_status_t jpeg_status = ffpsd_layer_save_as_jpeg_memory(layer, 90, &jpeg);
+    const ffpsd_status_t jpeg_status = ffpsd_jpeg_save_memory(&pixels_view, 90, &jpeg);
 
 #if defined(FFPSD_HAS_JPEG)
     ASSERT_EQ(jpeg_status, FFPSD_STATUS_OK) << ffpsd_last_error();
@@ -423,9 +435,52 @@ TEST(CApiTest, PngAndJpegThroughC)
     EXPECT_EQ(view.size, Pixels(layer).size() / 4 * 3); // the layer's transparency is dropped
     ffpsd_image_destroy(decoded);
     ffpsd_buffer_destroy(jpeg);
-    EXPECT_EQ(ffpsd_layer_save_as_jpeg_memory(layer, 0, &jpeg), FFPSD_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(ffpsd_jpeg_save_memory(&pixels_view, 0, &jpeg), FFPSD_STATUS_INVALID_ARGUMENT);
 #else
     EXPECT_EQ(jpeg_status, FFPSD_STATUS_UNSUPPORTED);
     EXPECT_EQ(jpeg, nullptr);
 #endif
+    ffpsd_image_destroy(pixels);
+}
+
+TEST(CApiTest, APictureGoesByItsSignatureThroughC)
+{
+    const std::vector<std::uint8_t> png = ReadFile(DataFile("generated/rgba_8bit.png"));
+    ffpsd_image_t* image = nullptr;
+    ffpsd_image_view_t view = {};
+    const ffpsd_status_t status = ffpsd_picture_load_memory(png.data(), png.size(), FFPSD_COLOR_MODE_RGB, 8, &image);
+
+#if defined(FFPSD_HAS_PNG)
+    EXPECT_EQ(ffpsd_format_is_supported(FFPSD_FORMAT_PNG), 1);
+    ASSERT_EQ(status, FFPSD_STATUS_OK) << ffpsd_last_error();
+    ASSERT_EQ(ffpsd_image_get_view(image, &view), FFPSD_STATUS_OK);
+    EXPECT_EQ(view.width, 3u);
+    EXPECT_EQ(view.channel_count, 4u);
+    EXPECT_EQ(view.color_mode, FFPSD_COLOR_MODE_RGB);
+    ffpsd_image_destroy(image);
+#else
+    EXPECT_EQ(ffpsd_format_is_supported(FFPSD_FORMAT_PNG), 0);
+    EXPECT_EQ(status, FFPSD_STATUS_UNSUPPORTED);
+    EXPECT_EQ(image, nullptr);
+#endif
+
+    const ffpsd_status_t jpeg_status = ffpsd_picture_load(DataFile("generated/rgb_quadrants.jpg").c_str(), FFPSD_COLOR_MODE_RGB, 8, &image);
+
+#if defined(FFPSD_HAS_JPEG)
+    EXPECT_EQ(ffpsd_format_is_supported(FFPSD_FORMAT_JPEG), 1);
+    ASSERT_EQ(jpeg_status, FFPSD_STATUS_OK) << ffpsd_last_error();
+    ASSERT_EQ(ffpsd_image_get_view(image, &view), FFPSD_STATUS_OK);
+    EXPECT_EQ(view.width, 32u);
+    EXPECT_EQ(view.channel_count, 3u);
+    ffpsd_image_destroy(image);
+#else
+    EXPECT_EQ(ffpsd_format_is_supported(FFPSD_FORMAT_JPEG), 0);
+    EXPECT_EQ(jpeg_status, FFPSD_STATUS_UNSUPPORTED);
+    EXPECT_EQ(image, nullptr);
+#endif
+
+    const std::uint8_t psd[] = {'8', 'B', 'P', 'S'};
+    EXPECT_EQ(ffpsd_picture_load_memory(psd, sizeof(psd), FFPSD_COLOR_MODE_RGB, 8, &image), FFPSD_STATUS_INVALID_FILE);
+    EXPECT_EQ(ffpsd_picture_load(DataFile("no_such_file.png").c_str(), FFPSD_COLOR_MODE_RGB, 8, &image), FFPSD_STATUS_IO);
+    EXPECT_EQ(image, nullptr);
 }

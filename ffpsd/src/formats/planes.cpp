@@ -1,4 +1,4 @@
-#include "detail/planes.hpp"
+#include "formats/planes.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -79,6 +79,7 @@ namespace ffpsd::detail
         image.height = SwapsSides(orientation) ? width : height;
         image.channel_count = channel_count;
         image.depth = depth;
+        image.color_mode = channel_count >= 3 ? ColorMode::kRgb : ColorMode::kGrayscale;
         image.bytes.resize(image.GetSizeBytes());
 
         const Steps steps = StepsOf(orientation, width, height);
@@ -99,14 +100,14 @@ namespace ffpsd::detail
         return image;
     }
 
-    std::vector<std::uint8_t> Interleave(const Image& image, std::uint16_t channel_count)
+    std::vector<std::uint8_t> Interleave(const ImageView& image, std::uint16_t channel_count)
     {
         const std::size_t sample = image.GetBytesPerSample();
         const std::size_t pixels = std::size_t{image.width} * image.height;
         std::vector<std::uint8_t> out(pixels * channel_count * sample);
         for (std::size_t channel = 0; channel < channel_count; ++channel)
         {
-            const std::uint8_t* plane = image.bytes.data() + channel * pixels * sample;
+            const std::uint8_t* plane = image.data + channel * pixels * sample;
             for (std::size_t i = 0; i < pixels; ++i)
                 std::memcpy(out.data() + (i * channel_count + channel) * sample, plane + i * sample, sample);
         }

@@ -8,10 +8,8 @@
 #include <exception>
 #include <ffpsd/ffpsd.hpp>
 #include <filesystem>
-#include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <iterator>
 #include <map>
 #include <mutex>
 #include <set>
@@ -21,7 +19,6 @@
 
 #if defined(_WIN32)
 #define NOMINMAX
-#include <stdexcept>
 #include <windows.h>
 #endif
 
@@ -122,23 +119,6 @@ namespace
         return true;
     }
 
-    std::vector<std::uint8_t> ReadFile(const fs::path& path)
-    {
-        std::ifstream file(path, std::ios::binary);
-        if (!file)
-            throw std::runtime_error("cannot open " + Utf8(path));
-        return std::vector<std::uint8_t>(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
-    }
-
-    void WriteFile(const fs::path& path, const std::vector<std::uint8_t>& data)
-    {
-        fs::create_directories(path.parent_path());
-        std::ofstream file(path, std::ios::binary);
-        file.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(data.size()));
-        if (!file)
-            throw std::runtime_error("cannot write " + Utf8(path));
-    }
-
     std::string Extension(const fs::path& path)
     {
         std::string extension = path.extension().u8string();
@@ -147,15 +127,10 @@ namespace
         return extension;
     }
 
-    bool IsJpeg(const fs::path& path)
-    {
-        const std::string extension = Extension(path);
-        return extension == ".jpg" || extension == ".jpeg";
-    }
-
     bool IsPicture(const fs::path& path)
     {
-        return Extension(path) == ".png" || IsJpeg(path);
+        const std::string extension = Extension(path);
+        return extension == ".png" || extension == ".jpg" || extension == ".jpeg";
     }
 
     // What the system leaves behind: Finder's .DS_Store and ._ files, which are no pictures, Thumbs.db and the like.
@@ -369,15 +344,6 @@ namespace
         return true;
     }
 
-    // A JPEG is turned upright by its EXIF orientation, as Photoshop opens it.
-    ffpsd::Image LoadPicture(const fs::path& path, ffpsd::ColorMode color_mode)
-    {
-        const std::vector<std::uint8_t> data = ReadFile(path);
-        if (IsJpeg(path))
-            return ffpsd::LoadJpeg(data.data(), data.size(), color_mode, 8);
-        return ffpsd::LoadPng(data.data(), data.size(), color_mode, 8);
-    }
-
     void Convert(const Options& options, const std::vector<Pictures>& found, const fs::path& file)
     {
         const ffpsd::ColorMode color_mode = options.gray ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb;
@@ -391,7 +357,7 @@ namespace
             const auto picture = found[i].find(file);
             if (picture != found[i].end())
             {
-                images.push_back(LoadPicture(options.layers[i] / picture->second, color_mode));
+                images.push_back(ffpsd::LoadPicture(Utf8(options.layers[i] / picture->second), color_mode, 8));
                 folders.push_back(i);
             }
         }
@@ -437,7 +403,8 @@ namespace
 
         fs::path target = options.output / file;
         target += ".psd"; // the name has no extension left to replace
-        WriteFile(target, doc.Save());
+        fs::create_directories(target.parent_path());
+        doc.Save(Utf8(target));
     }
 
     // The bar and the errors, from any thread.

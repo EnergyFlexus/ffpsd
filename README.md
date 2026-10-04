@@ -111,8 +111,8 @@ Benchmark's `compare.py`, which needs
 |---------------------|---------|------------------------------------|
 | `BUILD_SHARED_LIBS` | `OFF`   | shared instead of static           |
 | `FFPSD_BUILD_APPS`  | `ON`    | `apps/`                            |
-| `FFPSD_WITH_PNG`    | `ON`    | `ffpsd/png.hpp`, with libpng and zlib-ng |
-| `FFPSD_WITH_JPEG`   | `ON`    | `ffpsd/jpeg.hpp`, with libjpeg-turbo |
+| `FFPSD_WITH_PNG`    | `ON`    | PNG in `ffpsd/formats.hpp`, with libpng and zlib-ng |
+| `FFPSD_WITH_JPEG`   | `ON`    | JPEG in `ffpsd/formats.hpp`, with libjpeg-turbo |
 | `FFPSD_WITH_IMGUI`  | `OFF`   | the apps with a window, with Dear ImGui and SDL3 |
 | `FFPSD_BUILD_TESTS` | `OFF`, `ON` in the debug presets | `tests/` |
 | `FFPSD_BUILD_BENCHMARKS` | `OFF`, `ON` in `bench-release` and the debug presets | `benchmarks/` |
@@ -144,3 +144,9 @@ picks the right linkage. On MSVC the CRT follows the library kind:
 
 A DLL built with `-DFFPSD_MSVC_STATIC_RUNTIME=ON` has its own CRT and heap, so
 only the C API is safe with it; CMake warns about it.
+
+## Trademarks
+
+Adobe and Photoshop are either registered trademarks or trademarks of Adobe in
+the United States and/or other countries. ffpsd is not affiliated with or
+endorsed by Adobe.

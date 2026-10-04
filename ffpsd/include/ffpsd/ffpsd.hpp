@@ -4,19 +4,12 @@
 #include <ffpsd/adjustments.hpp>
 #include <ffpsd/document.hpp>
 #include <ffpsd/export.h>
+#include <ffpsd/formats.hpp>
 #include <ffpsd/image.hpp>
 #include <ffpsd/image_resources.hpp>
 #include <ffpsd/layer.hpp>
 #include <ffpsd/tagged_block.hpp>
 #include <ffpsd/types.hpp>
-
-#if defined(FFPSD_HAS_PNG)
-#include <ffpsd/png.hpp>
-#endif
-
-#if defined(FFPSD_HAS_JPEG)
-#include <ffpsd/jpeg.hpp>
-#endif
 
 namespace ffpsd
 {

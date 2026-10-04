@@ -29,6 +29,14 @@ TEST(DocumentCompressionTest, RawAndRleGiveTheSamePixels)
         for (std::size_t i = 0; i < 2; ++i)
             EXPECT_EQ(back.GetLayerByIndex(i)->GetPixels().bytes, original.GetLayerByIndex(i)->GetPixels().bytes);
     }
+
+    // Masks go raw too: 15 layer planes, 3 composite ones and masks of 1417 x 955 and twice 1417 x 703.
+    const ffpsd::Document masks = ffpsd::Document::Open(kRgbMasksPsd);
+    const std::vector<std::uint8_t> masks_raw = masks.Save(ffpsd::Compression::kRaw);
+    EXPECT_GT(masks_raw.size(), std::size_t{1890} * 1417 * 18 + std::size_t{1417} * (955 + 2 * 703));
+    const ffpsd::Document masks_back = ffpsd::Document::Parse(masks_raw);
+    for (std::size_t i = 0; i < 4; ++i)
+        EXPECT_EQ(masks_back.GetLayerByIndex(i)->GetPixels().bytes, masks.GetLayerByIndex(i)->GetPixels().bytes);
 }
 
 TEST(DocumentCompressionTest, RleIsKeptOnlyWhereItPacks)
@@ -62,5 +70,5 @@ TEST(DocumentCompressionTest, RleIsKeptOnlyWhereItPacks)
     ffpsd::Image wide = Pattern(20000, 2, 1, 32);
     std::fill(wide.bytes.begin() + 80000, wide.bytes.end(), std::uint8_t{0});
     wide_doc.AddLayer("wide", wide);
-    EXPECT_EQ(ffpsd::Document::Parse(wide_doc.Save()).GetLayerByIndex(0)->GetPixels().bytes, wide.bytes);
+    EXPECT_EQ(ffpsd::Document::Parse(wide_doc.Save()).GetLayerByIndex(0)->GetPixels().bytes, WithOpaqueAlpha(wide).bytes);
 }

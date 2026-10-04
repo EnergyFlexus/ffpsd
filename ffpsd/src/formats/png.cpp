@@ -1,13 +1,14 @@
 #include "detail/color.hpp"
+#include "detail/image.hpp"
 #include "detail/io/byte_order.hpp"
 #include "detail/io/file.hpp"
-#include "detail/planes.hpp"
+#include "formats/formats.hpp"
+#include "formats/planes.hpp"
 
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <ffpsd/layer.hpp>
-#include <ffpsd/png.hpp>
+#include <ffpsd/formats.hpp>
 #include <new>
 #include <png.h>
 #include <stdexcept>
@@ -197,29 +198,18 @@ namespace ffpsd
 #pragma warning(pop)
 #endif
 
-        int ColorType(std::uint16_t channel_count) noexcept
+        int ColorType(const ImageView& image)
         {
-            switch (channel_count)
-            {
-            case 1:
-                return PNG_COLOR_TYPE_GRAY;
-            case 2:
-                return PNG_COLOR_TYPE_GRAY_ALPHA;
-            case 3:
-                return PNG_COLOR_TYPE_RGB;
-            default:
-                return PNG_COLOR_TYPE_RGB_ALPHA;
-            }
+            const bool has_alpha = detail::HasTransparency(image);
+            if (image.color_mode == ColorMode::kGrayscale)
+                return has_alpha ? PNG_COLOR_TYPE_GRAY_ALPHA : PNG_COLOR_TYPE_GRAY;
+            return has_alpha ? PNG_COLOR_TYPE_RGB_ALPHA : PNG_COLOR_TYPE_RGB;
         }
     } // namespace
 
     Image LoadPng(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth)
     {
-        if (color_mode != ColorMode::kGrayscale && color_mode != ColorMode::kRgb)
-            throw std::invalid_argument(
-                "ffpsd: a PNG loads into grayscale or RGB, not color mode " + std::to_string(static_cast<int>(color_mode)));
-        if (depth != 8 && depth != 16)
-            throw std::invalid_argument("ffpsd: a PNG loads at 8 or 16 bit, not " + std::to_string(depth));
+        detail::CheckPictureMode(color_mode, depth, "PNG");
         if (data == nullptr || size < kSignatureSize || png_sig_cmp(data, 0, kSignatureSize) != 0)
             throw std::runtime_error("ffpsd: not a PNG");
 
@@ -238,13 +228,7 @@ namespace ffpsd
             throw std::runtime_error(std::string("ffpsd: PNG: ") + reader.error);
 
         const Image image = detail::Deinterleave(decoded.bytes.data(), decoded.width, decoded.height, decoded.channels, depth);
-
-        const bool is_rgb = image.channel_count >= 3;
-        if (color_mode == ColorMode::kGrayscale && is_rgb)
-            return detail::RgbToGray(image);
-        if (color_mode == ColorMode::kRgb && !is_rgb)
-            return detail::GrayToRgb(image);
-        return image;
+        return detail::ConvertColorMode(image, color_mode);
     }
 
     Image LoadPng(const std::string& path, ColorMode color_mode, std::uint16_t depth)
@@ -253,26 +237,17 @@ namespace ffpsd
         return LoadPng(data.data(), data.size(), color_mode, depth);
     }
 
-    std::vector<std::uint8_t> EncodePng(const Image& image)
+    std::vector<std::uint8_t> EncodePng(const ImageView& image)
     {
-        if (image.IsEmpty())
-            throw std::invalid_argument("ffpsd: an empty image makes no PNG");
-        if (image.channel_count > 4)
-            throw std::invalid_argument("ffpsd: a PNG holds 1 to 4 channels, not " + std::to_string(image.channel_count));
-        if (image.depth != 8 && image.depth != 16)
-            throw std::invalid_argument("ffpsd: a PNG holds 8 or 16 bit, not " + std::to_string(image.depth));
         if (image.width > kMaxSide || image.height > kMaxSide)
             throw std::invalid_argument("ffpsd: image is larger than a PSB allows");
-        if (image.bytes.size() != image.GetSizeBytes())
-            throw std::invalid_argument(
-                "ffpsd: image holds " + std::to_string(image.bytes.size()) + " bytes, its geometry needs " +
-                std::to_string(image.GetSizeBytes()));
+        detail::CheckPicture(image, "PNG");
 
         Interleaved interleaved;
         interleaved.width = image.width;
         interleaved.height = image.height;
         interleaved.bit_depth = image.depth;
-        interleaved.color_type = ColorType(image.channel_count);
+        interleaved.color_type = ColorType(image);
         interleaved.bytes = detail::Interleave(image, image.channel_count);
 
         const std::size_t row_bytes = std::size_t{image.width} * image.channel_count * image.GetBytesPerSample();
@@ -295,22 +270,8 @@ namespace ffpsd
         return out;
     }
 
-    void SavePng(const Image& image, const std::string& path)
+    void SavePng(const ImageView& image, const std::string& path)
     {
         detail::WriteFile(path, EncodePng(image));
-    }
-
-    std::vector<std::uint8_t> Layer::EncodePng() const
-    {
-        const ColorMode color_mode = document_->GetColorMode();
-        if (color_mode != ColorMode::kGrayscale && color_mode != ColorMode::kRgb)
-            throw std::invalid_argument(
-                "ffpsd: a PNG takes a gray or RGB layer, not color mode " + std::to_string(static_cast<int>(color_mode)));
-        return ffpsd::EncodePng(GetPixels());
-    }
-
-    void Layer::SavePng(const std::string& path) const
-    {
-        detail::WriteFile(path, EncodePng());
     }
 } // namespace ffpsd

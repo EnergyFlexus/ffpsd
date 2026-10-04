@@ -7,6 +7,7 @@
 #include <ffpsd/ffpsd.hpp>
 #include <fstream>
 #include <iterator>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -23,8 +24,9 @@ namespace ffpsd_test
     inline const std::string kRgbPsd = DataFile("photoshop/rgb_two_layers.psd");
     inline const std::string kRgbLevelsPsd = DataFile("photoshop/rgb_levels.psd");
     inline const std::string kGrayscaleLevelsPsd = DataFile("photoshop/grayscale_two_layers_levels.psd");
+    inline const std::string kRgbMasksPsd = DataFile("photoshop/rgb_masks.psd");
 
-    // Layer names in those files, UTF-8: "Fon", "Zalivka tsvetom 1", "Fon kopiya", "Urovni 1".
+    // Layer names in those files, UTF-8: "Fon", "Fon kopiya", "Urovni 1"; and a longer one, "Zalivka tsvetom 1".
     inline const std::string kBackgroundName = "\xD0\xA4\xD0\xBE\xD0\xBD";
     inline const std::string kColorFillName = "\xD0\x97\xD0\xB0\xD0\xBB\xD0\xB8\xD0\xB2\xD0\xBA\xD0\xB0 "
                                               "\xD1\x86\xD0\xB2\xD0\xB5\xD1\x82\xD0\xBE\xD0\xBC 1";
@@ -81,14 +83,17 @@ namespace ffpsd_test
         return sum;
     }
 
-    // Every sample distinct enough that a swapped plane or a shifted row shows.
-    inline ffpsd::Image Pattern(std::uint32_t width, std::uint32_t height, std::uint16_t channels, std::uint16_t depth = 8)
+    // Every sample distinct enough that a swapped plane or a shifted row shows; gray up to two channels, else RGB, unless given.
+    inline ffpsd::Image Pattern(
+        std::uint32_t width, std::uint32_t height, std::uint16_t channels, std::uint16_t depth = 8,
+        std::optional<ffpsd::ColorMode> color_mode = std::nullopt)
     {
         ffpsd::Image image;
         image.width = width;
         image.height = height;
         image.channel_count = channels;
         image.depth = depth;
+        image.color_mode = color_mode.value_or(channels <= 2 ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb);
         image.bytes.resize(image.GetSizeBytes());
 
         const std::size_t samples = image.bytes.size() / image.GetBytesPerSample();
@@ -109,6 +114,19 @@ namespace ffpsd_test
                 std::memcpy(image.bytes.data() + i * 4, &value, 4);
             }
         }
+        return image;
+    }
+
+    // What GetPixels gives for an image added without transparency: its planes and a fully opaque one.
+    inline ffpsd::Image WithOpaqueAlpha(ffpsd::Image image)
+    {
+        const std::size_t plane = std::size_t{image.width} * image.height * image.GetBytesPerSample();
+        const std::size_t start = image.bytes.size();
+        image.bytes.resize(start + plane, 0xFF);
+        const float full = 1.0f;
+        for (std::size_t at = start; image.depth == 32 && at < image.bytes.size(); at += sizeof(full))
+            std::memcpy(image.bytes.data() + at, &full, sizeof(full));
+        ++image.channel_count;
         return image;
     }
 

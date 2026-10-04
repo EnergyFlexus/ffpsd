@@ -13,6 +13,7 @@ namespace ffpsd::detail
     // 0 and up are color; below the transparency are the masks, -2 the layer mask and -3 the real user mask.
     constexpr std::int16_t kTransparencyId = -1;
     constexpr std::int16_t kLayerMaskId = -2;
+    constexpr std::int16_t kRealMaskId = -3;
 
     struct ChannelImageData
     {
@@ -22,9 +23,12 @@ namespace ffpsd::detail
         PixelData data;
     };
 
-    // Pass two of the layer info; a mask covers its own rectangle, which is not read, so its size is unknown.
+    // Pass two of the layer info; bounds is what the channel covers, the layer's or a mask's own rectangle.
     ChannelImageData ParseChannelImageData(
         BigEndianReader& reader, std::size_t end, std::int16_t id, std::uint64_t length, const Rect& bounds, std::uint16_t depth);
+
+    // Every sample at full coverage, 255, 65535 or 1.0: the transparency of an opaque layer.
+    ChannelImageData EncodeOpaqueChannel(std::int16_t id, std::size_t width, std::size_t height, std::uint16_t depth, bool is_psb);
 
     // Planar native samples, RLE when smaller; no samples give just the compression field.
     ChannelImageData EncodeChannelImageData(

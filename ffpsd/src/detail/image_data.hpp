@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <ffpsd/image.hpp>
+#include <ffpsd/types.hpp>
 
 namespace ffpsd::detail
 {
@@ -15,10 +16,11 @@ namespace ffpsd::detail
 
     // Raw and RLE; no data gives an empty Image.
     Image DecodeImageData(
-        const PixelData& data, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, bool is_psb);
+        const PixelData& data, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth,
+        ColorMode color_mode, bool is_psb);
 
     // RLE when smaller.
-    PixelData EncodeImageData(const Image& image, bool is_psb);
+    PixelData EncodeImageData(const ImageView& image, bool is_psb);
 
     // Zeros for a file without a composite; in RLE a large document costs a few bytes a row.
     PixelData EncodeBlankImageData(

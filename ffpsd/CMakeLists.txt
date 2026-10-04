@@ -12,16 +12,14 @@ target_sources(ffpsd
         src/detail/color_mode_data.cpp
         src/detail/composite.cpp
         src/detail/composite.hpp
-        src/detail/exif.cpp
-        src/detail/exif.hpp
         src/detail/color_mode_data.hpp
         src/detail/file_header.cpp
         src/detail/image_data.cpp
         src/detail/image_data.hpp
+        src/detail/image.cpp
+        src/detail/image.hpp
         src/detail/pixel_data.cpp
         src/detail/pixel_data.hpp
-        src/detail/planes.cpp
-        src/detail/planes.hpp
         src/detail/resample.cpp
         src/detail/resample.hpp
         src/detail/file_header.hpp
@@ -74,6 +72,12 @@ target_sources(ffpsd
         src/detail/image_resources/resolution_info.hpp
         src/detail/image_resources/version_info.cpp
         src/detail/image_resources/version_info.hpp
+        src/formats/exif.cpp
+        src/formats/exif.hpp
+        src/formats/formats.cpp
+        src/formats/formats.hpp
+        src/formats/planes.cpp
+        src/formats/planes.hpp
     PUBLIC
         FILE_SET HEADERS
         BASE_DIRS include
@@ -83,6 +87,7 @@ target_sources(ffpsd
             include/ffpsd/adjustments.hpp
             include/ffpsd/c_api.h
             include/ffpsd/document.hpp
+            include/ffpsd/formats.hpp
             include/ffpsd/image.hpp
             include/ffpsd/layer.hpp
             include/ffpsd/image_resources.hpp
@@ -92,25 +97,13 @@ target_sources(ffpsd
 target_include_directories(ffpsd PRIVATE src)
 
 if(FFPSD_WITH_PNG)
-    target_sources(ffpsd
-        PRIVATE
-            src/png.cpp
-        PUBLIC
-            FILE_SET HEADERS
-            FILES
-                include/ffpsd/png.hpp)
+    target_sources(ffpsd PRIVATE src/formats/png.cpp)
     target_link_libraries(ffpsd PRIVATE png_static)
     target_compile_definitions(ffpsd PUBLIC FFPSD_HAS_PNG)
 endif()
 
 if(FFPSD_WITH_JPEG)
-    target_sources(ffpsd
-        PRIVATE
-            src/jpeg.cpp
-        PUBLIC
-            FILE_SET HEADERS
-            FILES
-                include/ffpsd/jpeg.hpp)
+    target_sources(ffpsd PRIVATE src/formats/jpeg.cpp)
     # An imported library cannot join the export set, so a static package names the file it installs.
     get_target_property(ffpsd_jpeg_location ffpsd_jpeg IMPORTED_LOCATION)
     get_filename_component(ffpsd_jpeg_file "${ffpsd_jpeg_location}" NAME)

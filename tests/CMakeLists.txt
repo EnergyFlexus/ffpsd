@@ -14,6 +14,7 @@ add_executable(ffpsd_tests
     document/resources_test.cpp
     document/save_test.cpp
     document/stack_test.cpp
+    formats/formats_test.cpp
     layer/background_test.cpp
     layer/layer_test.cpp
     layer/pixels_test.cpp
@@ -23,10 +24,10 @@ add_executable(ffpsd_tests
     support/test_support.hpp)
 
 if(FFPSD_WITH_PNG)
-    target_sources(ffpsd_tests PRIVATE png/png_test.cpp)
+    target_sources(ffpsd_tests PRIVATE formats/png_test.cpp)
 endif()
 if(FFPSD_WITH_JPEG)
-    target_sources(ffpsd_tests PRIVATE jpeg/jpeg_test.cpp)
+    target_sources(ffpsd_tests PRIVATE formats/jpeg_test.cpp)
 endif()
 
 target_include_directories(ffpsd_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

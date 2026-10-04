@@ -17,15 +17,24 @@ namespace ffpsd::detail
 {
     namespace
     {
-        template <typename T> void SwapSamples(std::vector<std::uint8_t>& bytes) noexcept
+        template <typename T> void SwapSamples(std::uint8_t* bytes, std::size_t size) noexcept
         {
-            for (std::size_t at = 0; at + sizeof(T) <= bytes.size(); at += sizeof(T))
+            for (std::size_t at = 0; at + sizeof(T) <= size; at += sizeof(T))
             {
                 T value;
-                std::memcpy(&value, bytes.data() + at, sizeof(T));
+                std::memcpy(&value, bytes + at, sizeof(T));
                 value = Swapped(value);
-                std::memcpy(bytes.data() + at, &value, sizeof(T));
+                std::memcpy(bytes + at, &value, sizeof(T));
             }
+        }
+
+        // Big endian to native and back: the same swap.
+        void SwapSampleBytes(std::uint8_t* bytes, std::size_t size, std::size_t sample_size) noexcept
+        {
+            if (sample_size == 2)
+                SwapSamples<std::uint16_t>(bytes, size);
+            else if (sample_size == 4)
+                SwapSamples<std::uint32_t>(bytes, size);
         }
 
         bool IsRawOrRle(std::uint16_t compression) noexcept
@@ -61,21 +70,16 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    PixelData::PixelData(std::vector<std::uint8_t> bytes, std::size_t rows, std::size_t row_bytes)
+    PixelData::PixelData(std::vector<std::uint8_t> bytes, std::size_t rows, std::size_t row_bytes, std::size_t sample_size)
         : bytes_(std::move(bytes))
         , rows_(rows)
         , row_bytes_(row_bytes)
+        , sample_size_(sample_size)
     {
     }
 
-    PixelData PixelData::Unsized(std::vector<std::uint8_t> bytes)
-    {
-        PixelData data(std::move(bytes), 0, 0);
-        data.sized_ = false;
-        return data;
-    }
-
-    PixelData PixelData::Encode(const std::uint8_t* data, std::size_t rows, std::size_t row_bytes, bool is_psb, std::uint16_t compression)
+    PixelData PixelData::Encode(
+        const std::uint8_t* data, std::size_t rows, std::size_t row_bytes, std::size_t sample_size, bool is_psb, std::uint16_t compression)
     {
         const std::size_t total = rows * row_bytes;
         const std::size_t count_size = is_psb ? sizeof(std::uint32_t) : sizeof(std::uint16_t);
@@ -87,10 +91,21 @@ namespace ffpsd::detail
         std::vector<std::uint8_t> out(header + table, 0);
         out[1] = static_cast<std::uint8_t>(kCompressionRle);
         bool packs = compression == kCompressionRle && total != 0;
+
+        // One row at a time goes big endian, so the samples are never copied whole.
+        std::vector<std::uint8_t> swapped(sample_size > 1 ? row_bytes : 0);
         for (std::size_t row = 0; row < rows && packs; ++row)
         {
+            const std::uint8_t* samples = data + row * row_bytes;
+            if (!swapped.empty())
+            {
+                std::memcpy(swapped.data(), samples, row_bytes);
+                SwapSampleBytes(swapped.data(), row_bytes, sample_size);
+                samples = swapped.data();
+            }
+
             const std::size_t start = out.size();
-            PackBits(data + row * row_bytes, row_bytes, out);
+            PackBits(samples, row_bytes, out);
             const std::size_t count = out.size() - start;
 
             std::uint8_t* field = out.data() + header + row * count_size;
@@ -104,8 +119,9 @@ namespace ffpsd::detail
         {
             out.assign(header, 0);
             out.insert(out.end(), data, data + total);
+            SwapSampleBytes(out.data() + header, total, sample_size);
         }
-        return PixelData(std::move(out), rows, row_bytes);
+        return PixelData(std::move(out), rows, row_bytes, sample_size);
     }
 
     const std::vector<std::uint8_t>& PixelData::GetBytes() const noexcept
@@ -138,6 +154,7 @@ namespace ffpsd::detail
                     "ffpsd: raw pixel data holds " + std::to_string(reader.GetRemaining()) + " bytes, needs " + std::to_string(total));
             if (total != 0)
                 reader.ReadU8Array(out, total);
+            SwapSampleBytes(out, total, sample_size_);
             return;
         }
 
@@ -159,6 +176,7 @@ namespace ffpsd::detail
             UnpackBits(bytes_.data() + reader.Tell(), counts[row], out + row * row_bytes_, row_bytes_);
             reader.Skip(counts[row]);
         }
+        SwapSampleBytes(out, total, sample_size_);
     }
 
     bool PixelData::NeedsConversion(bool from_psb, bool to_psb, std::uint16_t compression) const noexcept
@@ -170,32 +188,22 @@ namespace ffpsd::detail
         const std::uint16_t current = GetCompression();
         if (current == kCompressionRle && from_psb != to_psb)
             return true;
-        return current != compression && sized_ && rows_ * row_bytes_ != 0 && IsRawOrRle(current) && IsRawOrRle(compression);
+        return current != compression && rows_ * row_bytes_ != 0 && IsRawOrRle(current) && IsRawOrRle(compression);
     }
 
     PixelData PixelData::Converted(bool from_psb, bool to_psb, std::uint16_t compression) const
     {
         if (!NeedsConversion(from_psb, to_psb, compression))
             return *this;
-        if (!sized_)
-            throw std::logic_error("ffpsd: RLE data of unknown size, such as a mask's, cannot switch between PSD and PSB yet");
 
         if (GetCompression() == kCompressionRle && compression == kCompressionRle)
         {
             if (std::optional<std::vector<std::uint8_t>> bytes = RewriteRowCounts(bytes_, rows_, from_psb, to_psb))
-                return PixelData(std::move(*bytes), rows_, row_bytes_);
+                return PixelData(std::move(*bytes), rows_, row_bytes_, sample_size_);
         }
 
         std::vector<std::uint8_t> samples(rows_ * row_bytes_);
         Decode(from_psb, samples.data());
-        return Encode(samples.data(), rows_, row_bytes_, to_psb, compression);
-    }
-
-    void SwapSampleBytes(std::vector<std::uint8_t>& bytes, std::size_t sample_size) noexcept
-    {
-        if (sample_size == 2)
-            SwapSamples<std::uint16_t>(bytes);
-        else if (sample_size == 4)
-            SwapSamples<std::uint32_t>(bytes);
+        return Encode(samples.data(), rows_, row_bytes_, sample_size_, to_psb, compression);
     }
 } // namespace ffpsd::detail

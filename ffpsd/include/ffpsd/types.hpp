@@ -5,6 +5,18 @@
 
 namespace ffpsd
 {
+    enum class ColorMode : std::uint16_t
+    {
+        kBitmap = 0,
+        kGrayscale = 1,
+        kIndexed = 2,
+        kRgb = 3,
+        kCmyk = 4,
+        kMultichannel = 7,
+        kDuotone = 8,
+        kLab = 9
+    };
+
     // Signed: a layer may extend past the canvas.
     struct Rect
     {

@@ -15,7 +15,7 @@ TEST(SmokeTest, AGrayscaleFileReadsAsTheDumpSays)
     const ffpsd::Document doc = ffpsd::Document::Open(kGrayscalePsd);
 
     EXPECT_EQ(doc.GetWidth(), 836u);
-    EXPECT_EQ(doc.GetHeight(), 1200u);
+    EXPECT_EQ(doc.GetHeight(), 882u);
     EXPECT_EQ(doc.GetChannelCount(), 1u);
     EXPECT_EQ(doc.GetDepth(), 8u);
     EXPECT_EQ(doc.GetColorMode(), ffpsd::ColorMode::kGrayscale);
@@ -23,40 +23,40 @@ TEST(SmokeTest, AGrayscaleFileReadsAsTheDumpSays)
 
     ASSERT_EQ(doc.GetLayerCount(), 2u);
     const ffpsd::Layer* background = doc.GetLayerByIndex(0);
-    const ffpsd::Layer* fill = doc.GetLayerByIndex(1);
+    const ffpsd::Layer* copy = doc.GetLayerByIndex(1);
     EXPECT_EQ(background->GetName(), kBackgroundName);
-    EXPECT_EQ(fill->GetName(), kColorFillName);
-    for (const ffpsd::Layer* layer : {background, fill})
+    EXPECT_EQ(copy->GetName(), kBackgroundCopyName);
+    for (const ffpsd::Layer* layer : {background, copy})
     {
         EXPECT_EQ(layer->GetKind(), ffpsd::LayerKind::kRaster);
         EXPECT_TRUE(layer->IsVisible());
         EXPECT_EQ(layer->GetOpacity(), 255u);
         EXPECT_EQ(layer->GetBlendKey(), Fourcc("norm"));
         EXPECT_EQ(layer->GetBounds().GetWidth(), 836);
-        EXPECT_EQ(layer->GetBounds().GetHeight(), 1200);
+        EXPECT_EQ(layer->GetBounds().GetHeight(), 882);
     }
 
-    // Ids need not be consecutive: layers 2 to 4 were created and deleted in Photoshop.
+    // Ids need not be consecutive: layers 2 to 7 were created and deleted in Photoshop.
     EXPECT_EQ(LayerId(*background), 1u);
-    EXPECT_EQ(LayerId(*fill), 5u);
+    EXPECT_EQ(LayerId(*copy), 8u);
 
     // A background has no transparency; the layer above it has, as the last plane.
     const ffpsd::Image background_pixels = background->GetPixels();
-    const ffpsd::Image fill_pixels = fill->GetPixels();
+    const ffpsd::Image copy_pixels = copy->GetPixels();
     ASSERT_EQ(background_pixels.channel_count, 1u);
-    ASSERT_EQ(fill_pixels.channel_count, 2u);
+    ASSERT_EQ(copy_pixels.channel_count, 2u);
     EXPECT_EQ(background_pixels.width, 836u);
-    EXPECT_EQ(background_pixels.height, 1200u);
-    EXPECT_EQ(PlaneSum(background_pixels, 0), 201492513u);
-    EXPECT_EQ(PlaneSum(fill_pixels, 0), 207820579u);
-    EXPECT_EQ(PlaneSum(fill_pixels, 1), 255816000u);
+    EXPECT_EQ(background_pixels.height, 882u);
+    EXPECT_EQ(PlaneSum(background_pixels, 0), 137735731u);
+    EXPECT_EQ(PlaneSum(copy_pixels, 0), 137565364u);
+    EXPECT_EQ(PlaneSum(copy_pixels, 1), 188024760u);
 }
 
 TEST(SmokeTest, AnRgbFileReadsAsTheDumpSays)
 {
     const ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
 
-    EXPECT_EQ(doc.GetImageResourceCount(), 27u);
+    EXPECT_EQ(doc.GetImageResourceCount(), 29u);
     // Set up in pixels per centimeter, so Photoshop stores 0x012BFFFE, just under 300 ppi.
     const ffpsd::ResolutionInfo resolution = doc.GetResolutionInfo();
     EXPECT_DOUBLE_EQ(resolution.horizontal, 0x012BFFFE / 65536.0);
@@ -85,9 +85,9 @@ TEST(SmokeTest, AnRgbFileReadsAsTheDumpSays)
     ASSERT_EQ(background.channel_count, 3u);
     ASSERT_EQ(copy.channel_count, 4u);
     EXPECT_EQ(PlaneSum(background, 0), 682923150u);
-    EXPECT_EQ(PlaneSum(copy, 0), 678522862u);
-    EXPECT_EQ(PlaneSum(copy, 1), 641365113u);
-    EXPECT_EQ(PlaneSum(copy, 2), 641365113u);
+    EXPECT_EQ(PlaneSum(copy, 0), 183326186u);
+    EXPECT_EQ(PlaneSum(copy, 1), 682923150u);
+    EXPECT_EQ(PlaneSum(copy, 2), 206836566u);
     EXPECT_EQ(PlaneSum(copy, 3), 682923150u);
 
     const ffpsd::Image merged = doc.GetMergedImage();
@@ -95,12 +95,12 @@ TEST(SmokeTest, AnRgbFileReadsAsTheDumpSays)
     ASSERT_EQ(merged.height, 1417u);
     ASSERT_EQ(merged.channel_count, 3u);
     ASSERT_EQ(merged.depth, 8u);
-    EXPECT_EQ(PlaneSum(merged, 0), 678522862u);
-    EXPECT_EQ(PlaneSum(merged, 1), 641365113u);
-    EXPECT_EQ(PlaneSum(merged, 2), 641365113u);
+    EXPECT_EQ(PlaneSum(merged, 0), 183326186u);
+    EXPECT_EQ(PlaneSum(merged, 1), 682923150u);
+    EXPECT_EQ(PlaneSum(merged, 2), 206836566u);
 
     // The blocks after the layers, in file order; three of them had padding to skip.
-    const std::vector<std::pair<std::uint32_t, std::size_t>> blocks = {{Fourcc("Patt"), 0},  {Fourcc("CAI "), 77}, {Fourcc("OCIO"), 172},
+    const std::vector<std::pair<std::uint32_t, std::size_t>> blocks = {{Fourcc("Patt"), 0},  {Fourcc("CAI "), 77}, {Fourcc("OCIO"), 170},
                                                                        {Fourcc("GenI"), 84}, {Fourcc("FMsk"), 12}, {Fourcc("cinf"), 410}};
     ASSERT_EQ(doc.GetTaggedBlockCount(), blocks.size());
     for (std::size_t i = 0; i < blocks.size(); ++i)

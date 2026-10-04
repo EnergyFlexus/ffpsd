@@ -10,12 +10,15 @@ namespace ffpsd::detail
 {
     std::vector<std::uint8_t> ReadFile(const std::string& path)
     {
-        std::error_code ec;
-        const std::uintmax_t size = std::filesystem::file_size(path, ec);
-        if (ec)
-            throw std::filesystem::filesystem_error("ffpsd: cannot open", path, ec);
+        // UTF-8 whatever the system's code page: Windows gets the path as UTF-16.
+        const std::filesystem::path file_path = std::filesystem::u8path(path);
 
-        std::ifstream file(path, std::ios::binary);
+        std::error_code ec;
+        const std::uintmax_t size = std::filesystem::file_size(file_path, ec);
+        if (ec)
+            throw std::filesystem::filesystem_error("ffpsd: cannot open", file_path, ec);
+
+        std::ifstream file(file_path, std::ios::binary);
         if (!file)
             throw std::system_error(errno, std::generic_category(), "ffpsd: cannot open " + path);
 
@@ -28,7 +31,7 @@ namespace ffpsd::detail
 
     void WriteFile(const std::string& path, const std::vector<std::uint8_t>& data)
     {
-        std::ofstream file(path, std::ios::binary | std::ios::trunc);
+        std::ofstream file(std::filesystem::u8path(path), std::ios::binary | std::ios::trunc);
         if (!file)
             throw std::system_error(errno, std::generic_category(), "ffpsd: cannot create " + path);
 

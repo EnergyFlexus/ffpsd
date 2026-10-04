@@ -11,7 +11,6 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <vector>
 
 namespace ffpsd
 {
@@ -61,12 +60,14 @@ namespace ffpsd
         FFPSD_EXPORT std::uint8_t GetOpacity() const noexcept;
         FFPSD_EXPORT bool IsVisible() const noexcept;
 
-        // Photoshop's background, marked by its 'lnsr' block; always the bottom layer.
+        // The bottom raster layer with locked transparency, a lock or no transparency at all, as Photoshop takes it.
         FFPSD_EXPORT bool IsBackground() const noexcept;
 
         // A raw fourcc such as 'norm', so an unknown mode survives a rewrite.
         FFPSD_EXPORT std::uint32_t GetBlendKey() const noexcept;
 
+        // UTF-8; Photoshop shows any name, the background's too.
+        FFPSD_EXPORT void SetName(const std::string& name);
         FFPSD_EXPORT void SetOpacity(std::uint8_t opacity) noexcept;
         FFPSD_EXPORT void SetVisible(bool visible) noexcept;
         FFPSD_EXPORT void SetBlendKey(std::uint32_t blend_key) noexcept;
@@ -84,25 +85,13 @@ namespace ffpsd
         FFPSD_EXPORT Image GetPixels() const;
 
         // Replaces color and transparency at the same top left corner; masks stay, the composite goes stale.
-        FFPSD_EXPORT void SetPixels(const Image& image);
+        FFPSD_EXPORT void SetPixels(const ImageView& image);
 
         // Both need a raster layer without a mask; the background keeps 0, 0 and the canvas size.
         FFPSD_EXPORT void SetPosition(std::int32_t top, std::int32_t left);
 
         // Resamples the pixels, transparency included, keeping the top left corner.
         FFPSD_EXPORT void Resize(std::uint32_t width, std::uint32_t height, ResampleFilter filter = ResampleFilter::kBicubic);
-
-#if defined(FFPSD_HAS_PNG)
-        // GetPixels as a PNG, for gray and RGB documents; declared only in a build with PNG.
-        FFPSD_EXPORT std::vector<std::uint8_t> EncodePng() const;
-        FFPSD_EXPORT void SavePng(const std::string& path) const;
-#endif
-
-#if defined(FFPSD_HAS_JPEG)
-        // GetPixels as a JPEG without transparency, for gray and RGB documents; declared only in a build with JPEG.
-        FFPSD_EXPORT std::vector<std::uint8_t> EncodeJpeg(int quality = 90) const;
-        FFPSD_EXPORT void SaveJpeg(const std::string& path, int quality = 90) const;
-#endif
 
         // Raw door to this layer's blocks, unchecked; pointers live until the block is removed.
         FFPSD_EXPORT std::size_t GetTaggedBlockCount() const noexcept;

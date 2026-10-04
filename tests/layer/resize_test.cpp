@@ -21,7 +21,12 @@ namespace
         ffpsd::Document doc = NewDocument(color_mode, image.depth);
         ffpsd::Layer* layer = doc.AddLayer("layer", image);
         layer->Resize(width, height, filter);
-        return layer->GetPixels();
+
+        // Only the planes the image had: AddLayer gives one without transparency an opaque plane of it.
+        ffpsd::Image pixels = layer->GetPixels();
+        pixels.channel_count = image.channel_count;
+        pixels.bytes.resize(pixels.GetSizeBytes());
+        return pixels;
     }
 
     // One gray row per line, each row 0, 4, 8, ... left to right.

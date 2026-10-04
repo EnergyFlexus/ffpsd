@@ -49,6 +49,12 @@ TEST(LayerTest, TheNameIsUnicodeWithALegacyCopy)
     EXPECT_EQ(plain->GetName(), "plain");
     plain->RemoveTaggedBlock(Fourcc("luni"));
     EXPECT_EQ(plain->GetName(), "plain");
+
+    // A new name goes into both: without 'luni' the legacy copy has it too.
+    plain->SetName(kBackgroundCopyName);
+    EXPECT_EQ(plain->GetName(), kBackgroundCopyName);
+    plain->RemoveTaggedBlock(Fourcc("luni"));
+    EXPECT_EQ(plain->GetName(), kBackgroundCopyName);
 }
 
 TEST(LayerTest, TheKindComesFromTheSectionDivider)

@@ -1,6 +1,7 @@
 #include "detail/layer_and_mask/layer_info.hpp"
 
 #include <cstdint>
+#include <optional>
 #include <stdexcept>
 #include <string>
 
@@ -52,7 +53,13 @@ namespace ffpsd::detail
             for (std::size_t c = 0; c < record.channels.size(); ++c)
             {
                 ChannelImageData& channel = record.channels[c];
-                channel = ParseChannelImageData(reader, end, channel.id, channel_lengths[i][c], record.bounds, depth);
+                std::optional<Rect> bounds = record.bounds;
+                if (channel.id < kTransparencyId)
+                    bounds = FindMaskBounds(record.mask_data, channel.id);
+                if (!bounds.has_value())
+                    throw std::runtime_error(
+                        "ffpsd: layer " + std::to_string(i) + " has mask channel " + std::to_string(channel.id) + " without its rectangle");
+                channel = ParseChannelImageData(reader, end, channel.id, channel_lengths[i][c], *bounds, depth);
             }
         }
 

@@ -2,6 +2,7 @@
 #include "detail/color_mode_data.hpp"
 #include "detail/composite.hpp"
 #include "detail/file_header.hpp"
+#include "detail/image.hpp"
 #include "detail/image_data.hpp"
 #include "detail/image_resources/document_specific_ids_seed_number.hpp"
 #include "detail/image_resources/image_resource.hpp"
@@ -48,9 +49,6 @@ namespace ffpsd
             std::size_t open = 0;
             for (std::size_t i = 0; i < layers.size(); ++i)
             {
-                if (i != 0 && layers[i]->IsBackground())
-                    return "leaves the background off the bottom";
-
                 switch (layers[i]->GetKind())
                 {
                 case LayerKind::kGroupEnd:
@@ -487,52 +485,25 @@ namespace ffpsd
         return impl_->layers[index].get();
     }
 
-    Layer* Document::AddLayer(const std::string& name, const Image& image, std::int32_t top, std::int32_t left)
-    {
-        if (!image.IsEmpty() && image.depth != impl_->depth)
-            throw std::invalid_argument(
-                "ffpsd: a " + std::to_string(image.depth) + " bit image in a " + std::to_string(impl_->depth) + " bit document");
-
-        return AddLayer(name, image.bytes.data(), image.bytes.size(), image.width, image.height, image.channel_count, top, left);
-    }
-
-    Layer* Document::AddLayer(
-        const std::string& name, const std::uint8_t* data, std::size_t size, std::uint32_t width, std::uint32_t height,
-        std::uint16_t channel_count, std::int32_t top, std::int32_t left)
+    Layer* Document::AddLayer(const std::string& name, const ImageView& image, std::int32_t top, std::int32_t left)
     {
         CheckKeepsLayers(impl_->color_mode);
-        const std::size_t color_count = detail::ColorChannelCount(impl_->color_mode);
+        detail::CheckLayerImage(image, impl_->color_mode, impl_->depth, IsPsb());
+        ImageView view = image;
+        view.color_mode = impl_->color_mode; // an empty image says nothing about its mode
 
-        // Keeps the size arithmetic below far from overflow.
-        detail::CheckLayerSides(width, height, IsPsb());
-
-        detail::SamplesView samples;
-        samples.data = data;
-        samples.size = size;
-        samples.width = width;
-        samples.height = height;
-        samples.channel_count = channel_count;
-        samples.depth = impl_->depth;
-
-        auto record = std::make_unique<detail::LayerRecord>(detail::CreateLayerRecord(name, samples, top, left, color_count, IsPsb()));
+        auto record = std::make_unique<detail::LayerRecord>(detail::CreateLayerRecord(name, view, top, left, false, IsPsb()));
         AssignLayerId(*record);
         impl_->layers.push_back(std::unique_ptr<Layer>(new Layer(std::move(record), this)));
         MarkStackChanged();
         return impl_->layers.back().get();
     }
 
-    Layer* Document::AddBackgroundLayer(const std::string& name, const Image& image)
+    Layer* Document::AddBackgroundLayer(const std::string& name, const ImageView& image)
     {
         CheckKeepsLayers(impl_->color_mode);
-        const std::size_t color_count = detail::ColorChannelCount(impl_->color_mode);
-        if (image.depth != impl_->depth)
-            throw std::invalid_argument(
-                "ffpsd: a " + std::to_string(image.depth) + " bit image in a " + std::to_string(impl_->depth) + " bit document");
-        if (image.channel_count != color_count && image.channel_count != color_count + 1)
-            throw std::invalid_argument(
-                "ffpsd: the document needs " + std::to_string(color_count) + " color channels, the image has " +
-                std::to_string(image.channel_count));
-        if (image.width != impl_->width || image.height != impl_->height)
+        detail::CheckLayerImage(image, impl_->color_mode, impl_->depth, IsPsb());
+        if (image.IsEmpty() || image.width != impl_->width || image.height != impl_->height)
             throw std::invalid_argument(
                 "ffpsd: a background is the document's size, " + std::to_string(impl_->width) + " x " + std::to_string(impl_->height) +
                 ", not " + std::to_string(image.width) + " x " + std::to_string(image.height));
@@ -540,15 +511,14 @@ namespace ffpsd
             throw std::logic_error("ffpsd: the document has a background already");
 
         Image flattened;
-        if (image.channel_count > color_count)
+        if (detail::HasTransparency(image))
         {
-            flattened = detail::MakeWhiteImage(image.width, image.height, impl_->color_mode, color_count, image.depth);
-            detail::BlendNormal(flattened, image, 0, 0, 255, color_count);
+            flattened = detail::MakeWhiteImage(image.width, image.height, impl_->color_mode, image.depth);
+            detail::BlendNormal(flattened, image, 0, 0, 255);
         }
-        const Image& opaque = flattened.IsEmpty() ? image : flattened;
+        const ImageView opaque = flattened.IsEmpty() ? image : ImageView(flattened);
 
-        auto record =
-            std::make_unique<detail::LayerRecord>(detail::CreateLayerRecord(name, detail::ViewOf(opaque), 0, 0, color_count, IsPsb()));
+        auto record = std::make_unique<detail::LayerRecord>(detail::CreateLayerRecord(name, opaque, 0, 0, true, IsPsb()));
         detail::MarkAsBackground(*record);
         AssignLayerId(*record);
         impl_->layers.insert(impl_->layers.begin(), std::unique_ptr<Layer>(new Layer(std::move(record), this)));
@@ -570,13 +540,12 @@ namespace ffpsd
         if (detail::HasLayerMask(*layer.record_))
             throw std::invalid_argument("ffpsd: a layer with a mask cannot become the background");
 
-        const std::size_t color_count = detail::ColorChannelCount(impl_->color_mode);
-        Image canvas = detail::MakeWhiteImage(impl_->width, impl_->height, impl_->color_mode, color_count, impl_->depth);
+        Image canvas = detail::MakeWhiteImage(impl_->width, impl_->height, impl_->color_mode, impl_->depth);
         const Rect bounds = layer.GetBounds();
-        detail::BlendNormal(canvas, layer.GetPixels(), bounds.top, bounds.left, layer.GetOpacity(), color_count);
+        detail::BlendNormal(canvas, layer.GetPixels(), bounds.top, bounds.left, layer.GetOpacity());
 
         // Everything that can throw is done; from here on the layer only changes.
-        std::vector<detail::ChannelImageData> channels = detail::EncodeLayerPixels(detail::ViewOf(canvas), color_count, IsPsb());
+        std::vector<detail::ChannelImageData> channels = detail::EncodeLayerPixels(canvas, true, IsPsb());
         detail::LayerRecord& record = *layer.record_;
         record.channels = std::move(channels);
         record.bounds = Rect{0, 0, static_cast<std::int32_t>(impl_->height), static_cast<std::int32_t>(impl_->width)};
@@ -594,20 +563,20 @@ namespace ffpsd
         if (impl_->layers.empty() || !impl_->layers.front()->IsBackground())
             return false;
 
-        detail::UnmarkBackground(*impl_->layers.front()->record_);
+        detail::UnmarkBackground(*impl_->layers.front()->record_, impl_->depth, IsPsb());
         return true;
     }
 
     template <class T> Layer* Document::AddAdjustmentLayer(const std::string& name, const T& value)
     {
         CheckKeepsLayers(impl_->color_mode);
-        const std::size_t color_count = detail::ColorChannelCount(impl_->color_mode);
 
         auto settings = std::make_unique<TaggedBlock>();
         settings->key = T::kKey;
         settings->data = detail::EncodeAdjustment(value);
 
-        auto record = std::make_unique<detail::LayerRecord>(detail::CreateAdjustmentLayerRecord(name, std::move(settings), color_count));
+        auto record =
+            std::make_unique<detail::LayerRecord>(detail::CreateAdjustmentLayerRecord(name, std::move(settings), impl_->color_mode));
         AssignLayerId(*record);
         impl_->layers.push_back(std::unique_ptr<Layer>(new Layer(std::move(record), this)));
         MarkStackChanged();
@@ -624,8 +593,8 @@ namespace ffpsd
             throw std::invalid_argument("ffpsd: the source layer comes from a document of another format");
 
         auto record = std::make_unique<detail::LayerRecord>(detail::CopyLayerRecord(*source.record_));
-        if (detail::IsBackground(*record))
-            detail::UnmarkBackground(*record);
+        if (source.IsBackground())
+            detail::UnmarkBackground(*record, impl_->depth, IsPsb());
 
         // The source's id stays with the source.
         AssignLayerId(*record);
@@ -679,6 +648,11 @@ namespace ffpsd
                     first + static_cast<std::ptrdiff_t>(a) + 1);
         };
 
+        // Photoshop keeps the background at the bottom: it does not move, and nothing goes under it.
+        if ((from == 0 || to == 0) && layers.front()->IsBackground())
+            throw std::invalid_argument(
+                "ffpsd: moving layer " + std::to_string(from) + " to " + std::to_string(to) + " leaves the background off the bottom");
+
         const bool was_valid = FindStackProblem(layers) == nullptr;
         rotate(from, to);
         if (const char* problem = was_valid ? FindStackProblem(layers) : nullptr)
@@ -713,18 +687,20 @@ namespace ffpsd
 
     Image Document::GetMergedImage() const
     {
-        return detail::DecodeImageData(impl_->image_data, impl_->width, impl_->height, impl_->channel_count, impl_->depth, IsPsb());
+        return detail::DecodeImageData(
+            impl_->image_data, impl_->width, impl_->height, impl_->channel_count, impl_->depth, impl_->color_mode, IsPsb());
     }
 
-    void Document::SetMergedImage(const Image& image)
+    void Document::SetMergedImage(const ImageView& image)
     {
         if (image.width != impl_->width || image.height != impl_->height || image.channel_count != impl_->channel_count ||
-            image.depth != impl_->depth)
+            image.depth != impl_->depth || image.color_mode != impl_->color_mode)
             throw std::invalid_argument(
                 "ffpsd: a " + std::to_string(image.width) + " x " + std::to_string(image.height) + ", " +
-                std::to_string(image.channel_count) + " channel, " + std::to_string(image.depth) + " bit merged image for a " +
-                std::to_string(impl_->width) + " x " + std::to_string(impl_->height) + ", " + std::to_string(impl_->channel_count) +
-                " channel, " + std::to_string(impl_->depth) + " bit document");
+                std::to_string(image.channel_count) + " channel, " + std::to_string(image.depth) + " bit, color mode " +
+                std::to_string(static_cast<int>(image.color_mode)) + " merged image for a " + std::to_string(impl_->width) + " x " +
+                std::to_string(impl_->height) + ", " + std::to_string(impl_->channel_count) + " channel, " + std::to_string(impl_->depth) +
+                " bit, color mode " + std::to_string(static_cast<int>(impl_->color_mode)) + " document");
 
         impl_->image_data = detail::EncodeImageData(image, IsPsb());
         SetHasRealMergedData(true);

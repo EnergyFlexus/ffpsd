@@ -4,7 +4,10 @@
 #include "detail/io/strings.hpp"
 #include "detail/layer_and_mask/tagged_blocks/layer_name_source_setting.hpp"
 #include "detail/layer_and_mask/tagged_blocks/protected_setting.hpp"
+#include "detail/layer_and_mask/tagged_blocks/unicode_layer_name.hpp"
 
+#include <algorithm>
+#include <iterator>
 #include <limits>
 #include <optional>
 #include <stdexcept>
@@ -22,6 +25,24 @@ namespace ffpsd::detail
         // Transparency, position and bit 3, which the specification leaves out, as Photoshop writes it.
         constexpr std::uint32_t kBackgroundProtection = 0x0000000D;
         constexpr std::uint16_t kMaxChannels = 56;
+
+        // Bit 4 of the mask flags: density and feather follow, as the parameter flags pick them.
+        constexpr std::uint8_t kMaskHasParameters = 0x10;
+
+        // User mask density and feather, then vector mask density and feather, by bits 0 to 3.
+        constexpr std::size_t kMaskParameterSizes[] = {1, 8, 1, 8};
+
+        constexpr std::size_t kRectSize = 16;
+
+        Rect ReadRect(BigEndianReader& reader)
+        {
+            Rect rect;
+            rect.top = reader.ReadI32();
+            rect.left = reader.ReadI32();
+            rect.bottom = reader.ReadI32();
+            rect.right = reader.ReadI32();
+            return rect;
+        }
 
         // A length-prefixed field of the extra data, which must not run past its end.
         std::vector<std::uint8_t> ReadExtraField(BigEndianReader& reader, std::size_t end, const char* what)
@@ -51,10 +72,7 @@ namespace ffpsd::detail
         const std::size_t record_start = reader.Tell();
 
         LayerRecord record;
-        record.bounds.top = reader.ReadI32();
-        record.bounds.left = reader.ReadI32();
-        record.bounds.bottom = reader.ReadI32();
-        record.bounds.right = reader.ReadI32();
+        record.bounds = ReadRect(reader);
 
         const std::uint16_t channel_count = reader.ReadU16();
         if (channel_count > kMaxChannels)
@@ -134,10 +152,12 @@ namespace ffpsd::detail
         writer.PatchLength(extra_length, false);
     }
 
-    bool IsBackground(const LayerRecord& record) noexcept
+    bool HasBackgroundMarks(const LayerRecord& record) noexcept
     {
-        const std::optional<LayerNameSourceSetting> source = GetTaggedBlock<LayerNameSourceSetting>(record.blocks);
-        return source.has_value() && source->id == LayerNameSourceSetting::kBackground;
+        const std::optional<ProtectedSetting> locks = GetTaggedBlock<ProtectedSetting>(record.blocks);
+        const bool has_transparency = std::any_of(
+            record.channels.begin(), record.channels.end(), [](const ChannelImageData& channel) { return channel.id == kTransparencyId; });
+        return (record.flags & kTransparencyLocked) != 0 || (locks.has_value() && locks->flags != 0) || !has_transparency;
     }
 
     void MarkAsBackground(LayerRecord& record)
@@ -147,11 +167,63 @@ namespace ffpsd::detail
         SetTaggedBlock(record.blocks, ProtectedSetting{kBackgroundProtection});
     }
 
-    void UnmarkBackground(LayerRecord& record)
+    void UnmarkBackground(LayerRecord& record, std::uint16_t depth, bool is_psb)
     {
         record.flags = static_cast<std::uint8_t>(record.flags & ~kTransparencyLocked);
         SetTaggedBlock(record.blocks, LayerNameSourceSetting{LayerNameSourceSetting::kLayer});
         SetTaggedBlock(record.blocks, ProtectedSetting{0});
+
+        const bool has_transparency = std::any_of(
+            record.channels.begin(), record.channels.end(), [](const ChannelImageData& channel) { return channel.id == kTransparencyId; });
+        if (!has_transparency)
+        {
+            const auto width = static_cast<std::size_t>(std::max(record.bounds.GetWidth(), 0));
+            const auto height = static_cast<std::size_t>(std::max(record.bounds.GetHeight(), 0));
+            record.channels.insert(record.channels.begin(), EncodeOpaqueChannel(kTransparencyId, width, height, depth, is_psb));
+        }
+    }
+
+    std::optional<Rect> FindMaskBounds(const std::vector<std::uint8_t>& mask_data, std::int16_t id)
+    {
+        // The layer mask's rectangle, its default color and flags; the size of 20 pads them.
+        BigEndianReader reader(mask_data);
+        if (reader.GetRemaining() < kRectSize + 2)
+            return std::nullopt;
+        const Rect layer_mask = ReadRect(reader);
+        reader.Skip(1);
+        const std::uint8_t flags = reader.ReadU8();
+        if (id == kLayerMaskId)
+            return layer_mask;
+        if (id != kRealMaskId)
+            return std::nullopt;
+
+        if ((flags & kMaskHasParameters) != 0)
+        {
+            if (reader.GetRemaining() < 1)
+                return std::nullopt;
+            const std::uint8_t parameters = reader.ReadU8();
+            std::size_t size = 0;
+            for (std::size_t bit = 0; bit < std::size(kMaskParameterSizes); ++bit)
+            {
+                if ((parameters >> bit & 1) != 0)
+                    size += kMaskParameterSizes[bit];
+            }
+            if (reader.GetRemaining() < size)
+                return std::nullopt;
+            reader.Skip(size);
+        }
+
+        // The real user mask's flags and background, then its rectangle.
+        if (reader.GetRemaining() < 2 + kRectSize)
+            return std::nullopt;
+        reader.Skip(2);
+        return ReadRect(reader);
+    }
+
+    void SetLayerName(LayerRecord& record, const std::string& name)
+    {
+        SetTaggedBlock(record.blocks, UnicodeLayerName{name});
+        record.name = name;
     }
 
     LayerRecord CopyLayerRecord(const LayerRecord& source)

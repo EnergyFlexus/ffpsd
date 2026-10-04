@@ -1,4 +1,4 @@
-#include "detail/exif.hpp"
+#include "formats/exif.hpp"
 
 #include <cstddef>
 #include <cstdint>

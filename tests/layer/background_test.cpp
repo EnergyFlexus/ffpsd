@@ -30,11 +30,13 @@ namespace
 
 TEST(LayerBackgroundTest, ItIsMarkedAsPhotoshopMarksIt)
 {
-    for (const std::string& path : {kRgbPsd, kGrayscalePsd, kRgbLevelsPsd})
+    // In the gray file with Levels the copy took its name from the background, so its 'lnsr' says 'bgnd' too.
+    for (const std::string& path : {kRgbPsd, kGrayscalePsd, kRgbLevelsPsd, kGrayscaleLevelsPsd})
     {
-        const ffpsd::Document doc = ffpsd::Document::Open(path);
+        ffpsd::Document doc = ffpsd::Document::Open(path);
         EXPECT_TRUE(doc.GetLayerByIndex(0)->IsBackground()) << path;
         EXPECT_FALSE(doc.GetLayerByIndex(1)->IsBackground()) << path;
+        EXPECT_NO_THROW(doc.MoveLayer(doc.GetLayerCount() - 1, 1)) << path;
     }
 
     // A new one gets the blocks and the flags of Photoshop's.
@@ -66,9 +68,45 @@ TEST(LayerBackgroundTest, ItIsMarkedAsPhotoshopMarksIt)
     EXPECT_FALSE(former->IsBackground());
     EXPECT_EQ(BlockData(*former, "lnsr"), BlockData(*photoshops_copy, "lnsr"));
     EXPECT_EQ(BlockData(*former, "lspf"), BlockData(*photoshops_copy, "lspf"));
-    EXPECT_EQ(former->GetPixels().bytes, pixels.bytes);
+    EXPECT_EQ(former->GetPixels().bytes, WithOpaqueAlpha(pixels).bytes);
     flags = NormalLayerFlags(rgb.Save());
     EXPECT_EQ(flags.at(0), flags.at(1));
+}
+
+TEST(LayerBackgroundTest, ItIsTheBottomRasterLayerWithAnyOfItsMarks)
+{
+    // An ordinary layer gets transparency even from an image without one, so at the bottom it stays ordinary.
+    ffpsd::Document doc = NewDocument();
+    ffpsd::Layer* bottom = doc.AddLayer("bottom", Pattern(4, 3, 3));
+    ffpsd::Layer* top = doc.AddLayer("top", Pattern(4, 3, 3));
+    EXPECT_FALSE(bottom->IsBackground());
+    EXPECT_FALSE(ffpsd::Document::Parse(doc.Save()).GetLayerByIndex(0)->IsBackground());
+
+    // A lock in 'lspf' is a mark, but only at the bottom.
+    const ffpsd::TaggedBlock position_lock = Block("lspf", {0, 0, 0, 4});
+    top->SetTaggedBlock(position_lock);
+    EXPECT_FALSE(top->IsBackground());
+    bottom->SetTaggedBlock(position_lock);
+    EXPECT_TRUE(bottom->IsBackground());
+    EXPECT_TRUE(ffpsd::Document::Parse(doc.Save()).GetLayerByIndex(0)->IsBackground());
+}
+
+TEST(LayerBackgroundTest, SetPixelsKeepsItOpaqueAndOfTheCanvasSize)
+{
+    ffpsd::Document doc = NewDocument();
+    ffpsd::Layer* background = doc.AddBackgroundLayer("Background", Pattern(4, 3, 3));
+
+    EXPECT_THROW(background->SetPixels(Pattern(4, 3, 4)), std::invalid_argument);
+    EXPECT_THROW(background->SetPixels(Pattern(3, 3, 3)), std::invalid_argument);
+    EXPECT_THROW(background->SetPixels(ffpsd::Image()), std::invalid_argument);
+    EXPECT_TRUE(background->IsBackground());
+    EXPECT_EQ(background->GetPixels().bytes, Pattern(4, 3, 3).bytes);
+
+    ffpsd::Image other = Pattern(4, 3, 3);
+    std::reverse(other.bytes.begin(), other.bytes.end());
+    background->SetPixels(other);
+    EXPECT_TRUE(background->IsBackground());
+    EXPECT_EQ(background->GetPixels().bytes, other.bytes);
 }
 
 TEST(LayerBackgroundTest, AddBackgroundLayerFlattensOntoWhite)
@@ -111,7 +149,7 @@ TEST(LayerBackgroundTest, AddBackgroundLayerFlattensOntoWhite)
 
     // Lab white has neutral a and b.
     ffpsd::Document lab = NewDocument(ffpsd::ColorMode::kLab);
-    ffpsd::Image clear = Pattern(4, 3, 4);
+    ffpsd::Image clear = Pattern(4, 3, 4, 8, ffpsd::ColorMode::kLab);
     std::fill(clear.bytes.begin() + 3 * 12, clear.bytes.end(), std::uint8_t{0});
     std::vector<std::uint8_t> white(12, 255);
     white.insert(white.end(), 24, 128);
@@ -125,6 +163,7 @@ TEST(LayerBackgroundTest, AddBackgroundLayerTakesOneImageOfTheCanvasSize)
     EXPECT_THROW(doc.AddBackgroundLayer("five", Pattern(4, 3, 5)), std::invalid_argument);
     EXPECT_THROW(doc.AddBackgroundLayer("small", Pattern(3, 3, 3)), std::invalid_argument);
     EXPECT_THROW(doc.AddBackgroundLayer("deep", Pattern(4, 3, 3, 16)), std::invalid_argument);
+    EXPECT_THROW(doc.AddBackgroundLayer("lab", Pattern(4, 3, 3, 8, ffpsd::ColorMode::kLab)), std::invalid_argument);
     EXPECT_THROW(doc.AddBackgroundLayer("empty", ffpsd::Image()), std::invalid_argument);
     EXPECT_EQ(doc.GetLayerCount(), 0u);
 

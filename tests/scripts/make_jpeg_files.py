@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Writes the JPEG test files into tests/data/generated/ with Pillow, so libjpeg-turbo is checked against another
 encoder. Flat 16 x 8 blocks at quality 100 without chroma subsampling decode within a few levels of these colors,
-which are the ones tests/jpeg/ expects. The EXIF blocks are built by hand, to have both byte orders."""
+which are the ones tests/formats/jpeg_test.cpp expects. The EXIF blocks are built by hand, to have both byte orders."""
 
 import struct
 from pathlib import Path

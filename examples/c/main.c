@@ -1,6 +1,7 @@
-/* Opens a PSD, prints what it holds, copies the top layer and saves the result. */
+/* Opens a PSD, prints what it holds, copies the top layer, adds a gradient and saves the result. */
 #include <ffpsd/c_api.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -20,8 +21,14 @@ int main(int argc, char** argv)
     ffpsd_document_t* doc = NULL;
     ffpsd_layer_t* top = NULL;
     ffpsd_layer_t* copy = NULL;
+    ffpsd_layer_t* gradient = NULL;
+    ffpsd_image_view_t view;
+    uint8_t* pixels = NULL;
+    size_t plane;
     size_t count;
     size_t i;
+    uint32_t x;
+    uint32_t y;
     int result = 1;
 
     if (argc != 3)
@@ -59,6 +66,37 @@ int main(int argc, char** argv)
     if (failed(ffpsd_document_get_layer(doc, count - 1, &top)) || failed(ffpsd_document_add_layer_copy(doc, top, &copy)))
         goto done;
 
+    /* Add a gradient over the canvas, planar as PSD keeps it: red grows to the right, green down, blue stays at half. */
+    view.width = ffpsd_document_get_width(doc);
+    view.height = ffpsd_document_get_height(doc);
+    view.color_mode = ffpsd_document_get_color_mode(doc);
+    view.channel_count = view.color_mode == FFPSD_COLOR_MODE_GRAYSCALE ? 1 : 3;
+    view.depth = 8;
+    plane = (size_t)view.width * view.height;
+    view.size = plane * view.channel_count;
+    pixels = (uint8_t*)malloc(view.size);
+    if (pixels == NULL)
+    {
+        fprintf(stderr, "out of memory\n");
+        goto done;
+    }
+    for (y = 0; y < view.height; ++y)
+    {
+        for (x = 0; x < view.width; ++x)
+        {
+            const size_t at = (size_t)y * view.width + x;
+            pixels[at] = (uint8_t)(x * 255u / view.width);
+            if (view.channel_count == 3)
+            {
+                pixels[plane + at] = (uint8_t)(y * 255u / view.height);
+                pixels[2 * plane + at] = 128;
+            }
+        }
+    }
+    view.data = pixels;
+    if (failed(ffpsd_document_add_layer(doc, "Gradient", &view, 0, 0, &gradient)))
+        goto done;
+
     /* Save, packed with RLE as Photoshop does. */
     if (failed(ffpsd_document_save(doc, argv[2], FFPSD_COMPRESSION_RLE)))
         goto done;
@@ -66,7 +104,8 @@ int main(int argc, char** argv)
     result = 0;
 
 done:
-    /* The document owns its layers, so this frees them too. */
+    /* The document owns its layers, so this frees them too; it copied the pixels it was given. */
     ffpsd_document_destroy(doc);
+    free(pixels);
     return result;
 }

@@ -1,5 +1,8 @@
 #include "detail/composite.hpp"
 
+#include "detail/color.hpp"
+#include "detail/image.hpp"
+
 #include <algorithm>
 #include <cstring>
 #include <limits>
@@ -78,10 +81,10 @@ namespace ffpsd::detail
         }
 
         template <typename T>
-        void
-        Composite(Image& target, const Image& source, std::int32_t top, std::int32_t left, std::uint8_t opacity, std::size_t color_count)
+        void Composite(Image& target, const ImageView& source, std::int32_t top, std::int32_t left, std::uint8_t opacity)
         {
-            const bool has_alpha = source.channel_count > color_count;
+            const std::size_t color_count = target.channel_count;
+            const bool has_alpha = HasTransparency(source);
             const std::size_t source_plane = std::size_t{source.width} * source.height;
             const std::size_t target_plane = std::size_t{target.width} * target.height;
 
@@ -90,7 +93,7 @@ namespace ffpsd::detail
             const std::int64_t x_end = std::min<std::int64_t>(target.width, std::int64_t{left} + source.width);
             const std::int64_t y_end = std::min<std::int64_t>(target.height, std::int64_t{top} + source.height);
 
-            const std::uint8_t* from = source.bytes.data();
+            const std::uint8_t* from = source.data;
             std::uint8_t* to = target.bytes.data();
             for (std::int64_t y = y_first; y < y_end; ++y)
             {
@@ -112,13 +115,14 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    Image MakeWhiteImage(std::uint32_t width, std::uint32_t height, ColorMode color_mode, std::size_t color_count, std::uint16_t depth)
+    Image MakeWhiteImage(std::uint32_t width, std::uint32_t height, ColorMode color_mode, std::uint16_t depth)
     {
         Image image;
         image.width = width;
         image.height = height;
-        image.channel_count = static_cast<std::uint16_t>(color_count);
+        image.channel_count = ColorChannelCount(color_mode);
         image.depth = depth;
+        image.color_mode = color_mode;
         image.bytes.resize(image.GetSizeBytes());
 
         switch (depth)
@@ -138,29 +142,28 @@ namespace ffpsd::detail
         return image;
     }
 
-    void BlendNormal(Image& target, const Image& source, std::int32_t top, std::int32_t left, std::uint8_t opacity, std::size_t color_count)
+    void BlendNormal(Image& target, const ImageView& source, std::int32_t top, std::int32_t left, std::uint8_t opacity)
     {
         // An empty layer has nothing to lay down and says nothing about its channels.
         if (source.IsEmpty())
             return;
-        if (source.depth != target.depth || target.channel_count != color_count ||
-            (source.channel_count != color_count && source.channel_count != color_count + 1) ||
-            source.bytes.size() != source.GetSizeBytes() || target.bytes.size() != target.GetSizeBytes())
-            throw std::invalid_argument("ffpsd: images that do not composite: channels, depth or size differ");
+        CheckImage(target);
+        CheckImage(source);
+        CheckColorChannels(source);
+        if (source.color_mode != target.color_mode || source.depth != target.depth || HasTransparency(target))
+            throw std::invalid_argument("ffpsd: images that do not composite: color mode, depth or transparency differ");
 
         switch (target.depth)
         {
         case 8:
-            Composite<std::uint8_t>(target, source, top, left, opacity, color_count);
+            Composite<std::uint8_t>(target, source, top, left, opacity);
             break;
         case 16:
-            Composite<std::uint16_t>(target, source, top, left, opacity, color_count);
-            break;
-        case 32:
-            Composite<float>(target, source, top, left, opacity, color_count);
+            Composite<std::uint16_t>(target, source, top, left, opacity);
             break;
         default:
-            throw std::invalid_argument("ffpsd: unsupported depth: " + std::to_string(target.depth));
+            Composite<float>(target, source, top, left, opacity);
+            break;
         }
     }
 } // namespace ffpsd::detail

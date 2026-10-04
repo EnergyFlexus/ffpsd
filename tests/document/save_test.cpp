@@ -63,7 +63,7 @@ TEST(DocumentSaveTest, TheCompositeStaysOrIsWrittenBlank)
     photoshop.RemoveLayer(0);
     const ffpsd::Document without_layers = ffpsd::Document::Parse(photoshop.Save());
     EXPECT_EQ(without_layers.GetLayerCount(), 0u);
-    EXPECT_EQ(PlaneSum(without_layers.GetMergedImage(), 0), 678522862u);
+    EXPECT_EQ(PlaneSum(without_layers.GetMergedImage(), 0), 183326186u);
 
     // A document made from scratch has no composite of its own, in either compression.
     ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kGrayscale);
@@ -109,4 +109,12 @@ TEST(DocumentSaveTest, APathGetsTheSameBytesOrASystemError)
     EXPECT_EQ(ReadFile(path.string()), ReadFile(kGrayscalePsd));
     EXPECT_THROW(doc.Save(unwritable.string()), std::system_error);
     std::filesystem::remove(path);
+
+    // A path is UTF-8 whatever the system's code page; "test" in Cyrillic, written as bytes for any compiler.
+    const std::filesystem::path cyrillic =
+        std::filesystem::path(testing::TempDir()) / std::filesystem::u8path("ffpsd_\xD1\x82\xD0\xB5\xD1\x81\xD1\x82.psd");
+    doc.Save(cyrillic.u8string());
+    EXPECT_TRUE(std::filesystem::exists(cyrillic));
+    EXPECT_EQ(ffpsd::Document::Open(cyrillic.u8string()).Save(), doc.Save());
+    std::filesystem::remove(cyrillic);
 }

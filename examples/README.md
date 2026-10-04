@@ -1,7 +1,9 @@
 # Examples
 
 One program in three languages: it opens a PSD, prints its size and layers,
-puts a copy of the top layer on top and saves the result.
+puts a copy of the top layer on top, adds a layer with a gradient over the
+canvas and saves the result. The gradient is 8 bit, gray or RGB, so the
+document has to be too.
 
 ```sh
 ffpsd_example_cpp tests/data/photoshop/rgb_levels.psd out.psd
@@ -11,7 +13,7 @@ ffpsd_example_cpp tests/data/photoshop/rgb_levels.psd out.psd
 1890 x 1417, 8 bit, 2 layers
   0: <name>, 1890 x 1417
   1: <name>, 0 x 0
-saved 3 layers to out.psd
+saved 4 layers to out.psd
 ```
 
 | Folder | API | Build |
@@ -43,5 +45,4 @@ cargo run -- ../../tests/data/photoshop/rgb_levels.psd out.psd
 ```
 
 On Windows `ffpsd-out/bin` must be on the `PATH`; on Linux and macOS the program
-records where the library is. Paths reach ffpsd in the system code page on
-Windows, so characters outside it do not open.
+records where the library is. Paths reach ffpsd as UTF-8, as Rust keeps them.

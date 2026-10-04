@@ -14,9 +14,11 @@ TEST(LayerPixelsTest, AddLayerKeepsThePlanesWhereTheyWerePut)
 {
     ffpsd::Document doc = NewDocument();
 
+    // Without transparency of its own an ordinary layer gets an opaque one, as Photoshop gives it.
     const ffpsd::Image opaque = doc.AddLayer("rgb", Pattern(3, 2, 3))->GetPixels();
-    EXPECT_EQ(opaque.channel_count, 3u);
-    EXPECT_EQ(opaque.bytes, Pattern(3, 2, 3).bytes);
+    EXPECT_EQ(opaque.channel_count, 4u);
+    EXPECT_EQ(opaque.color_mode, ffpsd::ColorMode::kRgb);
+    EXPECT_EQ(opaque.bytes, WithOpaqueAlpha(Pattern(3, 2, 3)).bytes);
 
     const ffpsd::Layer* transparent = doc.AddLayer("off canvas", Pattern(3, 2, 4), -5, 7);
     EXPECT_EQ(transparent->GetPixels().channel_count, 4u);
@@ -27,8 +29,10 @@ TEST(LayerPixelsTest, AddLayerKeepsThePlanesWhereTheyWerePut)
     EXPECT_EQ(bounds.bottom, -3);
     EXPECT_EQ(bounds.right, 10);
 
-    const ffpsd::Image planes = Pattern(3, 2, 4);
-    EXPECT_EQ(doc.AddLayer("planar", planes.bytes.data(), planes.bytes.size(), 3, 2, 4)->GetPixels().bytes, planes.bytes);
+    // A view borrows a buffer that is no Image.
+    const std::vector<std::uint8_t> planes = Pattern(3, 2, 4).bytes;
+    const ffpsd::ImageView view(3, 2, 4, 8, ffpsd::ColorMode::kRgb, planes.data(), planes.size());
+    EXPECT_EQ(doc.AddLayer("planar", view)->GetPixels().bytes, planes);
 
     const ffpsd::Layer* empty = doc.AddLayer("empty", ffpsd::Image(), 2, 1);
     EXPECT_EQ(empty->GetBounds().GetWidth(), 0);
@@ -44,7 +48,7 @@ TEST(LayerPixelsTest, AddLayerKeepsThePlanesWhereTheyWerePut)
     std::uint16_t read = 0;
     std::memcpy(&read, back.bytes.data(), sizeof(read));
     EXPECT_EQ(read, 0x1234);
-    EXPECT_EQ(back.bytes, image.bytes);
+    EXPECT_EQ(back.bytes, WithOpaqueAlpha(image).bytes);
 }
 
 TEST(LayerPixelsTest, AddLayerRefusesWhatDoesNotFit)
@@ -55,8 +59,13 @@ TEST(LayerPixelsTest, AddLayerRefusesWhatDoesNotFit)
     EXPECT_THROW(doc.AddLayer("gray", Pattern(2, 2, 1)), std::invalid_argument);
     EXPECT_THROW(doc.AddLayer("five", Pattern(2, 2, 5)), std::invalid_argument);
     EXPECT_THROW(doc.AddLayer("deep", Pattern(2, 2, 3, 16)), std::invalid_argument);
-    EXPECT_THROW(doc.AddLayer("short", image.bytes.data(), image.bytes.size() - 1, 2, 2, 3), std::invalid_argument);
-    EXPECT_THROW(doc.AddLayer("wide", nullptr, 0, 30001, 1, 3), std::invalid_argument);
+    EXPECT_THROW(doc.AddLayer("lab", Pattern(2, 2, 3, 8, ffpsd::ColorMode::kLab)), std::invalid_argument);
+    ffpsd::ImageView short_view = image;
+    short_view.size -= 1;
+    EXPECT_THROW(doc.AddLayer("short", short_view), std::invalid_argument);
+    ffpsd::ImageView wide = image;
+    wide.width = 30001;
+    EXPECT_THROW(doc.AddLayer("wide", wide), std::invalid_argument);
     EXPECT_EQ(doc.GetLayerCount(), 0u);
 
     // Photoshop keeps no layers in these modes, whatever the image.
@@ -81,6 +90,7 @@ TEST(LayerPixelsTest, SetPixelsReplacesColorAndTransparencyOnly)
     // A wrong image leaves the layer as it was.
     EXPECT_THROW(layer->SetPixels(Pattern(3, 2, 1)), std::invalid_argument);
     EXPECT_THROW(layer->SetPixels(Pattern(3, 2, 4, 16)), std::invalid_argument);
+    EXPECT_THROW(layer->SetPixels(Pattern(3, 2, 4, 8, ffpsd::ColorMode::kLab)), std::invalid_argument);
     EXPECT_EQ(layer->GetBounds().GetWidth(), 1890);
     EXPECT_EQ(layer->GetPixels().bytes, before.bytes);
 

@@ -1,19 +1,14 @@
-#include <ffpsd/c_api.h>
-#include <ffpsd/document.hpp>
-#include <ffpsd/layer.hpp>
-
-#if defined(FFPSD_HAS_PNG)
-#include <ffpsd/png.hpp>
-#endif
-
-#if defined(FFPSD_HAS_JPEG)
-#include <ffpsd/jpeg.hpp>
-#endif
+#include "detail/io/file.hpp"
+#include "formats/formats.hpp"
 
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <exception>
+#include <ffpsd/c_api.h>
+#include <ffpsd/document.hpp>
+#include <ffpsd/formats.hpp>
+#include <ffpsd/layer.hpp>
 #include <new>
 #include <optional>
 #include <stdexcept>
@@ -170,18 +165,16 @@ namespace
         return data;
     }
 
-    // One copy: the C++ setters take an Image.
-    ffpsd::Image ToImage(const ffpsd_image_view_t& view)
+    ffpsd::ImageView ToView(const ffpsd_image_view_t& view)
     {
-        const std::uint8_t* data = NeedBytes(view.data, view.size);
-
-        ffpsd::Image image;
+        ffpsd::ImageView image;
         image.width = view.width;
         image.height = view.height;
         image.channel_count = view.channel_count;
         image.depth = view.depth;
-        if (view.size != 0)
-            image.bytes.assign(data, data + view.size);
+        image.color_mode = static_cast<ffpsd::ColorMode>(view.color_mode);
+        image.data = NeedBytes(view.data, view.size);
+        image.size = view.size;
         return image;
     }
 
@@ -229,24 +222,8 @@ namespace
     using ffpsd::EncodePng;
     using ffpsd::LoadPng;
     using ffpsd::SavePng;
-
-    std::vector<std::uint8_t> LayerPng(const ffpsd::Layer& layer)
-    {
-        return layer.EncodePng();
-    }
-    void SaveLayerPng(const ffpsd::Layer& layer, const std::string& path)
-    {
-        layer.SavePng(path);
-    }
 #else
     // Never reached: RequirePng throws first. They keep the PNG entry points below compiling.
-    std::vector<std::uint8_t> LayerPng(const ffpsd::Layer&)
-    {
-        return {};
-    }
-    void SaveLayerPng(const ffpsd::Layer&, const std::string&)
-    {
-    }
     ffpsd::Image LoadPng(const std::string&, ffpsd::ColorMode, std::uint16_t)
     {
         return ffpsd::Image();
@@ -255,11 +232,11 @@ namespace
     {
         return ffpsd::Image();
     }
-    std::vector<std::uint8_t> EncodePng(const ffpsd::Image&)
+    std::vector<std::uint8_t> EncodePng(const ffpsd::ImageView&)
     {
         return {};
     }
-    void SavePng(const ffpsd::Image&, const std::string&)
+    void SavePng(const ffpsd::ImageView&, const std::string&)
     {
     }
 #endif
@@ -275,24 +252,8 @@ namespace
     using ffpsd::EncodeJpeg;
     using ffpsd::LoadJpeg;
     using ffpsd::SaveJpeg;
-
-    std::vector<std::uint8_t> LayerJpeg(const ffpsd::Layer& layer, int quality)
-    {
-        return layer.EncodeJpeg(quality);
-    }
-    void SaveLayerJpeg(const ffpsd::Layer& layer, const std::string& path, int quality)
-    {
-        layer.SaveJpeg(path, quality);
-    }
 #else
     // Never reached: RequireJpeg throws first. They keep the JPEG entry points below compiling.
-    std::vector<std::uint8_t> LayerJpeg(const ffpsd::Layer&, int)
-    {
-        return {};
-    }
-    void SaveLayerJpeg(const ffpsd::Layer&, const std::string&, int)
-    {
-    }
     ffpsd::Image LoadJpeg(const std::string&, ffpsd::ColorMode, std::uint16_t, bool)
     {
         return ffpsd::Image();
@@ -301,14 +262,25 @@ namespace
     {
         return ffpsd::Image();
     }
-    std::vector<std::uint8_t> EncodeJpeg(const ffpsd::Image&, int)
+    std::vector<std::uint8_t> EncodeJpeg(const ffpsd::ImageView&, int)
     {
         return {};
     }
-    void SaveJpeg(const ffpsd::Image&, const std::string&, int)
+    void SaveJpeg(const ffpsd::ImageView&, const std::string&, int)
     {
     }
 #endif
+
+    // UNSUPPORTED for a format this build lacks, as every PNG and JPEG call reports it.
+    ffpsd::Image LoadPicture(const std::uint8_t* data, std::size_t size, ffpsd_color_mode_t color_mode, std::uint16_t depth)
+    {
+        const std::optional<ffpsd::Format> format = ffpsd::detail::FindFormat(data, size);
+        if (format == ffpsd::Format::kPng)
+            RequirePng();
+        if (format == ffpsd::Format::kJpeg)
+            RequireJpeg();
+        return ffpsd::LoadPicture(data, size, static_cast<ffpsd::ColorMode>(color_mode), depth);
+    }
 
     template <typename T> const T* FoundOrThrow(const T* found, const char* what, std::uint32_t id)
     {
@@ -352,6 +324,7 @@ extern "C"
             view.height = value.height;
             view.channel_count = value.channel_count;
             view.depth = value.depth;
+            view.color_mode = static_cast<ffpsd_color_mode_t>(value.color_mode);
             view.data = value.bytes.data();
             view.size = value.bytes.size();
         });
@@ -657,19 +630,7 @@ extern "C"
             ffpsd_layer_t*& target = NeedOut(out);
             ffpsd::Document& value = Need(doc, "doc").value;
             const std::string layer_name(&Need(name, "name"));
-            if (image == nullptr)
-            {
-                target = ToHandle(value.AddLayer(layer_name, ffpsd::Image(), top, left));
-                return;
-            }
-
-            // The planar overload borrows the samples, so there is no copy.
-            if (image->depth != value.GetDepth())
-                throw std::invalid_argument(
-                    "ffpsd: a " + std::to_string(image->depth) + " bit image in a " + std::to_string(value.GetDepth()) + " bit document");
-            target = ToHandle(value.AddLayer(
-                layer_name, NeedBytes(image->data, image->size), image->size, image->width, image->height, image->channel_count, top,
-                left));
+            target = ToHandle(value.AddLayer(layer_name, image == nullptr ? ffpsd::ImageView() : ToView(*image), top, left));
         });
     }
     ffpsd_status_t
@@ -679,7 +640,7 @@ extern "C"
             ffpsd_layer_t*& target = NeedOut(out);
             ffpsd::Document& value = Need(doc, "doc").value;
             const std::string layer_name(&Need(name, "name"));
-            target = ToHandle(value.AddBackgroundLayer(layer_name, ToImage(Need(image, "image"))));
+            target = ToHandle(value.AddBackgroundLayer(layer_name, ToView(Need(image, "image"))));
         });
     }
     ffpsd_status_t ffpsd_document_set_background_layer(ffpsd_document_t* doc, size_t index)
@@ -758,7 +719,7 @@ extern "C"
     }
     ffpsd_status_t ffpsd_document_set_merged_image(ffpsd_document_t* doc, const ffpsd_image_view_t* image)
     {
-        return Guard([&] { Need(doc, "doc").value.SetMergedImage(ToImage(Need(image, "image"))); });
+        return Guard([&] { Need(doc, "doc").value.SetMergedImage(ToView(Need(image, "image"))); });
     }
 
     ffpsd_layer_kind_t ffpsd_layer_get_kind(const ffpsd_layer_t* layer)
@@ -811,6 +772,10 @@ extern "C"
     {
         return layer == nullptr ? 0 : reinterpret_cast<const ffpsd::Layer*>(layer)->GetBlendKey();
     }
+    ffpsd_status_t ffpsd_layer_set_name(ffpsd_layer_t* layer, const char* name)
+    {
+        return Guard([&] { ToLayer(layer).SetName(std::string(&Need(name, "name"))); });
+    }
     ffpsd_status_t ffpsd_layer_set_opacity(ffpsd_layer_t* layer, uint8_t opacity)
     {
         return Guard([&] { ToLayer(layer).SetOpacity(opacity); });
@@ -861,7 +826,7 @@ extern "C"
     }
     ffpsd_status_t ffpsd_layer_set_pixels(ffpsd_layer_t* layer, const ffpsd_image_view_t* image)
     {
-        return Guard([&] { ToLayer(layer).SetPixels(ToImage(Need(image, "image"))); });
+        return Guard([&] { ToLayer(layer).SetPixels(ToView(Need(image, "image"))); });
     }
 
     size_t ffpsd_layer_get_tagged_block_count(const ffpsd_layer_t* layer)
@@ -895,20 +860,25 @@ extern "C"
         });
     }
 
-    // Checked first, so a build without PNG reports UNSUPPORTED whatever the arguments.
-    ffpsd_status_t ffpsd_layer_save_as_png(const ffpsd_layer_t* layer, const char* path)
+    int ffpsd_format_is_supported(ffpsd_format_t format)
+    {
+        return ffpsd::IsFormatSupported(static_cast<ffpsd::Format>(format)) ? 1 : 0;
+    }
+
+    ffpsd_status_t ffpsd_picture_load(const char* path, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_image_t** out)
     {
         return Guard([&] {
-            RequirePng();
-            SaveLayerPng(ToLayer(layer), std::string(&Need(path, "path")));
+            ffpsd_image_t*& target = NeedOut(out);
+            const std::vector<std::uint8_t> data = ffpsd::detail::ReadFile(std::string(&Need(path, "path")));
+            target = NewImage(LoadPicture(data.data(), data.size(), color_mode, depth));
         });
     }
-    ffpsd_status_t ffpsd_layer_save_as_png_memory(const ffpsd_layer_t* layer, ffpsd_buffer_t** out)
+    ffpsd_status_t
+    ffpsd_picture_load_memory(const uint8_t* data, size_t size, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_image_t** out)
     {
         return Guard([&] {
-            ffpsd_buffer_t*& target = NeedOut(out);
-            RequirePng();
-            target = new ffpsd_buffer_t{LayerPng(ToLayer(layer))};
+            ffpsd_image_t*& target = NeedOut(out);
+            target = NewImage(LoadPicture(NeedBytes(data, size), size, color_mode, depth));
         });
     }
 
@@ -934,7 +904,7 @@ extern "C"
     {
         return Guard([&] {
             RequirePng();
-            SavePng(ToImage(Need(image, "image")), std::string(&Need(path, "path")));
+            SavePng(ToView(Need(image, "image")), std::string(&Need(path, "path")));
         });
     }
     ffpsd_status_t ffpsd_png_save_memory(const ffpsd_image_view_t* image, ffpsd_buffer_t** out)
@@ -942,24 +912,7 @@ extern "C"
         return Guard([&] {
             ffpsd_buffer_t*& target = NeedOut(out);
             RequirePng();
-            target = new ffpsd_buffer_t{EncodePng(ToImage(Need(image, "image")))};
-        });
-    }
-
-    // Checked first, so a build without JPEG reports UNSUPPORTED whatever the arguments.
-    ffpsd_status_t ffpsd_layer_save_as_jpeg(const ffpsd_layer_t* layer, const char* path, int quality)
-    {
-        return Guard([&] {
-            RequireJpeg();
-            SaveLayerJpeg(ToLayer(layer), std::string(&Need(path, "path")), quality);
-        });
-    }
-    ffpsd_status_t ffpsd_layer_save_as_jpeg_memory(const ffpsd_layer_t* layer, int quality, ffpsd_buffer_t** out)
-    {
-        return Guard([&] {
-            ffpsd_buffer_t*& target = NeedOut(out);
-            RequireJpeg();
-            target = new ffpsd_buffer_t{LayerJpeg(ToLayer(layer), quality)};
+            target = new ffpsd_buffer_t{EncodePng(ToView(Need(image, "image")))};
         });
     }
 
@@ -987,7 +940,7 @@ extern "C"
     {
         return Guard([&] {
             RequireJpeg();
-            SaveJpeg(ToImage(Need(image, "image")), std::string(&Need(path, "path")), quality);
+            SaveJpeg(ToView(Need(image, "image")), std::string(&Need(path, "path")), quality);
         });
     }
     ffpsd_status_t ffpsd_jpeg_save_memory(const ffpsd_image_view_t* image, int quality, ffpsd_buffer_t** out)
@@ -995,7 +948,7 @@ extern "C"
         return Guard([&] {
             ffpsd_buffer_t*& target = NeedOut(out);
             RequireJpeg();
-            target = new ffpsd_buffer_t{EncodeJpeg(ToImage(Need(image, "image")), quality)};
+            target = new ffpsd_buffer_t{EncodeJpeg(ToView(Need(image, "image")), quality)};
         });
     }
 } // extern "C"

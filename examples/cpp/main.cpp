@@ -1,5 +1,6 @@
-// Opens a PSD, prints what it holds, copies the top layer and saves the result.
+// Opens a PSD, prints what it holds, copies the top layer, adds a gradient and saves the result.
 #include <cstddef>
+#include <cstdint>
 #include <exception>
 #include <ffpsd/ffpsd.hpp>
 #include <iostream>
@@ -38,6 +39,29 @@ int main(int argc, char** argv)
         // Put a copy of the top layer on top; a group marker alone cannot be copied.
         const ffpsd::Layer* top = doc.GetLayerByIndex(doc.GetLayerCount() - 1);
         doc.AddLayerCopy(*top);
+
+        // Add a gradient over the canvas, planar as PSD keeps it: red grows to the right, green down, blue stays at half.
+        ffpsd::Image gradient;
+        gradient.width = doc.GetWidth();
+        gradient.height = doc.GetHeight();
+        gradient.color_mode = doc.GetColorMode();
+        gradient.channel_count = gradient.color_mode == ffpsd::ColorMode::kGrayscale ? 1 : 3;
+        gradient.bytes.resize(gradient.GetSizeBytes());
+        const std::size_t plane = std::size_t{gradient.width} * gradient.height;
+        for (std::uint32_t y = 0; y < gradient.height; ++y)
+        {
+            for (std::uint32_t x = 0; x < gradient.width; ++x)
+            {
+                const std::size_t at = std::size_t{y} * gradient.width + x;
+                gradient.bytes[at] = static_cast<std::uint8_t>(x * 255 / gradient.width);
+                if (gradient.channel_count == 3)
+                {
+                    gradient.bytes[plane + at] = static_cast<std::uint8_t>(y * 255 / gradient.height);
+                    gradient.bytes[2 * plane + at] = 128;
+                }
+            }
+        }
+        doc.AddLayer("Gradient", gradient);
 
         // Save, packed with RLE as Photoshop does.
         doc.Save(argv[2]);

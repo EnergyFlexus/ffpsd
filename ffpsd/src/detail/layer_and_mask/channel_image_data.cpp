@@ -1,6 +1,7 @@
 #include "detail/layer_and_mask/channel_image_data.hpp"
 
 #include <algorithm>
+#include <cstring>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -22,16 +23,23 @@ namespace ffpsd::detail
 
         ChannelImageData channel;
         channel.id = id;
-        if (id < kTransparencyId)
-        {
-            channel.data = PixelData::Unsized(std::move(bytes));
-            return channel;
-        }
-
         const auto rows = static_cast<std::size_t>(std::max(bounds.GetHeight(), 0));
         const auto width = static_cast<std::uint32_t>(std::max(bounds.GetWidth(), 0));
-        channel.data = PixelData(std::move(bytes), rows, RowBytes(width, depth));
+        channel.data = PixelData(std::move(bytes), rows, RowBytes(width, depth), SampleBytes(depth));
         return channel;
+    }
+
+    ChannelImageData EncodeOpaqueChannel(std::int16_t id, std::size_t width, std::size_t height, std::uint16_t depth, bool is_psb)
+    {
+        const std::size_t sample_size = SampleBytes(depth);
+        std::vector<std::uint8_t> samples(width * height * sample_size, 0xFF);
+        if (depth == 32)
+        {
+            const float full = 1.0f;
+            for (std::size_t at = 0; at < samples.size(); at += sizeof(full))
+                std::memcpy(samples.data() + at, &full, sizeof(full));
+        }
+        return EncodeChannelImageData(id, samples.data(), width, height, sample_size, is_psb);
     }
 
     ChannelImageData EncodeChannelImageData(
@@ -43,13 +51,11 @@ namespace ffpsd::detail
         const std::size_t size = width * height * bytes_per_sample;
         if (size == 0)
         {
-            channel.data = PixelData(std::vector<std::uint8_t>(sizeof(std::uint16_t), 0), 0, 0);
+            channel.data = PixelData(std::vector<std::uint8_t>(sizeof(std::uint16_t), 0), 0, 0, bytes_per_sample);
             return channel;
         }
 
-        std::vector<std::uint8_t> big_endian(samples, samples + size);
-        SwapSampleBytes(big_endian, bytes_per_sample);
-        channel.data = PixelData::Encode(big_endian.data(), height, width * bytes_per_sample, is_psb, kCompressionRle);
+        channel.data = PixelData::Encode(samples, height, width * bytes_per_sample, bytes_per_sample, is_psb, kCompressionRle);
         return channel;
     }
 } // namespace ffpsd::detail

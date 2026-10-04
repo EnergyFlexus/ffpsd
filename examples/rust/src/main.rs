@@ -1,4 +1,4 @@
-//! Opens a PSD, prints what it holds, copies the top layer and saves the result.
+//! Opens a PSD, prints what it holds, copies the top layer, adds a gradient and saves the result.
 mod ffi;
 
 use std::ffi::{CStr, CString};
@@ -65,6 +65,34 @@ fn run(input: &str, output: &str) -> Result<(), String> {
     check(unsafe { ffi::ffpsd_document_get_layer(doc.0, count.wrapping_sub(1), &mut top) })?;
     let mut copy = ptr::null_mut();
     check(unsafe { ffi::ffpsd_document_add_layer_copy(doc.0, top, &mut copy) })?;
+
+    // Add a gradient over the canvas, planar as PSD keeps it: red grows to the right, green down, blue stays at half.
+    let color_mode = unsafe { ffi::ffpsd_document_get_color_mode(doc.0) };
+    let channels: u16 = if color_mode == ffi::FFPSD_COLOR_MODE_GRAYSCALE { 1 } else { 3 };
+    let (columns, rows) = (width as usize, height as usize);
+    let plane = columns * rows;
+    let mut pixels = vec![128u8; plane * usize::from(channels)];
+    for y in 0..rows {
+        for x in 0..columns {
+            let at = y * columns + x;
+            pixels[at] = (x * 255 / columns) as u8;
+            if channels == 3 {
+                pixels[plane + at] = (y * 255 / rows) as u8;
+            }
+        }
+    }
+    let view = ffi::ffpsd_image_view_t {
+        width,
+        height,
+        channel_count: channels,
+        depth: 8,
+        color_mode,
+        data: pixels.as_ptr(),
+        size: pixels.len(),
+    };
+    let name = CString::new("Gradient").expect("the name has no null byte");
+    let mut gradient = ptr::null_mut();
+    check(unsafe { ffi::ffpsd_document_add_layer(doc.0, name.as_ptr(), &view, 0, 0, &mut gradient) })?;
 
     // Save, packed with RLE as Photoshop does.
     check(unsafe { ffi::ffpsd_document_save(doc.0, output_path.as_ptr(), ffi::FFPSD_COMPRESSION_RLE) })?;

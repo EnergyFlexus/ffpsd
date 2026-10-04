@@ -13,8 +13,7 @@ document/      document.hpp: the header, resources, the stack, parsing, saving,
 layer/         layer.hpp: properties, name, kind and blocks, pixels and position,
                the background, resizing
 adjustments/   adjustments.hpp: Levels
-png/           png.hpp; only with FFPSD_WITH_PNG
-jpeg/          jpeg.hpp; only with FFPSD_WITH_JPEG
+formats/       formats.hpp: LoadPicture; png and jpeg only with their options
 c_api/         c_api.h alone; c_header_check.c compiles it as C
 support/       test_support.hpp: the data files, their layer names, small builders
 data/          photoshop/: written by Photoshop; generated/: written by scripts/
@@ -34,10 +33,11 @@ and branch that is no longer covered. `--html DIR` shows it line by line.
 
 | File | What it holds |
 |------|---------------|
-| `photoshop/grayscale_two_layers.psd` | 836 x 1200 gray: a background and a fill layer with transparency |
+| `photoshop/grayscale_two_layers.psd` | 836 x 882 gray: a background and its copy with transparency |
 | `photoshop/rgb_two_layers.psd` | 1890 x 1417 RGB, RLE: a background and its copy with transparency |
 | `photoshop/rgb_levels.psd` | the same background under a Levels adjustment layer |
-| `photoshop/grayscale_two_layers_levels.psd` | the gray file under a Levels layer of 25 to 237 on its one channel |
+| `photoshop/grayscale_two_layers_levels.psd` | 836 x 879 gray: a background, its copy, whose 'lnsr' says 'bgnd' too, and a Levels layer of 25 to 237 |
+| `photoshop/rgb_masks.psd` | 1890 x 1417 RGB: a layer mask over the right half of a layer, and a pixel mask with an empty vector mask, channels -2 and -3 |
 | `generated/rgba_8bit.png` | 3 x 2 RGBA with known colors and alpha |
 | `generated/gray_16bit.png` | 2 x 2 16 bit gray |
 | `generated/palette_transparent.png` | 2 x 1 palette, one entry fully transparent |

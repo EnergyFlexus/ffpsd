@@ -67,6 +67,7 @@ namespace
         image.height = 16;
         image.channel_count = channels;
         image.depth = depth;
+        image.color_mode = channels <= 2 ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb;
         image.bytes.resize(image.GetSizeBytes());
         for (std::uint16_t channel = 0; channel < channels; ++channel)
         {
@@ -92,7 +93,7 @@ namespace
     }
 } // namespace
 
-TEST(JpegTest, LoadsTheColorsIntoPlanes)
+TEST(FormatsJpegTest, LoadsTheColorsIntoPlanes)
 {
     const ffpsd::Image rgb = ffpsd::LoadJpeg(Generated("rgb_quadrants.jpg"), ffpsd::ColorMode::kRgb, 8);
     EXPECT_EQ(rgb.width, 32u);
@@ -121,10 +122,11 @@ TEST(JpegTest, LoadsTheColorsIntoPlanes)
     EXPECT_TRUE(Near(RgbAt(cmyk, 13, 4), {127, 127, 127})); // half black
 }
 
-TEST(JpegTest, LoadsIntoTheModeAndDepthAskedFor)
+TEST(FormatsJpegTest, LoadsIntoTheModeAndDepthAskedFor)
 {
     const ffpsd::Image gray = ffpsd::LoadJpeg(Generated("rgb_quadrants.jpg"), ffpsd::ColorMode::kGrayscale, 8);
     ASSERT_EQ(gray.channel_count, 1u);
+    EXPECT_EQ(gray.color_mode, ffpsd::ColorMode::kGrayscale);
     EXPECT_NEAR(At(gray, 2, 2), 54, kTolerance);    // 0.2126 of red
     EXPECT_NEAR(At(gray, 29, 2), 182, kTolerance);  // 0.7152 of green
     EXPECT_NEAR(At(gray, 2, 13), 18, kTolerance);   // 0.0722 of blue
@@ -133,6 +135,7 @@ TEST(JpegTest, LoadsIntoTheModeAndDepthAskedFor)
     const ffpsd::Image one = ffpsd::LoadJpeg(Generated("gray.jpg"), ffpsd::ColorMode::kGrayscale, 8);
     const ffpsd::Image three = ffpsd::LoadJpeg(Generated("gray.jpg"), ffpsd::ColorMode::kRgb, 8);
     ASSERT_EQ(three.channel_count, 3u);
+    EXPECT_EQ(three.color_mode, ffpsd::ColorMode::kRgb);
     for (std::uint16_t channel = 0; channel < 3; ++channel)
         EXPECT_EQ(At(three, 13, 4, channel), At(one, 13, 4));
 
@@ -148,7 +151,7 @@ TEST(JpegTest, LoadsIntoTheModeAndDepthAskedFor)
     }
 }
 
-TEST(JpegTest, OrientationTurnsThePixelsUpright)
+TEST(FormatsJpegTest, OrientationTurnsThePixelsUpright)
 {
     struct Case
     {
@@ -188,7 +191,7 @@ TEST(JpegTest, OrientationTurnsThePixelsUpright)
     EXPECT_EQ(broken.bytes, stored.bytes);
 }
 
-TEST(JpegTest, LoadingRefusesWhatItCannotDo)
+TEST(FormatsJpegTest, LoadingRefusesWhatItCannotDo)
 {
     const std::vector<std::uint8_t> file = ReadFile(Generated("rgb_quadrants.jpg"));
     const std::vector<std::uint8_t> half(file.begin(), file.begin() + static_cast<std::ptrdiff_t>(file.size() / 2));
@@ -202,7 +205,7 @@ TEST(JpegTest, LoadingRefusesWhatItCannotDo)
     EXPECT_THROW(ffpsd::LoadJpeg(Generated("missing.jpg"), ffpsd::ColorMode::kRgb, 8), std::runtime_error);
 }
 
-TEST(JpegTest, EncodeThenLoadGivesTheColorsBack)
+TEST(FormatsJpegTest, EncodeThenLoadGivesTheColorsBack)
 {
     for (const std::uint16_t channels : {std::uint16_t{1}, std::uint16_t{2}, std::uint16_t{3}, std::uint16_t{4}})
     {
@@ -223,9 +226,14 @@ TEST(JpegTest, EncodeThenLoadGivesTheColorsBack)
 
     const ffpsd::Image image = ffpsd::LoadJpeg(Generated("rgb_quadrants.jpg"), ffpsd::ColorMode::kRgb, 8);
     EXPECT_LT(ffpsd::EncodeJpeg(image, 10).size(), ffpsd::EncodeJpeg(image, 100).size());
+
+    const std::filesystem::path path = std::filesystem::path(testing::TempDir()) / "ffpsd_image.jpg";
+    ffpsd::SaveJpeg(image, path.string(), 80);
+    EXPECT_EQ(ReadFile(path.string()), ffpsd::EncodeJpeg(image, 80));
+    std::filesystem::remove(path);
 }
 
-TEST(JpegTest, EncodingRefusesWhatJpegCannotHold)
+TEST(FormatsJpegTest, EncodingRefusesWhatJpegCannotHold)
 {
     ffpsd::Image cut = Pattern(2, 2, 3);
     cut.bytes.pop_back();
@@ -236,32 +244,8 @@ TEST(JpegTest, EncodingRefusesWhatJpegCannotHold)
     EXPECT_THROW(ffpsd::EncodeJpeg(Pattern(2, 2, 3), 0), std::invalid_argument);
     EXPECT_THROW(ffpsd::EncodeJpeg(Pattern(2, 2, 3), 101), std::invalid_argument);
     EXPECT_THROW(ffpsd::EncodeJpeg(cut), std::invalid_argument);
-}
 
-TEST(JpegTest, AGrayOrRgbLayerSavesWithoutItsTransparency)
-{
-    ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kRgb, 8, 16, 16);
-    const std::vector<std::uint8_t> jpeg = doc.AddLayer("blocks", Blocks(4, 8))->EncodeJpeg(100);
-    const ffpsd::Image loaded = ffpsd::LoadJpeg(jpeg.data(), jpeg.size(), ffpsd::ColorMode::kRgb, 8);
-    const ffpsd::Image expected = Blocks(3, 8);
-    ASSERT_EQ(loaded.bytes.size(), expected.bytes.size());
-    for (std::size_t i = 0; i < expected.bytes.size(); ++i)
-        ASSERT_NEAR(loaded.bytes[i], expected.bytes[i], kTolerance) << i;
-
-    const ffpsd::Document rgb = ffpsd::Document::Open(kRgbPsd);
-    const ffpsd::Layer* layer = rgb.GetLayerByIndex(1);
-    const std::filesystem::path layer_path = std::filesystem::path(testing::TempDir()) / "ffpsd_layer.jpg";
-    const std::filesystem::path image_path = std::filesystem::path(testing::TempDir()) / "ffpsd_image.jpg";
-    layer->SaveJpeg(layer_path.string(), 80);
-    ffpsd::SaveJpeg(layer->GetPixels(), image_path.string(), 80);
-    EXPECT_EQ(ReadFile(layer_path.string()), layer->EncodeJpeg(80));
-    EXPECT_EQ(ReadFile(image_path.string()), ffpsd::EncodeJpeg(layer->GetPixels(), 80));
-    std::filesystem::remove(layer_path);
-    std::filesystem::remove(image_path);
-
-    // A layer without pixels, or of another mode, makes no JPEG.
-    const ffpsd::Document levels = ffpsd::Document::Open(kRgbLevelsPsd);
-    ffpsd::Document cmyk = NewDocument(ffpsd::ColorMode::kCmyk);
-    EXPECT_THROW(levels.GetLayerByIndex(1)->EncodeJpeg(), std::invalid_argument);
-    EXPECT_THROW(cmyk.AddLayer("cmyk", Pattern(2, 2, 4))->EncodeJpeg(), std::invalid_argument);
+    // Channels alone would pass for RGB with alpha and RGB.
+    EXPECT_THROW(ffpsd::EncodeJpeg(Pattern(2, 2, 4, 8, ffpsd::ColorMode::kCmyk)), std::invalid_argument);
+    EXPECT_THROW(ffpsd::EncodeJpeg(Pattern(2, 2, 3, 8, ffpsd::ColorMode::kLab)), std::invalid_argument);
 }

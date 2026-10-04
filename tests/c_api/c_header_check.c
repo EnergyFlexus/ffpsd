@@ -7,7 +7,7 @@ int ffpsd_test_count_layers_from_c(const char* path)
 {
     ffpsd_document_t* doc = NULL;
     ffpsd_levels_channel_t identity = FFPSD_LEVELS_CHANNEL_IDENTITY;
-    ffpsd_image_view_t view = {0, 0, 0, 8, NULL, 0};
+    ffpsd_image_view_t view = {0, 0, 0, 8, FFPSD_COLOR_MODE_RGB, NULL, 0};
     int count = -1;
 
     if (ffpsd_document_open(path, &doc) != FFPSD_STATUS_OK)
