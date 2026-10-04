@@ -6,7 +6,6 @@
 #include "detail/layer_and_mask/layer_record.hpp"
 #include "detail/layer_and_mask/tagged_blocks/section_divider_setting.hpp"
 #include "detail/layer_and_mask/tagged_blocks/unicode_layer_name.hpp"
-#include "detail/resample.hpp"
 
 #include <algorithm>
 #include <cstdint>
