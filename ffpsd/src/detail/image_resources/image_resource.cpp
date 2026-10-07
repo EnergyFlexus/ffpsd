@@ -35,9 +35,7 @@ namespace ffpsd::detail
             entry.name = ReadPascalString(reader, kImageResourceNameAlignment);
 
             const std::uint32_t size = reader.ReadU32();
-            entry.data.resize(size);
-            if (size != 0)
-                reader.ReadU8Array(entry.data.data(), size);
+            entry.data = reader.ReadBytes(size);
             if (size % 2 != 0)
                 reader.Skip(1); // the pad byte is not counted in size
 

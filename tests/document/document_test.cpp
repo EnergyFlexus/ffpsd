@@ -103,3 +103,31 @@ TEST(DocumentTest, SectionBlocksAreARawDoor)
     EXPECT_EQ(doc.GetTaggedBlockByIndex(0)->key, Fourcc("cinf"));
     EXPECT_THROW(doc.GetTaggedBlockByIndex(1), std::out_of_range);
 }
+
+TEST(DocumentTest, TheCompositeIntoTheCallersMemoryMatchesGetMergedImage)
+{
+    const ffpsd::Document photoshop = ffpsd::Document::Open(kRgbPsd);
+    const ffpsd::Document raw = ffpsd::Document::Parse(photoshop.Save(ffpsd::Compression::kRaw));
+    for (const ffpsd::Document* doc : {&photoshop, &raw})
+    {
+        const ffpsd::Image image = doc->GetMergedImage();
+        const ffpsd::ImageInfo info = doc->GetMergedImageInfo();
+        EXPECT_EQ(info.width, image.width);
+        EXPECT_EQ(info.height, image.height);
+        EXPECT_EQ(info.channel_count, image.channel_count);
+        EXPECT_EQ(info.depth, image.depth);
+        EXPECT_EQ(info.GetSizeBytes(), image.bytes.size());
+
+        std::vector<std::uint8_t> bytes(info.GetSizeBytes(), 0xAB);
+        doc->GetMergedImageBytes(bytes.data(), bytes.size());
+        EXPECT_EQ(bytes, image.bytes);
+        EXPECT_THROW(doc->GetMergedImageBytes(bytes.data(), bytes.size() - 1), std::invalid_argument);
+    }
+
+    // Without a composite there is nothing to give, and nothing is asked.
+    const ffpsd::Document empty = NewDocument();
+    EXPECT_TRUE(empty.GetMergedImageInfo().IsEmpty());
+    EXPECT_NO_THROW(empty.GetMergedImageBytes(nullptr, 0));
+    std::uint8_t one = 0;
+    EXPECT_THROW(empty.GetMergedImageBytes(&one, 1), std::invalid_argument);
+}

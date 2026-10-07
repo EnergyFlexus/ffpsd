@@ -238,7 +238,27 @@ TEST(CApiTest, SaveTakesACompressionAndAPath)
     const std::string path = testing::TempDir() + "ffpsd_c_api_test.psd";
     ASSERT_EQ(ffpsd_document_save(file.doc, path.c_str(), FFPSD_COMPRESSION_RLE), FFPSD_STATUS_OK) << ffpsd_last_error();
     EXPECT_EQ(ReadFile(path), ReadFile(kRgbPsd));
+    ASSERT_EQ(ffpsd_document_save(file.doc, path.c_str(), FFPSD_COMPRESSION_DEFAULT), FFPSD_STATUS_OK) << ffpsd_last_error();
+    EXPECT_EQ(ReadFile(path), ReadFile(kRgbPsd));
     std::remove(path.c_str());
+}
+
+TEST(CApiTest, ChannelsTellHowTheyAreStored)
+{
+    OpenDocument file(kRgbPsd);
+    ffpsd_channel_compression_t merged = FFPSD_CHANNEL_COMPRESSION_RAW;
+    ASSERT_EQ(ffpsd_document_get_merged_compression(file.doc, &merged), FFPSD_STATUS_OK);
+    EXPECT_EQ(merged, FFPSD_CHANNEL_COMPRESSION_RLE);
+
+    ffpsd_layer_t* layer = nullptr;
+    ASSERT_EQ(ffpsd_document_get_layer(file.doc, 1, &layer), FFPSD_STATUS_OK);
+    ASSERT_EQ(ffpsd_layer_get_channel_count(layer), 4u);
+    ffpsd_channel_info_t channel{};
+    ASSERT_EQ(ffpsd_layer_get_channel_by_index(layer, 0, &channel), FFPSD_STATUS_OK);
+    EXPECT_EQ(channel.compression, FFPSD_CHANNEL_COMPRESSION_RLE);
+    EXPECT_GT(channel.size, 2u);
+    EXPECT_EQ(ffpsd_layer_get_channel_by_index(layer, 4, &channel), FFPSD_STATUS_OUT_OF_RANGE);
+    EXPECT_EQ(ffpsd_layer_get_channel_count(nullptr), 0u);
 }
 
 TEST(CApiTest, StackAndLayerEditsThroughC)
@@ -430,7 +450,7 @@ TEST(CApiTest, PngAndJpegThroughC)
     ASSERT_EQ(ffpsd_image_get_view(pixels, &pixels_view), FFPSD_STATUS_OK);
 
     ffpsd_buffer_t* png = nullptr;
-    const ffpsd_status_t status = ffpsd_png_save_memory(&pixels_view, &png);
+    const ffpsd_status_t status = ffpsd_png_save_memory(&pixels_view, FFPSD_PNG_COMPRESSION_FASTEST, &png);
 
 #if defined(FFPSD_HAS_PNG)
     ASSERT_EQ(status, FFPSD_STATUS_OK) << ffpsd_last_error();
@@ -509,4 +529,28 @@ TEST(CApiTest, APictureGoesByItsSignatureThroughC)
     EXPECT_EQ(ffpsd_picture_load_memory(psd, sizeof(psd), FFPSD_COLOR_MODE_RGB, 8, &image), FFPSD_STATUS_INVALID_FILE);
     EXPECT_EQ(ffpsd_picture_load(DataFile("no_such_file.png").c_str(), FFPSD_COLOR_MODE_RGB, 8, &image), FFPSD_STATUS_IO);
     EXPECT_EQ(image, nullptr);
+}
+
+TEST(CApiTest, PixelsIntoTheCallersMemory)
+{
+    OpenDocument file(kRgbPsd);
+    const ffpsd_layer_t* layer = Layer(file.doc, 1);
+    ffpsd_image_view_t info = {};
+    ASSERT_EQ(ffpsd_layer_get_pixels_info(layer, &info), FFPSD_STATUS_OK) << ffpsd_last_error();
+    EXPECT_EQ(info.data, nullptr);
+    EXPECT_EQ(info.size, std::size_t{info.width} * info.height * info.channel_count * (info.depth / 8));
+
+    std::vector<std::uint8_t> bytes(info.size);
+    ASSERT_EQ(ffpsd_layer_get_pixels_bytes(layer, bytes.data(), bytes.size()), FFPSD_STATUS_OK) << ffpsd_last_error();
+    EXPECT_EQ(bytes, Pixels(layer));
+    EXPECT_EQ(ffpsd_layer_get_pixels_bytes(layer, bytes.data(), bytes.size() - 1), FFPSD_STATUS_INVALID_ARGUMENT);
+
+    ffpsd_image_view_t merged_info = {};
+    ASSERT_EQ(ffpsd_document_get_merged_image_info(file.doc, &merged_info), FFPSD_STATUS_OK) << ffpsd_last_error();
+    std::vector<std::uint8_t> merged(merged_info.size);
+    ASSERT_EQ(ffpsd_document_get_merged_image_bytes(file.doc, merged.data(), merged.size()), FFPSD_STATUS_OK) << ffpsd_last_error();
+    ffpsd_image_t* image = nullptr;
+    ASSERT_EQ(ffpsd_document_get_merged_image(file.doc, &image), FFPSD_STATUS_OK);
+    EXPECT_EQ(merged, Bytes(image));
+    ffpsd_image_destroy(image);
 }

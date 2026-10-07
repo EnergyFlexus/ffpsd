@@ -127,6 +127,14 @@ namespace ffpsd
     {
         return detail::DecodeLayerPixels(*record_, document_->GetColorMode(), document_->GetDepth(), document_->IsPsb());
     }
+    ImageInfo Layer::GetPixelsInfo() const
+    {
+        return detail::LayerPixelsInfo(*record_, document_->GetColorMode(), document_->GetDepth());
+    }
+    void Layer::GetPixelsBytes(std::uint8_t* out, std::size_t size) const
+    {
+        detail::DecodeLayerPixels(*record_, document_->GetColorMode(), document_->GetDepth(), document_->IsPsb(), out, size);
+    }
 
     void Layer::SetPixels(const ImageView& image)
     {
@@ -254,6 +262,23 @@ namespace ffpsd
         record_->mask_data.clear();
         document_->SetHasRealMergedData(false);
         return true;
+    }
+
+    std::size_t Layer::GetChannelCount() const noexcept
+    {
+        return record_->channels.size();
+    }
+    ChannelInfo Layer::GetChannelByIndex(std::size_t index) const
+    {
+        if (index >= record_->channels.size())
+            throw std::out_of_range("ffpsd: channel index " + std::to_string(index) + " of " + std::to_string(record_->channels.size()));
+
+        const detail::ChannelImageData& channel = record_->channels[index];
+        ChannelInfo info;
+        info.id = channel.id;
+        info.compression = static_cast<ChannelCompression>(channel.data.GetCompression());
+        info.size = channel.data.GetBytes().size();
+        return info;
     }
 
     std::size_t Layer::GetTaggedBlockCount() const noexcept

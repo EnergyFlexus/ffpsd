@@ -15,8 +15,14 @@ namespace ffpsd::detail
     // Zeroed samples.
     Image MakeImage(std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, ColorMode color_mode);
 
+    // No samples yet, only the room for them: a decoder appends, which spares writing every byte twice.
+    Image ReserveImage(std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, ColorMode color_mode);
+
     // 8, 16 or 32 bit, and the bytes the geometry needs.
     void CheckImage(const ImageView& image);
+
+    // Memory a caller hands in for pixels of this shape: exactly its size, as a smaller one would be overrun.
+    void CheckBytesSize(const ImageInfo& info, const std::uint8_t* out, std::size_t size);
 
     // The colors of the mode and at most one plane more, transparency.
     void CheckColorChannels(const ImageView& image);

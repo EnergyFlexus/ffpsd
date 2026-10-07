@@ -90,9 +90,7 @@ namespace ffpsd::detail
                 throw std::runtime_error(
                     "ffpsd: tagged block '" + FourccString(block->key) + "' at offset " + std::to_string(block_start) + " claims " +
                     std::to_string(length) + " bytes, more than the section holds");
-            block->data.resize(static_cast<std::size_t>(length));
-            if (!block->data.empty())
-                reader.ReadU8Array(block->data.data(), block->data.size());
+            block->data = reader.ReadBytes(static_cast<std::size_t>(length));
 
             // Padding to 4 unless a block starts here (then it was 2, inside the length); the last may lack it.
             const std::size_t pad = (kAlignment - block->data.size() % kAlignment) % kAlignment;

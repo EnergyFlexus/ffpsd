@@ -109,16 +109,22 @@ TEST(FormatsPngTest, EncodeThenLoadGivesTheSamePlanes)
             const ffpsd::Image image = Pattern(5, 3, channels, depth);
             const ffpsd::ColorMode color_mode = channels < 3 ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb;
 
-            const std::vector<std::uint8_t> png = ffpsd::EncodePng(image);
+            for (const ffpsd::PngCompression compression :
+                 {ffpsd::PngCompression::kBalanced, ffpsd::PngCompression::kSmallest, ffpsd::PngCompression::kFastest})
+            {
+                const std::vector<std::uint8_t> png = ffpsd::EncodePng(image, compression);
+                const int mode = static_cast<int>(compression);
 
-            EXPECT_EQ(Header(png), std::make_tuple(5u, 3u, int{depth}, color_types[channels - 1])) << channels << " x " << depth;
-            EXPECT_EQ(ffpsd::LoadPng(png.data(), png.size(), color_mode, depth).bytes, image.bytes) << channels << " x " << depth;
+                EXPECT_EQ(Header(png), std::make_tuple(5u, 3u, int{depth}, color_types[channels - 1])) << channels << " x " << depth;
+                EXPECT_EQ(ffpsd::LoadPng(png.data(), png.size(), color_mode, depth).bytes, image.bytes)
+                    << channels << " x " << depth << ", mode " << mode;
+            }
         }
     }
 
     const std::filesystem::path path = std::filesystem::path(testing::TempDir()) / "ffpsd_image.png";
-    ffpsd::SavePng(Pattern(5, 3, 4), path.string());
-    EXPECT_EQ(ReadFile(path.string()), ffpsd::EncodePng(Pattern(5, 3, 4)));
+    ffpsd::SavePng(Pattern(5, 3, 4), path.string(), ffpsd::PngCompression::kFastest);
+    EXPECT_EQ(ReadFile(path.string()), ffpsd::EncodePng(Pattern(5, 3, 4), ffpsd::PngCompression::kFastest));
     std::filesystem::remove(path);
 }
 

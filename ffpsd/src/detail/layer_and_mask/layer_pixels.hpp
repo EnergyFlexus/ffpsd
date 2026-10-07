@@ -4,6 +4,7 @@
 #include "detail/layer_and_mask/channel_image_data.hpp"
 #include "detail/layer_and_mask/layer_record.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <ffpsd/image.hpp>
 #include <ffpsd/layer.hpp>
@@ -44,6 +45,11 @@ namespace ffpsd::detail
 
     // The color planes by channel id, then transparency when the layer has it; masks stay out.
     Image DecodeLayerPixels(const LayerRecord& record, ColorMode color_mode, std::uint16_t depth, bool is_psb);
+
+    // The shape DecodeLayerPixels gives, without decoding; the same into out, exactly its GetSizeBytes.
+    ImageInfo LayerPixelsInfo(const LayerRecord& record, ColorMode color_mode, std::uint16_t depth);
+    void DecodeLayerPixels(
+        const LayerRecord& record, ColorMode color_mode, std::uint16_t depth, bool is_psb, std::uint8_t* out, std::size_t size);
 
     // New color and transparency channels at the same top left corner; the masks stay.
     void ReplaceLayerPixels(LayerRecord& record, const ImageView& image, bool is_background, bool is_psb);

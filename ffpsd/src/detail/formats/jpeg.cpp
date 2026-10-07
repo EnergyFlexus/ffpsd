@@ -104,6 +104,26 @@ namespace ffpsd::detail
             }
         };
 
+        // The picture and its row buffers for libjpeg, made before the setjmp; narrow holds 16 bit rows taken to 8.
+        struct Interleaved
+        {
+            const ImageView* image = nullptr;
+            std::uint16_t colors = 0;
+            std::vector<std::uint8_t> row;
+            std::vector<std::uint8_t> narrow;
+        };
+
+        // Rounded, as libpng narrows 16 bit.
+        void NarrowRow(const std::uint8_t* samples, std::size_t count, std::uint8_t* out) noexcept
+        {
+            for (std::size_t i = 0; i < count; ++i)
+            {
+                std::uint16_t sample = 0;
+                std::memcpy(&sample, samples + i * 2, 2);
+                out[i] = static_cast<std::uint8_t>((sample * 255u + 32767) / 65535);
+            }
+        }
+
 #if defined(_MSC_VER)
 #pragma warning(push)
 #pragma warning(disable : 4611) // setjmp next to C++ objects: none of them lives in this frame
@@ -158,29 +178,34 @@ namespace ffpsd::detail
             return true;
         }
 
-        bool Encode(
-            Compressor& compressor, const std::vector<std::uint8_t>& pixels, std::uint32_t width, std::uint32_t height,
-            std::uint16_t channels, int quality)
+        bool Encode(Compressor& compressor, Interleaved& interleaved, int quality)
         {
             j_compress_ptr info = &compressor.info;
+            const ImageView& image = *interleaved.image;
             if (setjmp(compressor.error.jump))
                 return false;
 
             jpeg_CreateCompress(info, JPEG_LIB_VERSION, sizeof(jpeg_compress_struct));
             jpeg_mem_dest(info, &compressor.buffer, &compressor.size);
-            info->image_width = width;
-            info->image_height = height;
-            info->input_components = channels;
-            info->in_color_space = channels == 1 ? JCS_GRAYSCALE : JCS_RGB;
+            info->image_width = image.width;
+            info->image_height = image.height;
+            info->input_components = interleaved.colors;
+            info->in_color_space = interleaved.colors == 1 ? JCS_GRAYSCALE : JCS_RGB;
             jpeg_set_defaults(info);
             jpeg_set_quality(info, quality, TRUE);
             info->optimize_coding = TRUE;
             jpeg_start_compress(info, TRUE);
 
-            const std::size_t row_bytes = std::size_t{width} * channels;
+            // A row at a time, so the interleaved picture is never held whole.
             while (info->next_scanline < info->image_height)
             {
-                JSAMPROW row = const_cast<JSAMPROW>(pixels.data() + std::size_t{info->next_scanline} * row_bytes);
+                InterleaveRow(image, interleaved.colors, info->next_scanline, interleaved.row.data());
+                JSAMPROW row = interleaved.row.data();
+                if (image.depth == 16)
+                {
+                    NarrowRow(interleaved.row.data(), interleaved.narrow.size(), interleaved.narrow.data());
+                    row = interleaved.narrow.data();
+                }
                 jpeg_write_scanlines(info, &row, 1);
             }
             jpeg_finish_compress(info);
@@ -219,18 +244,6 @@ namespace ffpsd::detail
             return wide;
         }
 
-        // Rounded, as libpng narrows 16 bit.
-        std::vector<std::uint8_t> NarrowTo8(const std::vector<std::uint8_t>& samples)
-        {
-            std::vector<std::uint8_t> narrow(samples.size() / 2);
-            for (std::size_t i = 0; i < narrow.size(); ++i)
-            {
-                std::uint16_t sample = 0;
-                std::memcpy(&sample, samples.data() + i * 2, 2);
-                narrow[i] = static_cast<std::uint8_t>((sample * 255u + 32767) / 65535);
-            }
-            return narrow;
-        }
     } // namespace
 
     Image DecodeJpeg(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth, bool apply_orientation)
@@ -264,13 +277,15 @@ namespace ffpsd::detail
             throw std::invalid_argument("ffpsd: a JPEG side is at most " + std::to_string(JPEG_MAX_DIMENSION) + " pixels");
         CheckPicture(image, "JPEG");
 
-        const std::uint16_t colors = ColorChannelCount(image.color_mode);
-        std::vector<std::uint8_t> pixels = Interleave(image, colors);
+        Interleaved interleaved;
+        interleaved.image = &image;
+        interleaved.colors = ColorChannelCount(image.color_mode);
+        interleaved.row.resize(std::size_t{image.width} * interleaved.colors * image.GetBytesPerSample());
         if (image.depth == 16)
-            pixels = NarrowTo8(pixels);
+            interleaved.narrow.resize(std::size_t{image.width} * interleaved.colors);
 
         Compressor compressor;
-        if (!Encode(compressor, pixels, image.width, image.height, colors, quality))
+        if (!Encode(compressor, interleaved, quality))
             throw std::runtime_error(std::string("ffpsd: JPEG: ") + compressor.error.message);
         return std::vector<std::uint8_t>(compressor.buffer, compressor.buffer + compressor.size);
     }

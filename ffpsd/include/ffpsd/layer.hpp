@@ -47,6 +47,13 @@ namespace ffpsd
         std::uint8_t default_color = 255;
     };
 
+    struct ChannelInfo
+    {
+        std::int16_t id = 0; // 0 and up colors, -1 transparency, -2 and -3 masks
+        ChannelCompression compression = ChannelCompression::kRaw;
+        std::uint64_t size = 0; // the stored length, compression field and RLE row counts included
+    };
+
     // Created by Document::AddLayer; not copyable or movable, so a pointer to it stays valid.
     class Layer
     {
@@ -93,6 +100,10 @@ namespace ffpsd
         // Color planes by channel id, then transparency when the layer has one; decoded on each call.
         FFPSD_EXPORT Image GetPixels() const;
 
+        // Its shape without decoding, then its bytes into the caller's memory, exactly GetSizeBytes of it.
+        FFPSD_EXPORT ImageInfo GetPixelsInfo() const;
+        FFPSD_EXPORT void GetPixelsBytes(std::uint8_t* out, std::size_t size) const;
+
         // Replaces color and transparency at the same top left corner; masks stay, the composite goes stale.
         FFPSD_EXPORT void SetPixels(const ImageView& image);
 
@@ -114,6 +125,10 @@ namespace ffpsd
 
         // False when there is no pixel mask; a layer with a vector mask throws.
         FFPSD_EXPORT bool RemoveMask();
+
+        // In file order, masks included; a group's channels hold only a compression field.
+        FFPSD_EXPORT std::size_t GetChannelCount() const noexcept;
+        FFPSD_EXPORT ChannelInfo GetChannelByIndex(std::size_t index) const;
 
         // Raw door to this layer's blocks, unchecked; pointers live until the block is removed.
         FFPSD_EXPORT std::size_t GetTaggedBlockCount() const noexcept;

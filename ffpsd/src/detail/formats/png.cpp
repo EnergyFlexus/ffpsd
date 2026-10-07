@@ -17,6 +17,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <zlib.h>
 
 namespace ffpsd::detail
 {
@@ -164,15 +165,12 @@ namespace ffpsd::detail
             }
         };
 
-        // Interleaved rows ready for libpng, built before the setjmp.
+        // The picture and a row buffer for libpng, made before the setjmp.
         struct Interleaved
         {
-            std::uint32_t width = 0;
-            std::uint32_t height = 0;
-            int bit_depth = 8;
+            const ImageView* image = nullptr;
             int color_type = PNG_COLOR_TYPE_GRAY;
-            std::vector<std::uint8_t> bytes;
-            std::vector<png_bytep> rows;
+            std::vector<std::uint8_t> row;
         };
 
         void WriteData(png_structp png, png_bytep data, png_size_t count)
@@ -193,23 +191,44 @@ namespace ffpsd::detail
         {
         }
 
-        bool Encode(Writer& writer, Interleaved& image)
+        bool Encode(Writer& writer, Interleaved& interleaved, PngCompression compression)
         {
             png_structp png = writer.png;
             png_infop info = writer.info;
+            const ImageView& image = *interleaved.image;
             if (setjmp(png_jmpbuf(png)))
                 return false;
 
             png_set_write_fn(png, &writer, WriteData, FlushData);
             png_set_IHDR(
-                png, info, image.width, image.height, image.bit_depth, image.color_type, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT,
+                png, info, image.width, image.height, image.depth, interleaved.color_type, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT,
                 PNG_FILTER_TYPE_DEFAULT);
+
+            // Paeth alone packs about as small as every filter tried per row, in half the time; Z_RLE gives up flat areas for speed.
+            switch (compression)
+            {
+            case PngCompression::kSmallest:
+                png_set_compression_level(png, Z_BEST_COMPRESSION);
+                break;
+            case PngCompression::kFastest:
+                png_set_filter(png, PNG_FILTER_TYPE_BASE, PNG_FILTER_PAETH);
+                png_set_compression_strategy(png, Z_RLE);
+                break;
+            default:
+                png_set_filter(png, PNG_FILTER_TYPE_BASE, PNG_FILTER_PAETH);
+                break;
+            }
             png_write_info(png, info);
 
-            if (image.bit_depth == 16 && kNativeLittle)
+            if (image.depth == 16 && kNativeLittle)
                 png_set_swap(png);
 
-            png_write_image(png, image.rows.data());
+            // A row at a time, so the interleaved picture is never held whole.
+            for (std::uint32_t y = 0; y < image.height; ++y)
+            {
+                InterleaveRow(image, image.channel_count, y, interleaved.row.data());
+                png_write_row(png, interleaved.row.data());
+            }
             png_write_end(png, nullptr);
             return true;
         }
@@ -251,23 +270,16 @@ namespace ffpsd::detail
         return ConvertColorMode(std::move(decoded.planes), color_mode);
     }
 
-    std::vector<std::uint8_t> EncodePng(const ImageView& image)
+    std::vector<std::uint8_t> EncodePng(const ImageView& image, PngCompression compression)
     {
         if (image.width > kMaxSidePsb || image.height > kMaxSidePsb)
             throw std::invalid_argument("ffpsd: image is larger than a PSB allows");
         CheckPicture(image, "PNG");
 
         Interleaved interleaved;
-        interleaved.width = image.width;
-        interleaved.height = image.height;
-        interleaved.bit_depth = image.depth;
+        interleaved.image = &image;
         interleaved.color_type = ColorType(image);
-        interleaved.bytes = Interleave(image, image.channel_count);
-
-        const std::size_t row_bytes = std::size_t{image.width} * image.channel_count * image.GetBytesPerSample();
-        interleaved.rows.resize(image.height);
-        for (std::size_t y = 0; y < image.height; ++y)
-            interleaved.rows[y] = interleaved.bytes.data() + y * row_bytes;
+        interleaved.row.resize(std::size_t{image.width} * image.channel_count * image.GetBytesPerSample());
 
         std::vector<std::uint8_t> out;
         Writer writer;
@@ -279,7 +291,7 @@ namespace ffpsd::detail
         if (writer.info == nullptr)
             throw std::bad_alloc();
 
-        if (!Encode(writer, interleaved))
+        if (!Encode(writer, interleaved, compression))
             throw std::runtime_error(std::string("ffpsd: PNG: ") + writer.error);
         return out;
     }

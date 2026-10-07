@@ -35,6 +35,22 @@ fn layer_name(layer: *const ffi::ffpsd_layer_t) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&buffer).into_owned())
 }
 
+/// The layer's planes straight into a Vec of ours: the shape first, then exactly that many bytes.
+///
+/// Another path: ffpsd decodes into an image it owns, read through a view and destroyed after:
+///     ffpsd_layer_get_pixels(layer, &mut image);
+///     ffpsd_image_get_view(image, &mut view);
+///     let pixels = slice::from_raw_parts(view.data, view.size).to_vec();
+///     ffpsd_image_destroy(image);
+fn layer_pixels(layer: *const ffi::ffpsd_layer_t) -> Result<(ffi::ffpsd_image_view_t, Vec<u8>), String> {
+    let mut info = ffi::ffpsd_image_view_t::default();
+    check(unsafe { ffi::ffpsd_layer_get_pixels_info(layer, &mut info) })?;
+    // Zeroed, so no unsafe set_len; Vec::with_capacity and set_len after the call would skip the zeros for big pictures.
+    let mut pixels = vec![0u8; info.size];
+    check(unsafe { ffi::ffpsd_layer_get_pixels_bytes(layer, pixels.as_mut_ptr(), pixels.len()) })?;
+    Ok((info, pixels))
+}
+
 fn run(input: &str, output: &str) -> Result<(), String> {
     let input_path = CString::new(input).map_err(|_| format!("{input}: a path with a null byte"))?;
     let output_path = CString::new(output).map_err(|_| format!("{output}: a path with a null byte"))?;
@@ -59,11 +75,23 @@ fn run(input: &str, output: &str) -> Result<(), String> {
         check(unsafe { ffi::ffpsd_document_get_layer(doc.0, index, &mut layer) })?;
         let mut bounds = ffi::ffpsd_rect_t::default();
         check(unsafe { ffi::ffpsd_layer_get_bounds(layer, &mut bounds) })?;
+        let (info, pixels) = layer_pixels(layer)?;
+
+        // Planes lie one after another, so the first plane is the first width * height samples.
+        let plane = info.width as usize * info.height as usize;
+        let mean = match (info.depth, plane) {
+            (8, 1..) => format!(
+                ", mean of the first plane {}",
+                pixels[..plane].iter().map(|&v| u64::from(v)).sum::<u64>() / plane as u64
+            ),
+            _ => String::new(),
+        };
         println!(
-            "  {index}: {}, {} x {}",
+            "  {index}: {}, {} x {}, {} planes{mean}",
             layer_name(layer)?,
             bounds.right - bounds.left,
-            bounds.bottom - bounds.top
+            bounds.bottom - bounds.top,
+            info.channel_count
         );
     }
 

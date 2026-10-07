@@ -5,7 +5,6 @@
 
 #include <cstdint>
 #include <ffpsd/image.hpp>
-#include <vector>
 
 namespace ffpsd::detail
 {
@@ -20,8 +19,8 @@ namespace ffpsd::detail
         const std::uint8_t* pixels, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth,
         Orientation orientation = Orientation::kNormal);
 
-    // The first channel_count planes of the image as interleaved pixels, as codecs take them.
-    std::vector<std::uint8_t> Interleave(const ImageView& image, std::uint16_t channel_count);
+    // Row y of the first channel_count planes as interleaved pixels, as codecs take them.
+    void InterleaveRow(const ImageView& image, std::uint16_t channel_count, std::uint32_t y, std::uint8_t* out) noexcept;
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_FORMATS_PLANES_HPP_

@@ -17,6 +17,14 @@ namespace ffpsd
         kJpeg
     };
 
+    // Speed against size of a written PNG; kFastest can grow flat pictures a few times over.
+    enum class PngCompression : std::uint8_t
+    {
+        kBalanced = 0,
+        kSmallest = 1,
+        kFastest = 2
+    };
+
     // Whether this build reads and writes the format.
     FFPSD_EXPORT bool IsFormatSupported(Format format) noexcept;
 
@@ -30,8 +38,8 @@ namespace ffpsd
     FFPSD_EXPORT Image LoadPng(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth);
 
     // Gray, gray with alpha, RGB or RGBA by the channel count; 8 or 16 bit.
-    FFPSD_EXPORT std::vector<std::uint8_t> EncodePng(const ImageView& image);
-    FFPSD_EXPORT void SavePng(const ImageView& image, const std::string& path);
+    FFPSD_EXPORT std::vector<std::uint8_t> EncodePng(const ImageView& image, PngCompression compression = PngCompression::kBalanced);
+    FFPSD_EXPORT void SavePng(const ImageView& image, const std::string& path, PngCompression compression = PngCompression::kBalanced);
 #endif
 
 #if defined(FFPSD_HAS_JPEG)

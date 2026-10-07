@@ -32,6 +32,27 @@ namespace ffpsd::detail
         return image;
     }
 
+    Image ReserveImage(std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, ColorMode color_mode)
+    {
+        Image image;
+        image.width = width;
+        image.height = height;
+        image.channel_count = channel_count;
+        image.depth = depth;
+        image.color_mode = color_mode;
+        image.bytes.reserve(image.GetSizeBytes());
+        return image;
+    }
+
+    void CheckBytesSize(const ImageInfo& info, const std::uint8_t* out, std::size_t size)
+    {
+        if (size != info.GetSizeBytes())
+            throw std::invalid_argument(
+                "ffpsd: " + std::to_string(size) + " bytes given for pixels of " + std::to_string(info.GetSizeBytes()));
+        if (size != 0 && out == nullptr)
+            throw std::invalid_argument("ffpsd: no memory given for the pixels");
+    }
+
     void CheckImage(const ImageView& image)
     {
         if (!IsSampleDepth(image.depth))

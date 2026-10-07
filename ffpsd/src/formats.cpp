@@ -59,8 +59,8 @@ namespace ffpsd
 
     Image LoadPicture(const std::string& path, ColorMode color_mode, std::uint16_t depth)
     {
-        const std::vector<std::uint8_t> data = detail::ReadFile(path);
-        return LoadPicture(data.data(), data.size(), color_mode, depth);
+        const detail::FileData file = detail::ReadFile(path);
+        return LoadPicture(file.bytes.get(), file.size, color_mode, depth);
     }
 
 #if defined(FFPSD_HAS_PNG)
@@ -71,18 +71,18 @@ namespace ffpsd
 
     Image LoadPng(const std::string& path, ColorMode color_mode, std::uint16_t depth)
     {
-        const std::vector<std::uint8_t> data = detail::ReadFile(path);
-        return detail::DecodePng(data.data(), data.size(), color_mode, depth);
+        const detail::FileData file = detail::ReadFile(path);
+        return detail::DecodePng(file.bytes.get(), file.size, color_mode, depth);
     }
 
-    std::vector<std::uint8_t> EncodePng(const ImageView& image)
+    std::vector<std::uint8_t> EncodePng(const ImageView& image, PngCompression compression)
     {
-        return detail::EncodePng(image);
+        return detail::EncodePng(image, compression);
     }
 
-    void SavePng(const ImageView& image, const std::string& path)
+    void SavePng(const ImageView& image, const std::string& path, PngCompression compression)
     {
-        detail::WriteFile(path, detail::EncodePng(image));
+        detail::WriteFile(path, detail::EncodePng(image, compression));
     }
 #endif
 
@@ -94,8 +94,8 @@ namespace ffpsd
 
     Image LoadJpeg(const std::string& path, ColorMode color_mode, std::uint16_t depth, bool apply_orientation)
     {
-        const std::vector<std::uint8_t> data = detail::ReadFile(path);
-        return detail::DecodeJpeg(data.data(), data.size(), color_mode, depth, apply_orientation);
+        const detail::FileData file = detail::ReadFile(path);
+        return detail::DecodeJpeg(file.bytes.get(), file.size, color_mode, depth, apply_orientation);
     }
 
     std::vector<std::uint8_t> EncodeJpeg(const ImageView& image, int quality)

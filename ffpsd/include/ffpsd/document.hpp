@@ -10,6 +10,7 @@
 #include <ffpsd/tagged_block.hpp>
 #include <ffpsd/types.hpp>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -24,8 +25,8 @@ namespace ffpsd
         FFPSD_EXPORT static Document Parse(const std::uint8_t* data, std::size_t size);
 
         // Unknown blocks, masks and ZIP data are written as read; without a composite, section 5 gets zeros.
-        FFPSD_EXPORT void Save(const std::string& path, Compression compression = Compression::kRleOrRaw) const;
-        FFPSD_EXPORT std::vector<std::uint8_t> Save(Compression compression = Compression::kRleOrRaw) const;
+        FFPSD_EXPORT void Save(const std::string& path, Compression compression = Compression::kDefault) const;
+        FFPSD_EXPORT std::vector<std::uint8_t> Save(Compression compression = Compression::kDefault) const;
 
         // Multichannel throws: it has no fixed channel count. A side over 30000 makes it a PSB.
         FFPSD_EXPORT Document(std::uint32_t width, std::uint32_t height, ColorMode color_mode, std::uint16_t depth = 8);
@@ -129,6 +130,12 @@ namespace ffpsd
 
         // Section 5, decoded on each call; an empty Image when the file has none.
         FFPSD_EXPORT Image GetMergedImage() const;
+
+        // Its shape without decoding, then its bytes into the caller's memory, exactly GetSizeBytes of it.
+        FFPSD_EXPORT ImageInfo GetMergedImageInfo() const;
+        FFPSD_EXPORT void GetMergedImageBytes(std::uint8_t* out, std::size_t size) const;
+
+        FFPSD_EXPORT std::optional<ChannelCompression> GetMergedCompression() const noexcept;
 
         // Channels past the colors are alpha or spot channels and set the channel count; sets has_real_merged_data.
         FFPSD_EXPORT void SetMergedImage(const ImageView& image);

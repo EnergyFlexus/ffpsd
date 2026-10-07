@@ -453,8 +453,8 @@ namespace ffpsd
         std::vector<std::pair<detail::PixelData*, detail::PixelData>> converted;
         const auto convert = [&](detail::PixelData& data) {
             const Compression kept = data.GetCompression() == detail::kCompressionRaw ? Compression::kRaw : Compression::kRle;
-            if (data.NeedsConversion(from_psb, psb, kept))
-                converted.emplace_back(&data, data.Converted(from_psb, psb, kept));
+            if (std::optional<detail::PixelData> result = data.Converted(from_psb, psb, kept))
+                converted.emplace_back(&data, std::move(*result));
         };
         for (const std::unique_ptr<Layer>& layer : impl_->layers)
         {
@@ -714,6 +714,21 @@ namespace ffpsd
         return detail::DecodeImageData(
             impl_->image_data, impl_->width, impl_->height, impl_->channel_count, impl_->depth, impl_->color_mode, IsPsb());
     }
+    ImageInfo Document::GetMergedImageInfo() const
+    {
+        return detail::ImageDataInfo(impl_->image_data, impl_->width, impl_->height, impl_->channel_count, impl_->depth, impl_->color_mode);
+    }
+    void Document::GetMergedImageBytes(std::uint8_t* out, std::size_t size) const
+    {
+        detail::DecodeImageData(impl_->image_data, GetMergedImageInfo(), IsPsb(), out, size);
+    }
+
+    std::optional<ChannelCompression> Document::GetMergedCompression() const noexcept
+    {
+        if (impl_->image_data.IsEmpty())
+            return std::nullopt;
+        return static_cast<ChannelCompression>(impl_->image_data.GetCompression());
+    }
 
     void Document::SetMergedImage(const ImageView& image)
     {
@@ -791,9 +806,10 @@ namespace ffpsd
         // Only data in another compression is packed again; a deque keeps the pointers to it valid.
         std::deque<detail::PixelData> repacked;
         const auto choose = [&](const detail::PixelData& data) {
-            if (!data.NeedsConversion(IsPsb(), IsPsb(), compression))
+            std::optional<detail::PixelData> result = data.Converted(IsPsb(), IsPsb(), compression);
+            if (!result.has_value())
                 return &data;
-            return static_cast<const detail::PixelData*>(&repacked.emplace_back(data.Converted(IsPsb(), IsPsb(), compression)));
+            return static_cast<const detail::PixelData*>(&repacked.emplace_back(std::move(*result)));
         };
 
         std::vector<detail::LayerToWrite> layers;
@@ -830,7 +846,8 @@ namespace ffpsd
 
     Document Document::Open(const std::string& path)
     {
-        return Parse(detail::ReadFile(path));
+        const detail::FileData file = detail::ReadFile(path);
+        return Parse(file.bytes.get(), file.size);
     }
 
     Document Document::Parse(const std::vector<std::uint8_t>& data)

@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
-#include <vector>
 
 namespace ffpsd::detail
 {
@@ -102,6 +101,39 @@ namespace ffpsd::detail
                 }
             }
         }
+        // SplitRow backwards: a sample size known at compile time makes each copy a plain move instead of a call.
+        template <std::size_t kSample, std::uint16_t kChannels>
+        void JoinRow(const std::uint8_t* in, std::uint32_t width, std::size_t plane_bytes, std::uint8_t* out) noexcept
+        {
+            for (std::uint16_t channel = 0; channel < kChannels; ++channel, in += plane_bytes)
+            {
+                for (std::uint32_t x = 0; x < width; ++x)
+                    std::memcpy(out + (x * kChannels + channel) * kSample, in + x * kSample, kSample);
+            }
+        }
+
+        template <std::size_t kSample>
+        void
+        JoinRow(const std::uint8_t* in, std::uint32_t width, std::uint16_t channels, std::size_t plane_bytes, std::uint8_t* out) noexcept
+        {
+            switch (channels)
+            {
+            case 1:
+                return JoinRow<kSample, 1>(in, width, plane_bytes, out);
+            case 2:
+                return JoinRow<kSample, 2>(in, width, plane_bytes, out);
+            case 3:
+                return JoinRow<kSample, 3>(in, width, plane_bytes, out);
+            case 4:
+                return JoinRow<kSample, 4>(in, width, plane_bytes, out);
+            default:
+                for (std::uint16_t channel = 0; channel < channels; ++channel, in += plane_bytes)
+                {
+                    for (std::uint32_t x = 0; x < width; ++x)
+                        std::memcpy(out + (std::size_t{x} * channels + channel) * kSample, in + x * kSample, kSample);
+                }
+            }
+        }
     } // namespace
 
     Image MakePlanes(std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth)
@@ -159,17 +191,19 @@ namespace ffpsd::detail
         return image;
     }
 
-    std::vector<std::uint8_t> Interleave(const ImageView& image, std::uint16_t channel_count)
+    void InterleaveRow(const ImageView& image, std::uint16_t channel_count, std::uint32_t y, std::uint8_t* out) noexcept
     {
-        const std::size_t sample = image.GetBytesPerSample();
-        const std::size_t pixels = std::size_t{image.width} * image.height;
-        std::vector<std::uint8_t> out(pixels * channel_count * sample);
-        for (std::size_t channel = 0; channel < channel_count; ++channel)
+        const std::size_t row_bytes = std::size_t{image.width} * image.GetBytesPerSample();
+        const std::size_t plane_bytes = row_bytes * image.height;
+        const std::uint8_t* in = image.data + y * row_bytes;
+        switch (image.GetBytesPerSample())
         {
-            const std::uint8_t* plane = image.data + channel * pixels * sample;
-            for (std::size_t i = 0; i < pixels; ++i)
-                std::memcpy(out.data() + (i * channel_count + channel) * sample, plane + i * sample, sample);
+        case 1:
+            return JoinRow<1>(in, image.width, channel_count, plane_bytes, out);
+        case 2:
+            return JoinRow<2>(in, image.width, channel_count, plane_bytes, out);
+        default:
+            return JoinRow<4>(in, image.width, channel_count, plane_bytes, out);
         }
-        return out;
     }
 } // namespace ffpsd::detail

@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <ffpsd/ffpsd.hpp>
 #include <gtest/gtest.h>
+#include <optional>
+#include <stdexcept>
 #include <vector>
 
 using namespace ffpsd_test;
@@ -13,7 +15,7 @@ TEST(DocumentCompressionTest, RawAndRleGiveTheSamePixels)
     const ffpsd::Document original = ffpsd::Document::Open(kRgbPsd);
 
     const std::vector<std::uint8_t> raw = original.Save(ffpsd::Compression::kRaw);
-    const std::vector<std::uint8_t> rle = ffpsd::Document::Parse(raw).Save();
+    const std::vector<std::uint8_t> rle = ffpsd::Document::Parse(raw).Save(ffpsd::Compression::kRleOrRaw);
 
     // Section 5 ends the file: a compression field of 0, then every plane of 1890 x 1417 x 3.
     const std::size_t composite = std::size_t{1890} * 1417 * 3;
@@ -89,4 +91,82 @@ TEST(DocumentCompressionTest, RleIsKeptOnlyWhereItPacks)
     std::fill(wide.bytes.begin() + 80000, wide.bytes.end(), std::uint8_t{0});
     wide_doc.AddLayer("wide", wide);
     EXPECT_EQ(ffpsd::Document::Parse(wide_doc.Save()).GetLayerByIndex(0)->GetPixels().bytes, WithOpaqueAlpha(wide).bytes);
+}
+
+TEST(DocumentCompressionTest, DefaultKeepsEachChannelAsStored)
+{
+    const ffpsd::Document photoshop = ffpsd::Document::Open(kRgbPsd);
+    EXPECT_EQ(photoshop.Save(), ReadFile(kRgbPsd));
+
+    // Raw from the file stays raw, though RLE would pack it; kRleOrRaw packs it again.
+    const std::vector<std::uint8_t> raw = photoshop.Save(ffpsd::Compression::kRaw);
+    const ffpsd::Document back = ffpsd::Document::Parse(raw);
+    EXPECT_EQ(back.Save(), raw);
+    EXPECT_LT(back.Save(ffpsd::Compression::kRleOrRaw).size(), raw.size());
+}
+
+TEST(DocumentCompressionTest, DefaultSavesANewDocumentAsRleOrRaw)
+{
+    ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kRgb, 8, 64, 64);
+    ffpsd::Image noise = Pattern(64, 64, 4);
+    for (std::size_t i = 0; i < noise.bytes.size(); ++i)
+        noise.bytes[i] = static_cast<std::uint8_t>((i * 2654435761u) >> 13);
+    doc.AddLayer("noise", noise);
+    ffpsd::Image flat = Pattern(64, 64, 4);
+    std::fill(flat.bytes.begin(), flat.bytes.end(), std::uint8_t{200});
+    doc.AddLayer("flat", flat);
+
+    EXPECT_EQ(doc.Save(), doc.Save(ffpsd::Compression::kRleOrRaw));
+    doc.SetMergedImage(Pattern(64, 64, 3));
+    EXPECT_EQ(doc.Save(), doc.Save(ffpsd::Compression::kRleOrRaw));
+}
+
+TEST(DocumentCompressionTest, ChannelsTellHowTheyAreStored)
+{
+    const ffpsd::Document photoshop = ffpsd::Document::Open(kRgbPsd);
+    EXPECT_EQ(photoshop.GetMergedCompression(), ffpsd::ChannelCompression::kRle);
+
+    const ffpsd::Layer& layer = *photoshop.GetLayerByIndex(1);
+    ASSERT_EQ(layer.GetChannelCount(), 4u);
+    std::vector<std::int16_t> ids;
+    for (std::size_t i = 0; i < layer.GetChannelCount(); ++i)
+    {
+        const ffpsd::ChannelInfo channel = layer.GetChannelByIndex(i);
+        ids.push_back(channel.id);
+        EXPECT_EQ(channel.compression, ffpsd::ChannelCompression::kRle);
+        EXPECT_GT(channel.size, 2u);
+    }
+    std::sort(ids.begin(), ids.end());
+    EXPECT_EQ(ids, (std::vector<std::int16_t>{-1, 0, 1, 2}));
+    EXPECT_THROW(layer.GetChannelByIndex(4), std::out_of_range);
+
+    // Noise does not pack, so the new layer is raw: a compression field and 64 x 64 bytes a channel.
+    ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kGrayscale, 8, 64, 64);
+    EXPECT_EQ(doc.GetMergedCompression(), std::nullopt);
+    ffpsd::Image noise = Pattern(64, 64, 1);
+    for (std::size_t i = 0; i < noise.bytes.size(); ++i)
+        noise.bytes[i] = static_cast<std::uint8_t>((i * 2654435761u) >> 13);
+    const ffpsd::Layer& added = *doc.AddLayer("noise", noise);
+    for (std::size_t i = 0; i < added.GetChannelCount(); ++i)
+    {
+        const ffpsd::ChannelInfo channel = added.GetChannelByIndex(i);
+        if (channel.id != 0)
+            continue;
+        EXPECT_EQ(channel.compression, ffpsd::ChannelCompression::kRaw);
+        EXPECT_EQ(channel.size, 2u + 64 * 64);
+    }
+}
+
+TEST(DocumentCompressionTest, NoiseAtTheTopDoesNotKeepTheRestRaw)
+{
+    // The top 10% is noise, the rest flat: RLE still packs the layer to a fraction of its 4 x 64 x 160 bytes.
+    ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kRgb, 8, 64, 160);
+    ffpsd::Image picture = Pattern(64, 160, 4);
+    const std::size_t plane = std::size_t{64} * 160;
+    for (std::size_t i = 0; i < picture.bytes.size(); ++i)
+        picture.bytes[i] = i % plane < plane / 10 ? static_cast<std::uint8_t>((i * 2654435761u) >> 13) : std::uint8_t{0};
+    const ffpsd::Layer& layer = *doc.AddLayer("top noise", picture);
+    for (std::size_t i = 0; i < layer.GetChannelCount(); ++i)
+        EXPECT_EQ(layer.GetChannelByIndex(i).compression, ffpsd::ChannelCompression::kRle) << layer.GetChannelByIndex(i).id;
+    EXPECT_EQ(ffpsd::Document::Parse(doc.Save()).GetLayerByIndex(0)->GetPixels().bytes, picture.bytes);
 }

@@ -47,6 +47,9 @@ namespace ffpsd::detail
         // A 4 byte length and that many bytes, which must end by end.
         std::vector<std::uint8_t> ReadBlob(std::size_t end, const char* what);
 
+        // Copied once: a sized vector would be zeroed before the copy.
+        std::vector<std::uint8_t> ReadBytes(std::size_t count);
+
         std::uint8_t ReadU8();
         std::uint16_t ReadU16();
         std::uint32_t ReadU32();

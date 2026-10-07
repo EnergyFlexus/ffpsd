@@ -47,13 +47,23 @@ extern "C"
         FFPSD_LAYER_KIND_ADJUSTMENT = 4
     } ffpsd_layer_kind_t;
 
-    /* How a save writes pixel data: RLE everywhere, as Photoshop writes it, or for each channel the smaller of RLE and raw. */
+    /* How a save writes pixel data; DEFAULT keeps each channel as stored, pixels set through ffpsd being RLE_OR_RAW. */
     typedef enum ffpsd_compression_t
     {
-        FFPSD_COMPRESSION_RAW = 0,
-        FFPSD_COMPRESSION_RLE = 1,
-        FFPSD_COMPRESSION_RLE_OR_RAW = 2
+        FFPSD_COMPRESSION_DEFAULT = 0,
+        FFPSD_COMPRESSION_RAW = 1,
+        FFPSD_COMPRESSION_RLE = 2,
+        FFPSD_COMPRESSION_RLE_OR_RAW = 3
     } ffpsd_compression_t;
+
+    /* A channel's compression field as the file stores it. */
+    typedef enum ffpsd_channel_compression_t
+    {
+        FFPSD_CHANNEL_COMPRESSION_RAW = 0,
+        FFPSD_CHANNEL_COMPRESSION_RLE = 1,
+        FFPSD_CHANNEL_COMPRESSION_ZIP = 2,
+        FFPSD_CHANNEL_COMPRESSION_ZIP_PREDICTION = 3
+    } ffpsd_channel_compression_t;
 
     typedef enum ffpsd_resample_filter_t
     {
@@ -95,6 +105,14 @@ extern "C"
         FFPSD_FORMAT_JPEG = 1
     } ffpsd_format_t;
 
+    /* Speed against size of a written PNG; FASTEST can grow flat pictures a few times over. */
+    typedef enum ffpsd_png_compression_t
+    {
+        FFPSD_PNG_COMPRESSION_BALANCED = 0,
+        FFPSD_PNG_COMPRESSION_SMALLEST = 1,
+        FFPSD_PNG_COMPRESSION_FASTEST = 2
+    } ffpsd_png_compression_t;
+
     /* Owned by the caller, released with its _destroy. */
     typedef struct ffpsd_document_t ffpsd_document_t;
     typedef struct ffpsd_image_t ffpsd_image_t;
@@ -112,6 +130,14 @@ extern "C"
         int32_t bottom;
         int32_t right;
     } ffpsd_rect_t;
+
+    /* size is the stored length, compression field and RLE row counts included. */
+    typedef struct ffpsd_channel_info_t
+    {
+        int16_t id;
+        ffpsd_channel_compression_t compression;
+        uint64_t size;
+    } ffpsd_channel_info_t;
 
     /* Planar samples in native byte order; as an input it only has to live for the call. */
     typedef struct ffpsd_image_view_t
@@ -288,7 +314,14 @@ extern "C"
 
     /* An empty image when the file has none. Setting it sets has_real_merged_data. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_get_merged_image(const ffpsd_document_t* doc, ffpsd_image_t** out);
+
+    /* Its shape without decoding, data NULL and size the bytes it needs; then those bytes into the caller's memory, exactly size. */
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_get_merged_image_info(const ffpsd_document_t* doc, ffpsd_image_view_t* out);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_get_merged_image_bytes(const ffpsd_document_t* doc, uint8_t* out, size_t size);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_set_merged_image(ffpsd_document_t* doc, const ffpsd_image_view_t* image);
+
+    /* NOT_FOUND when the file has no composite. */
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_get_merged_compression(const ffpsd_document_t* doc, ffpsd_channel_compression_t* out);
 
     FFPSD_EXPORT ffpsd_layer_kind_t ffpsd_layer_get_kind(const ffpsd_layer_t* layer);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_get_bounds(const ffpsd_layer_t* layer, ffpsd_rect_t* out);
@@ -320,6 +353,10 @@ extern "C"
 
     /* Color planes by channel id, then transparency when the layer has one. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_get_pixels(const ffpsd_layer_t* layer, ffpsd_image_t** out);
+
+    /* Its shape without decoding, data NULL and size the bytes it needs; then those bytes into the caller's memory, exactly size. */
+    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_get_pixels_info(const ffpsd_layer_t* layer, ffpsd_image_view_t* out);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_get_pixels_bytes(const ffpsd_layer_t* layer, uint8_t* out, size_t size);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_pixels(ffpsd_layer_t* layer, const ffpsd_image_view_t* image);
 
     /* NOT_FOUND without a pixel mask; Photoshop's rendering of a vector mask is not one. */
@@ -330,6 +367,10 @@ extern "C"
     FFPSD_EXPORT ffpsd_status_t
     ffpsd_layer_set_mask(ffpsd_layer_t* layer, const ffpsd_image_view_t* image, int32_t top, int32_t left, uint8_t default_color);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_remove_mask(ffpsd_layer_t* layer);
+
+    /* In file order, masks included. */
+    FFPSD_EXPORT size_t ffpsd_layer_get_channel_count(const ffpsd_layer_t* layer);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_get_channel_by_index(const ffpsd_layer_t* layer, size_t index, ffpsd_channel_info_t* out);
 
     /* Unchecked; keys may repeat, so a get or remove by key finds the first. */
     FFPSD_EXPORT size_t ffpsd_layer_get_tagged_block_count(const ffpsd_layer_t* layer);
@@ -352,8 +393,9 @@ extern "C"
     ffpsd_png_load_memory(const uint8_t* data, size_t size, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_image_t** out);
 
     /* Gray, gray with alpha, RGB or RGBA by the channel count; 8 or 16 bit. */
-    FFPSD_EXPORT ffpsd_status_t ffpsd_png_save(const ffpsd_image_view_t* image, const char* path);
-    FFPSD_EXPORT ffpsd_status_t ffpsd_png_save_memory(const ffpsd_image_view_t* image, ffpsd_buffer_t** out);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_png_save(const ffpsd_image_view_t* image, const char* path, ffpsd_png_compression_t compression);
+    FFPSD_EXPORT ffpsd_status_t
+    ffpsd_png_save_memory(const ffpsd_image_view_t* image, ffpsd_png_compression_t compression, ffpsd_buffer_t** out);
 
     /* Every JPEG call is UNSUPPORTED in a build without JPEG; a nonzero apply_orientation turns the pixels upright by EXIF. */
     FFPSD_EXPORT ffpsd_status_t

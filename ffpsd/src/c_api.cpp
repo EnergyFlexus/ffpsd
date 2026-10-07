@@ -46,8 +46,10 @@ namespace
     static_assert(static_cast<int>(ffpsd::Anchor::kBottomRight) == FFPSD_ANCHOR_BOTTOM_RIGHT);
     static_assert(static_cast<int>(ffpsd::Rotation::k270) == FFPSD_ROTATION_270);
     static_assert(static_cast<int>(ffpsd::FlipDirection::kVertical) == FFPSD_FLIP_VERTICAL);
-    static_assert(static_cast<int>(ffpsd::Compression::kRle) == FFPSD_COMPRESSION_RLE);
+    static_assert(static_cast<int>(ffpsd::Compression::kDefault) == FFPSD_COMPRESSION_DEFAULT);
     static_assert(static_cast<int>(ffpsd::Compression::kRleOrRaw) == FFPSD_COMPRESSION_RLE_OR_RAW);
+    static_assert(static_cast<int>(ffpsd::ChannelCompression::kZipPrediction) == FFPSD_CHANNEL_COMPRESSION_ZIP_PREDICTION);
+    static_assert(static_cast<int>(ffpsd::PngCompression::kFastest) == FFPSD_PNG_COMPRESSION_FASTEST);
 
     thread_local std::string g_last_error;
 
@@ -187,6 +189,17 @@ namespace
         return new ffpsd_image_t{std::move(image)};
     }
 
+    void Fill(const ffpsd::ImageInfo& info, const std::uint8_t* data, std::size_t size, ffpsd_image_view_t& out) noexcept
+    {
+        out.width = info.width;
+        out.height = info.height;
+        out.channel_count = info.channel_count;
+        out.depth = info.depth;
+        out.color_mode = static_cast<ffpsd_color_mode_t>(info.color_mode);
+        out.data = data;
+        out.size = size;
+    }
+
     void Fill(const ffpsd::ImageResource& resource, ffpsd_image_resource_t& out) noexcept
     {
         out.id = resource.id;
@@ -256,11 +269,11 @@ namespace
     {
         return ffpsd::Image();
     }
-    std::vector<std::uint8_t> EncodePng(const ffpsd::ImageView&)
+    std::vector<std::uint8_t> EncodePng(const ffpsd::ImageView&, ffpsd::PngCompression)
     {
         return {};
     }
-    void SavePng(const ffpsd::ImageView&, const std::string&)
+    void SavePng(const ffpsd::ImageView&, const std::string&, ffpsd::PngCompression)
     {
     }
 #endif
@@ -343,14 +356,7 @@ extern "C"
     {
         return Guard([&] {
             const ffpsd::Image& value = Need(image, "image").value;
-            ffpsd_image_view_t& view = Need(out, "out");
-            view.width = value.width;
-            view.height = value.height;
-            view.channel_count = value.channel_count;
-            view.depth = value.depth;
-            view.color_mode = static_cast<ffpsd_color_mode_t>(value.color_mode);
-            view.data = value.bytes.data();
-            view.size = value.bytes.size();
+            Fill(value, value.bytes.data(), value.bytes.size(), Need(out, "out"));
         });
     }
     void ffpsd_image_destroy(ffpsd_image_t* image)
@@ -723,9 +729,30 @@ extern "C"
             target = NewImage(Need(doc, "doc").value.GetMergedImage());
         });
     }
+    ffpsd_status_t ffpsd_document_get_merged_image_info(const ffpsd_document_t* doc, ffpsd_image_view_t* out)
+    {
+        return Guard([&] {
+            const ffpsd::ImageInfo info = Need(doc, "doc").value.GetMergedImageInfo();
+            Fill(info, nullptr, info.GetSizeBytes(), Need(out, "out"));
+        });
+    }
+    ffpsd_status_t ffpsd_document_get_merged_image_bytes(const ffpsd_document_t* doc, uint8_t* out, size_t size)
+    {
+        return Guard([&] { Need(doc, "doc").value.GetMergedImageBytes(out, size); });
+    }
     ffpsd_status_t ffpsd_document_set_merged_image(ffpsd_document_t* doc, const ffpsd_image_view_t* image)
     {
         return Guard([&] { Need(doc, "doc").value.SetMergedImage(ToView(Need(image, "image"))); });
+    }
+    ffpsd_status_t ffpsd_document_get_merged_compression(const ffpsd_document_t* doc, ffpsd_channel_compression_t* out)
+    {
+        return Guard([&] {
+            ffpsd_channel_compression_t& target = Need(out, "out");
+            const std::optional<ffpsd::ChannelCompression> compression = Need(doc, "doc").value.GetMergedCompression();
+            if (!compression.has_value())
+                throw NotFound("ffpsd: the document has no composite");
+            target = static_cast<ffpsd_channel_compression_t>(*compression);
+        });
     }
 
     ffpsd_layer_kind_t ffpsd_layer_get_kind(const ffpsd_layer_t* layer)
@@ -832,6 +859,17 @@ extern "C"
             target = NewImage(ToLayer(layer).GetPixels());
         });
     }
+    ffpsd_status_t ffpsd_layer_get_pixels_info(const ffpsd_layer_t* layer, ffpsd_image_view_t* out)
+    {
+        return Guard([&] {
+            const ffpsd::ImageInfo info = ToLayer(layer).GetPixelsInfo();
+            Fill(info, nullptr, info.GetSizeBytes(), Need(out, "out"));
+        });
+    }
+    ffpsd_status_t ffpsd_layer_get_pixels_bytes(const ffpsd_layer_t* layer, uint8_t* out, size_t size)
+    {
+        return Guard([&] { ToLayer(layer).GetPixelsBytes(out, size); });
+    }
     ffpsd_status_t ffpsd_layer_set_pixels(ffpsd_layer_t* layer, const ffpsd_image_view_t* image)
     {
         return Guard([&] { ToLayer(layer).SetPixels(ToView(Need(image, "image"))); });
@@ -861,6 +899,21 @@ extern "C"
         return Guard([&] {
             if (!ToLayer(layer).RemoveMask())
                 throw NotFound("ffpsd: the layer has no pixel mask");
+        });
+    }
+
+    size_t ffpsd_layer_get_channel_count(const ffpsd_layer_t* layer)
+    {
+        return layer == nullptr ? 0 : reinterpret_cast<const ffpsd::Layer*>(layer)->GetChannelCount();
+    }
+    ffpsd_status_t ffpsd_layer_get_channel_by_index(const ffpsd_layer_t* layer, size_t index, ffpsd_channel_info_t* out)
+    {
+        return Guard([&] {
+            ffpsd_channel_info_t& target = Need(out, "out");
+            const ffpsd::ChannelInfo info = ToLayer(layer).GetChannelByIndex(index);
+            target.id = info.id;
+            target.compression = static_cast<ffpsd_channel_compression_t>(info.compression);
+            target.size = info.size;
         });
     }
 
@@ -904,8 +957,8 @@ extern "C"
     {
         return Guard([&] {
             ffpsd_image_t*& target = NeedOut(out);
-            const std::vector<std::uint8_t> data = ffpsd::detail::ReadFile(std::string(&Need(path, "path")));
-            target = NewImage(LoadPicture(data.data(), data.size(), color_mode, depth));
+            const ffpsd::detail::FileData file = ffpsd::detail::ReadFile(std::string(&Need(path, "path")));
+            target = NewImage(LoadPicture(file.bytes.get(), file.size, color_mode, depth));
         });
     }
     ffpsd_status_t
@@ -935,19 +988,19 @@ extern "C"
             target = NewImage(LoadPng(NeedBytes(data, size), size, static_cast<ffpsd::ColorMode>(color_mode), depth));
         });
     }
-    ffpsd_status_t ffpsd_png_save(const ffpsd_image_view_t* image, const char* path)
+    ffpsd_status_t ffpsd_png_save(const ffpsd_image_view_t* image, const char* path, ffpsd_png_compression_t compression)
     {
         return Guard([&] {
             RequirePng();
-            SavePng(ToView(Need(image, "image")), std::string(&Need(path, "path")));
+            SavePng(ToView(Need(image, "image")), std::string(&Need(path, "path")), static_cast<ffpsd::PngCompression>(compression));
         });
     }
-    ffpsd_status_t ffpsd_png_save_memory(const ffpsd_image_view_t* image, ffpsd_buffer_t** out)
+    ffpsd_status_t ffpsd_png_save_memory(const ffpsd_image_view_t* image, ffpsd_png_compression_t compression, ffpsd_buffer_t** out)
     {
         return Guard([&] {
             ffpsd_buffer_t*& target = NeedOut(out);
             RequirePng();
-            target = new ffpsd_buffer_t{EncodePng(ToView(Need(image, "image")))};
+            target = new ffpsd_buffer_t{EncodePng(ToView(Need(image, "image")), static_cast<ffpsd::PngCompression>(compression))};
         });
     }
 

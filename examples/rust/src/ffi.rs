@@ -19,7 +19,7 @@ pub type ffpsd_compression_t = c_int;
 pub type ffpsd_color_mode_t = c_int;
 
 pub const FFPSD_STATUS_OK: ffpsd_status_t = 0;
-pub const FFPSD_COMPRESSION_RLE_OR_RAW: ffpsd_compression_t = 2;
+pub const FFPSD_COMPRESSION_RLE_OR_RAW: ffpsd_compression_t = 3;
 pub const FFPSD_COLOR_MODE_GRAYSCALE: ffpsd_color_mode_t = 1;
 
 #[repr(C)]
@@ -31,7 +31,7 @@ pub struct ffpsd_rect_t {
     pub right: i32,
 }
 
-// Planar samples in native byte order, borrowed for the call.
+// Planar samples in native byte order, borrowed for the call; the *_info calls leave data null and size the bytes needed.
 #[repr(C)]
 pub struct ffpsd_image_view_t {
     pub width: u32,
@@ -41,6 +41,20 @@ pub struct ffpsd_image_view_t {
     pub color_mode: ffpsd_color_mode_t,
     pub data: *const u8,
     pub size: usize,
+}
+
+impl Default for ffpsd_image_view_t {
+    fn default() -> Self {
+        Self {
+            width: 0,
+            height: 0,
+            channel_count: 0,
+            depth: 0,
+            color_mode: 0,
+            data: std::ptr::null(),
+            size: 0,
+        }
+    }
 }
 
 extern "C" {
@@ -80,6 +94,8 @@ extern "C" {
     ) -> ffpsd_status_t;
 
     pub fn ffpsd_layer_get_bounds(layer: *const ffpsd_layer_t, out: *mut ffpsd_rect_t) -> ffpsd_status_t;
+    pub fn ffpsd_layer_get_pixels_info(layer: *const ffpsd_layer_t, out: *mut ffpsd_image_view_t) -> ffpsd_status_t;
+    pub fn ffpsd_layer_get_pixels_bytes(layer: *const ffpsd_layer_t, out: *mut u8, size: usize) -> ffpsd_status_t;
     pub fn ffpsd_layer_get_name(
         layer: *const ffpsd_layer_t,
         buffer: *mut c_char,

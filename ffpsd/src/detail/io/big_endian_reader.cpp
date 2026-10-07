@@ -67,10 +67,16 @@ namespace ffpsd::detail
 
     std::vector<std::uint8_t> BigEndianReader::ReadBlob(std::size_t end, const char* what)
     {
-        std::vector<std::uint8_t> blob(CheckLength(ReadU32(), end, what));
-        if (!blob.empty())
-            ReadU8Array(blob.data(), blob.size());
-        return blob;
+        return ReadBytes(CheckLength(ReadU32(), end, what));
+    }
+
+    std::vector<std::uint8_t> BigEndianReader::ReadBytes(std::size_t count)
+    {
+        if (count > size_ - offset_)
+            ThrowPastEnd(count);
+        const std::uint8_t* first = data_ + offset_;
+        offset_ += count;
+        return std::vector<std::uint8_t>(first, first + count);
     }
 
     std::uint8_t BigEndianReader::ReadU8()

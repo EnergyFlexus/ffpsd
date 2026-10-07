@@ -13,24 +13,39 @@ namespace ffpsd::detail
     PixelData
     ParseImageData(BigEndianReader& reader, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth)
     {
-        std::vector<std::uint8_t> bytes(reader.GetRemaining());
-        if (!bytes.empty())
-            reader.ReadU8Array(bytes.data(), bytes.size());
+        std::vector<std::uint8_t> bytes = reader.ReadBytes(reader.GetRemaining());
         return PixelData(std::move(bytes), std::size_t{height} * channel_count, RowBytes(width, depth), SampleBytes(depth));
+    }
+
+    ImageInfo ImageDataInfo(
+        const PixelData& data, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth,
+        ColorMode color_mode)
+    {
+        if (data.IsEmpty())
+            return ImageInfo();
+        if (!IsSampleDepth(depth))
+            throw std::runtime_error(UnsupportedDepth(depth));
+        return ImageInfo{width, height, channel_count, depth, color_mode};
     }
 
     Image DecodeImageData(
         const PixelData& data, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth,
         ColorMode color_mode, bool is_psb)
     {
+        const ImageInfo info = ImageDataInfo(data, width, height, channel_count, depth, color_mode);
         if (data.IsEmpty())
             return Image();
-        if (!IsSampleDepth(depth))
-            throw std::runtime_error(UnsupportedDepth(depth));
 
-        Image image = MakeImage(width, height, channel_count, depth, color_mode);
-        data.Decode(is_psb, image.bytes.data());
+        Image image = ReserveImage(info.width, info.height, info.channel_count, info.depth, info.color_mode);
+        data.Decode(is_psb, image.bytes);
         return image;
+    }
+
+    void DecodeImageData(const PixelData& data, const ImageInfo& info, bool is_psb, std::uint8_t* out, std::size_t size)
+    {
+        CheckBytesSize(info, out, size);
+        if (!data.IsEmpty())
+            data.Decode(is_psb, out);
     }
 
     PixelData EncodeImageData(const ImageView& image, bool is_psb)

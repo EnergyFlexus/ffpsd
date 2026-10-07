@@ -17,6 +17,8 @@ namespace ffpsd::detail
 
     void UnpackBits(const std::uint8_t* data, std::size_t size, std::uint8_t* out, std::size_t out_size)
     {
+        // 16 byte steps are plain stores, cheaper than a call per short chunk; they run only where their overrun stays in the row.
+        constexpr std::size_t kStep = 16;
         std::size_t in = 0;
         std::size_t written = 0;
         while (written < out_size)
@@ -32,7 +34,15 @@ namespace ffpsd::detail
                 if (count > size - in || count > out_size - written)
                     throw std::runtime_error("ffpsd: PackBits literal runs past its row");
 
-                std::memcpy(out + written, data + in, count);
+                if (size - in >= count + kStep && out_size - written >= count + kStep)
+                {
+                    for (std::size_t step = 0; step < count; step += kStep)
+                        std::memcpy(out + written + step, data + in + step, kStep);
+                }
+                else
+                {
+                    std::memcpy(out + written, data + in, count);
+                }
                 in += count;
                 written += count;
             }
@@ -42,7 +52,16 @@ namespace ffpsd::detail
                 if (in >= size || count > out_size - written)
                     throw std::runtime_error("ffpsd: PackBits run runs past its row");
 
-                std::memset(out + written, data[in++], count);
+                const std::uint8_t value = data[in++];
+                if (out_size - written >= count + kStep)
+                {
+                    for (std::size_t step = 0; step < count; step += kStep)
+                        std::memset(out + written + step, value, kStep);
+                }
+                else
+                {
+                    std::memset(out + written, value, count);
+                }
                 written += count;
             }
         }

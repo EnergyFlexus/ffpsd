@@ -15,9 +15,7 @@ namespace ffpsd::detail
         if (!reader.FitsLength(length, end))
             throw std::runtime_error(
                 "ffpsd: channel " + std::to_string(id) + " claims " + std::to_string(length) + " bytes, more than are left");
-        std::vector<std::uint8_t> bytes(static_cast<std::size_t>(length));
-        if (!bytes.empty())
-            reader.ReadU8Array(bytes.data(), bytes.size());
+        std::vector<std::uint8_t> bytes = reader.ReadBytes(static_cast<std::size_t>(length));
 
         ChannelImageData channel;
         channel.id = id;

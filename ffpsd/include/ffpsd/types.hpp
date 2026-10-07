@@ -20,9 +20,19 @@ namespace ffpsd
     // A PSD row too long for its 2 byte count leaves its channel raw whatever is asked.
     enum class Compression : std::uint16_t
     {
+        kDefault = 0, // each channel as it is stored; pixels set through ffpsd, so a new document, come out as kRleOrRaw
+        kRaw = 1,
+        kRle = 2,      // even where it comes out larger than raw
+        kRleOrRaw = 3, // per channel, whichever is smaller
+    };
+
+    // A channel's compression field as the file stores it.
+    enum class ChannelCompression : std::uint16_t
+    {
         kRaw = 0,
-        kRle = 1,      // even where it comes out larger than raw
-        kRleOrRaw = 2, // per channel, whichever is smaller
+        kRle = 1,
+        kZip = 2,
+        kZipPrediction = 3
     };
 
     // Where Document::ResizeCanvas keeps the old canvas; row by row, since it reads value / 3 and value % 3.

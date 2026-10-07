@@ -137,3 +137,50 @@ TEST(LayerPixelsTest, SetPositionMovesThePixelsAsTheyAre)
     EXPECT_THROW(layer->SetPosition(-4, std::numeric_limits<std::int32_t>::max() - 1), std::invalid_argument);
     EXPECT_EQ(layer->GetBounds().left, 7);
 }
+
+TEST(LayerPixelsTest, BytesIntoTheCallersMemoryMatchGetPixels)
+{
+    const auto check = [](const ffpsd::Document& doc) {
+        for (std::size_t i = 0; i < doc.GetLayerCount(); ++i)
+        {
+            const ffpsd::Layer& layer = *doc.GetLayerByIndex(i);
+            const ffpsd::Image image = layer.GetPixels();
+            const ffpsd::ImageInfo info = layer.GetPixelsInfo();
+            EXPECT_EQ(info.width, image.width) << i;
+            EXPECT_EQ(info.height, image.height) << i;
+            EXPECT_EQ(info.channel_count, image.channel_count) << i;
+            EXPECT_EQ(info.depth, image.depth) << i;
+            EXPECT_EQ(info.color_mode, image.color_mode) << i;
+
+            // Filled with a pattern first, so a byte left unwritten would show.
+            std::vector<std::uint8_t> bytes(info.GetSizeBytes(), 0xAB);
+            layer.GetPixelsBytes(bytes.data(), bytes.size());
+            EXPECT_EQ(bytes, image.bytes) << i;
+        }
+    };
+
+    // Photoshop's RLE channels, then the same written raw.
+    for (const std::string& path : {kRgbPsd, kGrayscalePsd, kRgbMasksPsd})
+    {
+        const ffpsd::Document doc = ffpsd::Document::Open(path);
+        check(doc);
+        check(ffpsd::Document::Parse(doc.Save(ffpsd::Compression::kRaw)));
+    }
+}
+
+TEST(LayerPixelsTest, BytesNeedExactlyTheSize)
+{
+    const ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
+    const ffpsd::Layer& layer = *doc.GetLayerByIndex(1);
+    const std::size_t size = layer.GetPixelsInfo().GetSizeBytes();
+    std::vector<std::uint8_t> bytes(size + 1);
+    EXPECT_THROW(layer.GetPixelsBytes(bytes.data(), size - 1), std::invalid_argument);
+    EXPECT_THROW(layer.GetPixelsBytes(bytes.data(), size + 1), std::invalid_argument);
+    EXPECT_THROW(layer.GetPixelsBytes(nullptr, size), std::invalid_argument);
+
+    // A view over them is the Image's view.
+    layer.GetPixelsBytes(bytes.data(), size);
+    const ffpsd::ImageView view(layer.GetPixelsInfo(), bytes.data(), size);
+    EXPECT_EQ(view.GetSizeBytes(), size);
+    EXPECT_EQ(view.channel_count, layer.GetPixels().channel_count);
+}

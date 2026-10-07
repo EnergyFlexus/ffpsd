@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <ffpsd/types.hpp>
+#include <optional>
 #include <vector>
 
 namespace ffpsd::detail
@@ -44,16 +45,21 @@ namespace ffpsd::detail
         // The compression field, or raw for data too short to have one.
         std::uint16_t GetCompression() const noexcept;
 
-        // Raw and RLE; out gets rows * row_bytes bytes in native byte order.
+        // Raw and RLE, rows * row_bytes bytes in native byte order: straight into out, or appended, so a vector is reserved, not zeroed.
         void Decode(bool is_psb, std::uint8_t* out) const;
+        void Decode(bool is_psb, std::vector<std::uint8_t>& out) const;
 
-        // Whether Converted gives other bytes: RLE changing format, or rows packed another way.
-        bool NeedsConversion(bool from_psb, bool to_psb, Compression compression) const noexcept;
-
-        // RLE changing format rewrites only the counts.
-        PixelData Converted(bool from_psb, bool to_psb, Compression compression) const;
+        // None while the stored bytes stay, raw RLE could not shrink included; RLE changing format rewrites only the counts.
+        std::optional<PixelData> Converted(bool from_psb, bool to_psb, Compression compression) const;
 
     private:
+        // RLE rows; none where a count does not fit its field or, when smallest, RLE comes out no smaller.
+        static std::optional<PixelData> Pack(
+            const std::uint8_t* data, std::size_t rows, std::size_t row_bytes, std::size_t sample_size, bool is_psb, bool smallest,
+            bool& fits);
+
+        bool NeedsConversion(bool from_psb, bool to_psb, Compression compression) const noexcept;
+
         std::vector<std::uint8_t> bytes_;
         std::size_t rows_ = 0;
         std::size_t row_bytes_ = 0;
