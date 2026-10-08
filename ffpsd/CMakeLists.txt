@@ -3,6 +3,7 @@ add_library(ffpsd::ffpsd ALIAS ffpsd)
 
 target_sources(ffpsd
     PRIVATE
+        src/bytes.cpp
         src/c_api.cpp
         src/document.cpp
         src/ffpsd.cpp
@@ -89,6 +90,7 @@ target_sources(ffpsd
             include/ffpsd/export.h
             include/ffpsd/ffpsd.hpp
             include/ffpsd/adjustments.hpp
+            include/ffpsd/bytes.hpp
             include/ffpsd/c_api.h
             include/ffpsd/document.hpp
             include/ffpsd/formats.hpp

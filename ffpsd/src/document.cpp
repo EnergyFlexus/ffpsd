@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <deque>
 #include <ffpsd/document.hpp>
 #include <memory>
@@ -111,9 +112,15 @@ namespace ffpsd
         // White colors; alpha and spot channels empty.
         Image MakeBlankComposite(std::uint32_t width, std::uint32_t height, const Image& like)
         {
-            Image composite = detail::MakeWhiteImage(width, height, like.color_mode, like.depth);
-            composite.channel_count = like.channel_count;
-            composite.bytes.resize(composite.GetSizeBytes(), 0);
+            Image white = detail::MakeWhiteImage(width, height, like.color_mode, like.depth);
+            if (white.channel_count == like.channel_count)
+                return white;
+
+            ImageInfo info = white;
+            info.channel_count = like.channel_count;
+            Image composite(info);
+            std::memcpy(composite.bytes.data(), white.bytes.data(), white.bytes.size());
+            std::memset(composite.bytes.data() + white.bytes.size(), 0, composite.bytes.size() - white.bytes.size());
             return composite;
         }
 

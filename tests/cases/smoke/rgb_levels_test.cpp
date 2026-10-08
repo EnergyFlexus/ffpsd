@@ -78,8 +78,8 @@ namespace
     constexpr Plane kCompositePlanes[] = {
         {612985261, 0xdc30c4a089111436u}, {682923150, 0x978207291fe19333u}, {640542472, 0x0bf1dab859ff58ffu}};
 
-    // Input floor, input ceiling, output floor, output ceiling; every gamma 1.
-    constexpr std::uint16_t kLevelsRecords[4][4] = {{70, 200, 0, 255}, {10, 245, 0, 255}, {20, 250, 0, 255}, {10, 250, 0, 255}};
+    // Input floor and ceiling, onto 0 to 255 at gamma 1.
+    constexpr std::uint16_t kLevelsRecords[4][2] = {{70, 200}, {10, 245}, {20, 250}, {10, 250}};
 
     template <class Owner, std::size_t N> void ExpectBlocks(const Owner& owner, const Block (&expected)[N], const char* what)
     {
@@ -151,11 +151,7 @@ namespace
         EXPECT_FALSE(layer.GetAdjustment<ffpsd::LevelsInfo>().has_value());
         EXPECT_EQ(LayerId(layer), 1u);
 
-        const ffpsd::Rect bounds = layer.GetBounds();
-        EXPECT_EQ(bounds.top, 0);
-        EXPECT_EQ(bounds.left, 0);
-        EXPECT_EQ(bounds.bottom, 1417);
-        EXPECT_EQ(bounds.right, 1890);
+        ExpectRect(layer.GetBounds(), 0, 0, 1417, 1890);
 
         ExpectBlocks(layer, kBackgroundBlocks, "background");
 
@@ -174,11 +170,7 @@ namespace
         EXPECT_EQ(layer.GetAdjustmentKey(), Fourcc("levl"));
         EXPECT_EQ(LayerId(layer), 3u);
 
-        const ffpsd::Rect bounds = layer.GetBounds();
-        EXPECT_EQ(bounds.top, 0);
-        EXPECT_EQ(bounds.left, 0);
-        EXPECT_EQ(bounds.bottom, 0);
-        EXPECT_EQ(bounds.right, 0);
+        ExpectRect(layer.GetBounds(), 0, 0, 0, 0);
 
         ExpectBlocks(layer, kLevelsBlocks, "levels");
         EXPECT_TRUE(layer.GetPixels().bytes.empty());
@@ -187,13 +179,7 @@ namespace
         ASSERT_TRUE(levels.has_value());
         ASSERT_EQ(levels->channels.size(), 4u);
         for (std::size_t i = 0; i < 4; ++i)
-        {
-            EXPECT_EQ(levels->channels[i].input_floor, kLevelsRecords[i][0]) << "record " << i;
-            EXPECT_EQ(levels->channels[i].input_ceiling, kLevelsRecords[i][1]) << "record " << i;
-            EXPECT_EQ(levels->channels[i].output_floor, kLevelsRecords[i][2]) << "record " << i;
-            EXPECT_EQ(levels->channels[i].output_ceiling, kLevelsRecords[i][3]) << "record " << i;
-            EXPECT_DOUBLE_EQ(levels->channels[i].gamma, 1.0) << "record " << i;
-        }
+            ExpectLevelsRecord(levels->channels[i], kLevelsRecords[i][0], kLevelsRecords[i][1], "record " + std::to_string(i));
     }
 
     // Every value the API shows, on the file itself and on whatever it was written into.
@@ -215,11 +201,6 @@ namespace
         ExpectBlocks(doc, kSectionBlocks, "section 4");
         ExpectPlanes(doc.GetMergedImage(), kCompositePlanes, "composite");
     }
-
-    ffpsd::Document Reparsed(const std::vector<std::uint8_t>& bytes)
-    {
-        return ffpsd::Document::Parse(bytes);
-    }
 } // namespace
 
 TEST(SmokeRgbLevelsTest, EveryValueIsTheDumps)
@@ -234,16 +215,16 @@ TEST(SmokeRgbLevelsTest, EveryValueIsTheDumps)
 TEST(SmokeRgbLevelsTest, RawAndPsbKeepEveryValue)
 {
     const std::vector<std::uint8_t> raw = ffpsd::Document::Open(kRgbLevelsPsd).Save(ffpsd::Compression::kRaw);
-    const ffpsd::Document from_raw = Reparsed(raw);
+    const ffpsd::Document from_raw = ffpsd::Document::Parse(raw);
     ExpectTheFile(from_raw, false);
-    ExpectTheFile(Reparsed(from_raw.Save()), false);
+    ExpectTheFile(ffpsd::Document::Parse(from_raw.Save()), false);
 
     // Unpacked, the composite alone is three planes of 1890 x 1417.
     EXPECT_GT(raw.size(), std::size_t{kWidth} * kHeight * 3);
 
     ffpsd::Document doc = ffpsd::Document::Open(kRgbLevelsPsd);
     doc.SetPsb(true);
-    ffpsd::Document psb = Reparsed(doc.Save());
+    ffpsd::Document psb = ffpsd::Document::Parse(doc.Save());
     ExpectTheFile(psb, true);
 
     psb.SetPsb(false);
@@ -265,7 +246,7 @@ TEST(SmokeRgbLevelsTest, EditsChangeOnlyWhatTheyTouch)
     levels->SetVisible(false);
     background->SetOpacity(128);
 
-    const ffpsd::Document back = Reparsed(doc.Save());
+    const ffpsd::Document back = ffpsd::Document::Parse(doc.Save());
     const ffpsd::Layer* background_back = back.GetLayerByIndex(0);
     const ffpsd::Layer* levels_back = back.GetLayerByIndex(1);
 

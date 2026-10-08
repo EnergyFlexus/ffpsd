@@ -15,7 +15,7 @@ namespace
         ffpsd::Image result = image;
         result.width = width;
         result.height = height;
-        result.bytes.assign(result.GetSizeBytes(), 255);
+        result.bytes = ffpsd::Bytes(result.GetSizeBytes(), 255);
         for (std::size_t c = 0; c < image.channel_count; ++c)
         {
             for (std::int64_t y = 0; y < height; ++y)
@@ -38,7 +38,7 @@ namespace
         ffpsd::Image result = image;
         result.width *= 2;
         result.height *= 2;
-        result.bytes.resize(result.GetSizeBytes());
+        result.bytes = ffpsd::Bytes(result.GetSizeBytes());
         for (std::size_t c = 0; c < image.channel_count; ++c)
         {
             for (std::size_t y = 0; y < result.height; ++y)
@@ -269,9 +269,6 @@ TEST(DocumentCanvasTest, PhotoshopsMasksTurnWithTheCanvas)
     doc.RotateCanvas(ffpsd::Rotation::k90);
 
     const ffpsd::LayerMask turned = *ffpsd::Document::Parse(doc.Save()).GetLayerByIndex(2)->GetMask();
-    EXPECT_EQ(turned.bounds.top, 935);
-    EXPECT_EQ(turned.bounds.left, 0);
-    EXPECT_EQ(turned.bounds.bottom, 1890);
-    EXPECT_EQ(turned.bounds.right, 1417);
+    ExpectRect(turned.bounds, 935, 0, 1890, 1417);
     EXPECT_EQ(turned.image.bytes, Clockwise(mask.image).bytes);
 }

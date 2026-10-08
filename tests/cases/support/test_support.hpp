@@ -1,6 +1,7 @@
 #ifndef FFPSD_TESTS_SUPPORT_TEST_SUPPORT_HPP_
 #define FFPSD_TESTS_SUPPORT_TEST_SUPPORT_HPP_
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -95,7 +96,7 @@ namespace ffpsd_test
         image.channel_count = channels;
         image.depth = depth;
         image.color_mode = color_mode.value_or(channels <= 2 ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb);
-        image.bytes.resize(image.GetSizeBytes());
+        image.bytes = ffpsd::Bytes(image.GetSizeBytes());
 
         const std::size_t samples = image.bytes.size() / image.GetBytesPerSample();
         for (std::size_t i = 0; i < samples; ++i)
@@ -118,15 +119,55 @@ namespace ffpsd_test
         return image;
     }
 
+    // Every byte differs from its neighbour, so RLE only grows it.
+    inline ffpsd::Image Noise(std::uint32_t width, std::uint32_t height, std::uint16_t channels)
+    {
+        ffpsd::Image image = Pattern(width, height, channels);
+        for (std::size_t i = 0; i < image.bytes.size(); ++i)
+            image.bytes[i] = static_cast<std::uint8_t>((i * 2654435761u) >> 13);
+        return image;
+    }
+
+    // Every sample the same byte.
+    inline ffpsd::Image Flat(std::uint32_t width, std::uint32_t height, std::uint16_t channels, std::uint8_t value)
+    {
+        ffpsd::Image image = Pattern(width, height, channels);
+        std::fill(image.bytes.begin(), image.bytes.end(), value);
+        return image;
+    }
+
+    inline std::vector<std::uint16_t> Samples16(const ffpsd::Image& image)
+    {
+        std::vector<std::uint16_t> samples(image.bytes.size() / 2);
+        std::memcpy(samples.data(), image.bytes.data(), image.bytes.size());
+        return samples;
+    }
+
+    // What neither PNG nor JPEG takes: nothing, floats, five channels, short bytes, and channels that only look like RGB.
+    inline std::vector<ffpsd::Image> ImagesNoCodecTakes()
+    {
+        ffpsd::Image cut = Pattern(2, 2, 3);
+        cut.bytes = ffpsd::Bytes(cut.bytes.data(), cut.bytes.size() - 1);
+        return {
+            ffpsd::Image(),
+            Pattern(2, 2, 3, 32),
+            Pattern(2, 2, 5),
+            cut,
+            Pattern(2, 2, 4, 8, ffpsd::ColorMode::kCmyk),
+            Pattern(2, 2, 3, 8, ffpsd::ColorMode::kLab)};
+    }
+
     // What GetPixels gives for an image added without transparency: its planes and a fully opaque one.
     inline ffpsd::Image WithOpaqueAlpha(ffpsd::Image image)
     {
         const std::size_t plane = std::size_t{image.width} * image.height * image.GetBytesPerSample();
         const std::size_t start = image.bytes.size();
-        image.bytes.resize(start + plane, 0xFF);
+        ffpsd::Bytes bytes(start + plane, 0xFF);
+        std::copy(image.bytes.begin(), image.bytes.end(), bytes.begin());
         const float full = 1.0f;
-        for (std::size_t at = start; image.depth == 32 && at < image.bytes.size(); at += sizeof(full))
-            std::memcpy(image.bytes.data() + at, &full, sizeof(full));
+        for (std::size_t at = start; image.depth == 32 && at < bytes.size(); at += sizeof(full))
+            std::memcpy(bytes.data() + at, &full, sizeof(full));
+        image.bytes = std::move(bytes);
         ++image.channel_count;
         return image;
     }
@@ -139,22 +180,41 @@ namespace ffpsd_test
         EXPECT_EQ(rect.right, right);
     }
 
-    // Every 8 bit pixel a quarter turn clockwise.
-    inline ffpsd::Image Clockwise(const ffpsd::Image& image)
+    // A Levels record from input_floor to input_ceiling, onto the whole output range at gamma 1.
+    inline void ExpectLevelsRecord(
+        const ffpsd::LevelsInfo::Channel& record, std::uint16_t input_floor, std::uint16_t input_ceiling, const std::string& what = "")
+    {
+        EXPECT_EQ(record.input_floor, input_floor) << what;
+        EXPECT_EQ(record.input_ceiling, input_ceiling) << what;
+        EXPECT_EQ(record.output_floor, 0u) << what;
+        EXPECT_EQ(record.output_ceiling, 255u) << what;
+        EXPECT_DOUBLE_EQ(record.gamma, 1.0) << what;
+    }
+
+    // An 8 bit image with the pixel at x, y moved to where(x, y, width, height).
+    template <class Where> ffpsd::Image Moved(const ffpsd::Image& image, bool swap_sides, const Where& where)
     {
         ffpsd::Image result = image;
-        result.width = image.height;
-        result.height = image.width;
-        for (std::size_t c = 0; c < image.channel_count; ++c)
+        if (swap_sides)
+            std::swap(result.width, result.height);
+        for (std::uint32_t c = 0; c < image.channel_count; ++c)
         {
-            for (std::size_t y = 0; y < image.height; ++y)
+            for (std::uint32_t y = 0; y < image.height; ++y)
             {
-                for (std::size_t x = 0; x < image.width; ++x)
-                    result.bytes[(c * result.height + x) * result.width + (image.height - 1 - y)] =
-                        image.bytes[(c * image.height + y) * image.width + x];
+                for (std::uint32_t x = 0; x < image.width; ++x)
+                {
+                    const auto [to_x, to_y] = where(x, y, image.width, image.height);
+                    result.bytes[(c * result.height + to_y) * result.width + to_x] = image.bytes[(c * image.height + y) * image.width + x];
+                }
             }
         }
         return result;
+    }
+
+    // Every 8 bit pixel a quarter turn clockwise.
+    inline ffpsd::Image Clockwise(const ffpsd::Image& image)
+    {
+        return Moved(image, true, [](std::uint32_t x, std::uint32_t y, std::uint32_t, std::uint32_t h) { return std::pair(h - 1 - y, x); });
     }
 
     // A small document with no layers.

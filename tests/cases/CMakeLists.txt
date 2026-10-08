@@ -34,7 +34,7 @@ if(FFPSD_WITH_JPEG)
 endif()
 
 target_include_directories(ffpsd_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_definitions(ffpsd_tests PRIVATE FFPSD_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
+target_compile_definitions(ffpsd_tests PRIVATE FFPSD_TEST_DATA_DIR="${PROJECT_SOURCE_DIR}/tests/data")
 target_link_libraries(ffpsd_tests PRIVATE ffpsd::ffpsd GTest::gtest_main)
 
 include(GoogleTest)

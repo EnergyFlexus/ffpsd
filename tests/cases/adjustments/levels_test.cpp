@@ -12,15 +12,6 @@ using namespace ffpsd_test;
 namespace
 {
     constexpr std::uint32_t kLevelsKey = Fourcc("levl");
-
-    void ExpectIdentity(const ffpsd::LevelsInfo::Channel& channel)
-    {
-        EXPECT_EQ(channel.input_floor, 0u);
-        EXPECT_EQ(channel.input_ceiling, 255u);
-        EXPECT_EQ(channel.output_floor, 0u);
-        EXPECT_EQ(channel.output_ceiling, 255u);
-        EXPECT_DOUBLE_EQ(channel.gamma, 1.0);
-    }
 } // namespace
 
 TEST(AdjustmentLevelsTest, PhotoshopsRecordsReadAndWriteBack)
@@ -48,12 +39,8 @@ TEST(AdjustmentLevelsTest, PhotoshopsRecordsReadAndWriteBack)
     const std::optional<ffpsd::LevelsInfo> gray_info = gray.GetLayerByIndex(2)->GetAdjustment<ffpsd::LevelsInfo>();
     ASSERT_TRUE(gray_info.has_value());
     ASSERT_EQ(gray_info->channels.size(), 2u);
-    ExpectIdentity(gray_info->channels[0]);
-    EXPECT_EQ(gray_info->channels[1].input_floor, 25u);
-    EXPECT_EQ(gray_info->channels[1].input_ceiling, 237u);
-    EXPECT_EQ(gray_info->channels[1].output_floor, 0u);
-    EXPECT_EQ(gray_info->channels[1].output_ceiling, 255u);
-    EXPECT_DOUBLE_EQ(gray_info->channels[1].gamma, 1.0);
+    ExpectLevelsRecord(gray_info->channels[0], 0, 255, "all");
+    ExpectLevelsRecord(gray_info->channels[1], 25, 237, "gray");
 }
 
 TEST(AdjustmentLevelsTest, OnlyALevelsLayerTakesRecordsInPhotoshopsRanges)
@@ -108,14 +95,14 @@ TEST(AdjustmentLevelsTest, MissingRecordsAreTheIdentity)
     const ffpsd::LevelsInfo info = *levels->GetAdjustment<ffpsd::LevelsInfo>();
     ASSERT_EQ(info.channels.size(), 4u);
     for (const ffpsd::LevelsInfo::Channel& channel : info.channels)
-        ExpectIdentity(channel);
+        ExpectLevelsRecord(channel, 0, 255);
 
     // A new layer has a record for every color channel and one for all of them.
     ffpsd::Document rgb = NewDocument();
     const ffpsd::LevelsInfo rgb_info = *rgb.AddAdjustmentLayer<ffpsd::LevelsInfo>("levels")->GetAdjustment<ffpsd::LevelsInfo>();
     ASSERT_EQ(rgb_info.channels.size(), 4u);
     for (const ffpsd::LevelsInfo::Channel& channel : rgb_info.channels)
-        ExpectIdentity(channel);
+        ExpectLevelsRecord(channel, 0, 255);
     ffpsd::Document gray = NewDocument(ffpsd::ColorMode::kGrayscale);
     EXPECT_EQ(gray.AddAdjustmentLayer<ffpsd::LevelsInfo>("levels")->GetAdjustment<ffpsd::LevelsInfo>()->channels.size(), 2u);
 }
@@ -148,5 +135,5 @@ TEST(AdjustmentLevelsTest, ANewLayerIsWhatPhotoshopWritesThroughSaving)
     EXPECT_EQ(levels->GetName(), "levels");
     EXPECT_EQ(levels->GetKind(), ffpsd::LayerKind::kAdjustment);
     EXPECT_EQ(levels->GetAdjustment<ffpsd::LevelsInfo>()->channels[1].input_floor, 30u);
-    ExpectIdentity(levels->GetAdjustment<ffpsd::LevelsInfo>()->channels[2]);
+    ExpectLevelsRecord(levels->GetAdjustment<ffpsd::LevelsInfo>()->channels[2], 0, 255);
 }

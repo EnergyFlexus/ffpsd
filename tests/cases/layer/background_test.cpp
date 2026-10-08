@@ -113,11 +113,7 @@ TEST(LayerBackgroundTest, AddBackgroundLayerFlattensOntoWhite)
 {
     ffpsd::Document gray = NewDocument(ffpsd::ColorMode::kGrayscale);
     const ffpsd::Layer* opaque = gray.AddBackgroundLayer("Background", Pattern(4, 3, 1));
-    const ffpsd::Rect bounds = opaque->GetBounds();
-    EXPECT_EQ(bounds.top, 0);
-    EXPECT_EQ(bounds.left, 0);
-    EXPECT_EQ(bounds.GetWidth(), 4);
-    EXPECT_EQ(bounds.GetHeight(), 3);
+    ExpectRect(opaque->GetBounds(), 0, 0, 3, 4);
     EXPECT_EQ(opaque->GetPixels().channel_count, 1u);
     EXPECT_EQ(opaque->GetPixels().bytes, Pattern(4, 3, 1).bytes);
 
@@ -132,7 +128,7 @@ TEST(LayerBackgroundTest, AddBackgroundLayerFlattensOntoWhite)
     image.bytes[15] = 64;
     const ffpsd::Image flattened = eight.AddBackgroundLayer("Background", image)->GetPixels();
     ASSERT_EQ(flattened.channel_count, 1u);
-    EXPECT_EQ(flattened.bytes, (std::vector<std::uint8_t>{0, 255, 127, 241, 0, 0, 0, 0, 0, 0, 0, 0}));
+    EXPECT_EQ(flattened.bytes, (ffpsd::Bytes{0, 255, 127, 241, 0, 0, 0, 0, 0, 0, 0, 0}));
 
     // 16 bit white is full.
     ffpsd::Document sixteen = NewDocument(ffpsd::ColorMode::kGrayscale, 16);
@@ -141,9 +137,7 @@ TEST(LayerBackgroundTest, AddBackgroundLayerFlattensOntoWhite)
     std::fill(samples.begin() + 12, samples.end(), std::uint16_t{0xFFFF});
     samples[12] = 0;
     std::memcpy(deep.bytes.data(), samples.data(), deep.bytes.size());
-    const ffpsd::Image deep_pixels = sixteen.AddBackgroundLayer("Background", deep)->GetPixels();
-    std::vector<std::uint16_t> read(12);
-    std::memcpy(read.data(), deep_pixels.bytes.data(), deep_pixels.bytes.size());
+    const std::vector<std::uint16_t> read = Samples16(sixteen.AddBackgroundLayer("Background", deep)->GetPixels());
     EXPECT_EQ(read[0], 0xFFFFu);
     EXPECT_EQ(read[1], 0x1234u);
 
@@ -151,8 +145,8 @@ TEST(LayerBackgroundTest, AddBackgroundLayerFlattensOntoWhite)
     ffpsd::Document lab = NewDocument(ffpsd::ColorMode::kLab);
     ffpsd::Image clear = Pattern(4, 3, 4, 8, ffpsd::ColorMode::kLab);
     std::fill(clear.bytes.begin() + 3 * 12, clear.bytes.end(), std::uint8_t{0});
-    std::vector<std::uint8_t> white(12, 255);
-    white.insert(white.end(), 24, 128);
+    ffpsd::Bytes white(36, 128);
+    std::fill(white.begin(), white.begin() + 12, std::uint8_t{255});
     EXPECT_EQ(lab.AddBackgroundLayer("Background", clear)->GetPixels().bytes, white);
 }
 
@@ -221,18 +215,14 @@ TEST(LayerBackgroundTest, SetBackgroundLayerFlattensItOntoAWhiteCanvas)
     doc.SetBackgroundLayer(1);
     EXPECT_EQ(doc.GetLayerByIndex(0), small);
     EXPECT_TRUE(small->IsBackground());
-    EXPECT_EQ(small->GetBounds().left, 0);
-    EXPECT_EQ(small->GetBounds().GetWidth(), 4);
-    EXPECT_EQ(small->GetBounds().GetHeight(), 3);
+    ExpectRect(small->GetBounds(), 0, 0, 3, 4);
 
     // Pattern(2, 1, 3) is 3, 10 | 17, 24 | 31, 38; it lands on pixels 5 and 6 of each plane.
-    std::vector<std::uint8_t> expected;
-    for (const std::uint8_t first : {std::uint8_t{3}, std::uint8_t{17}, std::uint8_t{31}})
+    ffpsd::Bytes expected(36, 255);
+    for (const std::size_t plane : {0, 1, 2})
     {
-        std::vector<std::uint8_t> plane(12, 255);
-        plane[5] = first;
-        plane[6] = static_cast<std::uint8_t>(first + 7);
-        expected.insert(expected.end(), plane.begin(), plane.end());
+        expected[plane * 12 + 5] = static_cast<std::uint8_t>(3 + 14 * plane);
+        expected[plane * 12 + 6] = static_cast<std::uint8_t>(10 + 14 * plane);
     }
     EXPECT_EQ(small->GetPixels().bytes, expected);
 
@@ -244,7 +234,7 @@ TEST(LayerBackgroundTest, SetBackgroundLayerFlattensItOntoAWhiteCanvas)
     layer->SetOpacity(51);
     layer->SetBlendKey(Fourcc("mul "));
     faded.SetBackgroundLayer(0);
-    EXPECT_EQ(layer->GetPixels().bytes, std::vector<std::uint8_t>(36, 204));
+    EXPECT_EQ(layer->GetPixels().bytes, ffpsd::Bytes(36, 204));
     EXPECT_EQ(layer->GetOpacity(), 255u);
     EXPECT_EQ(layer->GetBlendKey(), Fourcc("norm"));
 
@@ -252,13 +242,13 @@ TEST(LayerBackgroundTest, SetBackgroundLayerFlattensItOntoAWhiteCanvas)
     const ffpsd::Layer* empty = gray.AddLayer("empty");
     gray.SetBackgroundLayer(0);
     EXPECT_TRUE(empty->IsBackground());
-    EXPECT_EQ(empty->GetPixels().bytes, std::vector<std::uint8_t>(12, 255));
+    EXPECT_EQ(empty->GetPixels().bytes, ffpsd::Bytes(12, 255));
 
     // Unset and set again, Photoshop's layers give their own pixels back; the copy's alpha is fully opaque.
     ffpsd::Document rgb = ffpsd::Document::Open(kRgbPsd);
     const ffpsd::Image background = rgb.GetLayerByIndex(0)->GetPixels();
     ffpsd::Image copy = rgb.GetLayerByIndex(1)->GetPixels();
-    copy.bytes.resize(copy.bytes.size() / 4 * 3);
+    copy.bytes = ffpsd::Bytes(copy.bytes.data(), copy.bytes.size() / 4 * 3);
     rgb.UnsetBackgroundLayer();
     rgb.SetBackgroundLayer(0);
     EXPECT_EQ(rgb.GetLayerByIndex(0)->GetPixels().bytes, background.bytes);

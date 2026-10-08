@@ -10,32 +10,11 @@ using namespace ffpsd_test;
 
 namespace
 {
-    // An 8 bit image with the pixel at x, y moved to where(x, y, width, height).
-    template <class Where> ffpsd::Image Moved(const ffpsd::Image& image, bool swap_sides, const Where& where)
-    {
-        ffpsd::Image result = image;
-        if (swap_sides)
-            std::swap(result.width, result.height);
-        for (std::uint32_t c = 0; c < image.channel_count; ++c)
-        {
-            for (std::uint32_t y = 0; y < image.height; ++y)
-            {
-                for (std::uint32_t x = 0; x < image.width; ++x)
-                {
-                    const auto [to_x, to_y] = where(x, y, image.width, image.height);
-                    result.bytes[(c * result.height + to_y) * result.width + to_x] = image.bytes[(c * image.height + y) * image.width + x];
-                }
-            }
-        }
-        return result;
-    }
-
     ffpsd::Image Mirrored(const ffpsd::Image& image)
     {
         return Moved(
             image, false, [](std::uint32_t x, std::uint32_t y, std::uint32_t w, std::uint32_t) { return std::pair(w - 1 - x, y); });
     }
-
 } // namespace
 
 TEST(LayerTurnTest, AQuarterTurnKeepsTheCenterAndTurnsTheMask)

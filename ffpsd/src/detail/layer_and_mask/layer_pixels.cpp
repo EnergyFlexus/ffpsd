@@ -117,9 +117,11 @@ namespace ffpsd::detail
         if (bounds.GetWidth() <= 0 || bounds.GetHeight() <= 0)
             return MakeImage(0, 0, 1, depth, ColorMode::kGrayscale);
 
-        Image mask = ReserveImage(
-            static_cast<std::uint32_t>(bounds.GetWidth()), static_cast<std::uint32_t>(bounds.GetHeight()), 1, depth, ColorMode::kGrayscale);
-        channel.data.Decode(is_psb, mask.bytes);
+        Image mask(
+            ImageInfo{
+                static_cast<std::uint32_t>(bounds.GetWidth()), static_cast<std::uint32_t>(bounds.GetHeight()), 1, depth,
+                ColorMode::kGrayscale});
+        channel.data.Decode(is_psb, mask.bytes.data());
         return mask;
     }
 
@@ -223,11 +225,8 @@ namespace ffpsd::detail
 
     Image DecodeLayerPixels(const LayerRecord& record, ColorMode color_mode, std::uint16_t depth, bool is_psb)
     {
-        const LayerPlanes planes = FindLayerPlanes(record, color_mode, depth);
-        const ImageInfo& info = planes.info;
-        Image image = ReserveImage(info.width, info.height, info.channel_count, info.depth, info.color_mode);
-        for (const ChannelImageData* channel : planes.channels)
-            channel->data.Decode(is_psb, image.bytes);
+        Image image(LayerPixelsInfo(record, color_mode, depth));
+        DecodeLayerPixels(record, color_mode, depth, is_psb, image.bytes.data(), image.bytes.size());
         return image;
     }
 

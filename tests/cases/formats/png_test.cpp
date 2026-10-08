@@ -2,7 +2,6 @@
 #include "support/test_support.hpp"
 
 #include <cstdint>
-#include <cstring>
 #include <ffpsd/ffpsd.hpp>
 #include <filesystem>
 #include <gtest/gtest.h>
@@ -20,17 +19,10 @@ namespace
     const std::string kPalettePng = DataFile("generated/palette_transparent.png");
 
     // Planes of rgba_8bit.png: red, green at half alpha, clear blue; white, black, gray at quarter alpha.
-    const std::vector<std::uint8_t> kRgbaPlanes = {255, 0,   0,   255, 0,   128, // R
-                                                   0,   255, 0,   255, 0,   128, // G
-                                                   0,   0,   255, 255, 0,   128, // B
-                                                   255, 128, 0,   255, 255, 64}; // A
-
-    std::vector<std::uint16_t> Samples16(const ffpsd::Image& image)
-    {
-        std::vector<std::uint16_t> samples(image.bytes.size() / 2);
-        std::memcpy(samples.data(), image.bytes.data(), image.bytes.size());
-        return samples;
-    }
+    const ffpsd::Bytes kRgbaPlanes = {255, 0,   0,   255, 0,   128, // R
+                                      0,   255, 0,   255, 0,   128, // G
+                                      0,   0,   255, 255, 0,   128, // B
+                                      255, 128, 0,   255, 255, 64}; // A
 
     // Width, height, bit depth and color type from the IHDR chunk, which always comes first.
     std::tuple<std::uint32_t, std::uint32_t, int, int> Header(const std::vector<std::uint8_t>& png)
@@ -56,7 +48,7 @@ TEST(FormatsPngTest, LoadsWhatTheFileHoldsIntoPlanes)
 
     const ffpsd::Image palette = ffpsd::LoadPng(kPalettePng, ffpsd::ColorMode::kRgb, 8);
     ASSERT_EQ(palette.channel_count, 4u);
-    EXPECT_EQ(palette.bytes, (std::vector<std::uint8_t>{10, 200, 20, 100, 30, 50, 255, 0}));
+    EXPECT_EQ(palette.bytes, (ffpsd::Bytes{10, 200, 20, 100, 30, 50, 255, 0}));
 }
 
 TEST(FormatsPngTest, LoadsIntoTheModeAndDepthAskedFor)
@@ -65,7 +57,7 @@ TEST(FormatsPngTest, LoadsIntoTheModeAndDepthAskedFor)
     const ffpsd::Image gray = ffpsd::LoadPng(kRgbaPng, ffpsd::ColorMode::kGrayscale, 8);
     ASSERT_EQ(gray.channel_count, 2u);
     EXPECT_EQ(gray.color_mode, ffpsd::ColorMode::kGrayscale);
-    EXPECT_EQ(gray.bytes, (std::vector<std::uint8_t>{54, 182, 18, 255, 0, 128, 255, 128, 0, 255, 255, 64}));
+    EXPECT_EQ(gray.bytes, (ffpsd::Bytes{54, 182, 18, 255, 0, 128, 255, 128, 0, 255, 255, 64}));
 
     const ffpsd::Image wide = ffpsd::LoadPng(kRgbaPng, ffpsd::ColorMode::kRgb, 16);
     ASSERT_EQ(wide.depth, 16u);
@@ -77,11 +69,7 @@ TEST(FormatsPngTest, LoadsIntoTheModeAndDepthAskedFor)
     const ffpsd::Image narrow = ffpsd::LoadPng(kGray16Png, ffpsd::ColorMode::kRgb, 8);
     ASSERT_EQ(narrow.channel_count, 3u);
     EXPECT_EQ(narrow.color_mode, ffpsd::ColorMode::kRgb);
-    const std::vector<std::uint8_t> plane = {0, 255, 128, 18};
-    std::vector<std::uint8_t> expected;
-    for (int i = 0; i < 3; ++i)
-        expected.insert(expected.end(), plane.begin(), plane.end());
-    EXPECT_EQ(narrow.bytes, expected);
+    EXPECT_EQ(narrow.bytes, (ffpsd::Bytes{0, 255, 128, 18, 0, 255, 128, 18, 0, 255, 128, 18}));
 }
 
 TEST(FormatsPngTest, LoadingRefusesWhatItCannotDo)
@@ -130,17 +118,8 @@ TEST(FormatsPngTest, EncodeThenLoadGivesTheSamePlanes)
 
 TEST(FormatsPngTest, EncodingRefusesWhatPngCannotHold)
 {
-    ffpsd::Image cut = Pattern(2, 2, 3);
-    cut.bytes.pop_back();
-
-    EXPECT_THROW(ffpsd::EncodePng(ffpsd::Image()), std::invalid_argument);
-    EXPECT_THROW(ffpsd::EncodePng(Pattern(2, 2, 3, 32)), std::invalid_argument);
-    EXPECT_THROW(ffpsd::EncodePng(Pattern(2, 2, 5)), std::invalid_argument);
-    EXPECT_THROW(ffpsd::EncodePng(cut), std::invalid_argument);
-
-    // Channels alone would pass for RGBA and RGB.
-    EXPECT_THROW(ffpsd::EncodePng(Pattern(2, 2, 4, 8, ffpsd::ColorMode::kCmyk)), std::invalid_argument);
-    EXPECT_THROW(ffpsd::EncodePng(Pattern(2, 2, 3, 8, ffpsd::ColorMode::kLab)), std::invalid_argument);
+    for (const ffpsd::Image& image : ImagesNoCodecTakes())
+        EXPECT_THROW(ffpsd::EncodePng(image), std::invalid_argument) << image.channel_count << " x " << image.depth;
 }
 
 TEST(FormatsPngTest, PlanesSplitTheSameAtAnyWidth)

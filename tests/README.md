@@ -2,22 +2,23 @@
 
 GoogleTest, built by the debug presets; the top-level README shows how to run them.
 
-A folder per public header, and a file per part of it. A suite is the folder
-and the file, `DocumentStackTest` for `document/stack_test.cpp`, just the folder
-for the folder's main file, so `run_tests.py --filter Document` runs `document/`.
+In `cases/`, a folder per public header, and a file per part of it. A suite is the folder
+and the file, `DocumentStackTest` for `cases/document/stack_test.cpp`, just the folder
+for the folder's main file, so `run_tests.py --filter Document` runs `cases/document/`.
 
 ```
-smoke/         Photoshop files end to end against scripts/dump_psd.py, read and written
-document/      document.hpp: the header, resources, the stack, parsing, saving,
-               PSD and PSB, compression
-layer/         layer.hpp: properties, name, kind and blocks, pixels and position,
-               the background, resizing
-adjustments/   adjustments.hpp: Levels
-formats/       formats.hpp: LoadPicture; png and jpeg only with their options
-c_api/         c_api.h alone; c_header_check.c compiles it as C
-support/       test_support.hpp: the data files, their layer names, small builders
-data/          photoshop/: written by Photoshop; generated/: written by scripts/
-scripts/       what writes data/generated/ and dumps data/photoshop/; run by hand
+cases/           what builds into ffpsd_tests
+  smoke/         Photoshop files end to end against scripts/dump_psd.py, read and written
+  document/      document.hpp: the header, resources, the stack, parsing, saving,
+                 PSD and PSB, compression
+  layer/         layer.hpp: properties, name, kind and blocks, pixels and position,
+                 the background, resizing
+  adjustments/   adjustments.hpp: Levels
+  formats/       formats.hpp: LoadPicture; png and jpeg only with their options
+  c_api/         c_api.h alone; c_header_check.c compiles it as C
+  support/       test_support.hpp: the data files, their layer names, small builders
+data/            photoshop/: written by Photoshop; generated/: written by scripts/
+scripts/         what writes data/generated/ and dumps data/photoshop/; run by hand
 ```
 
 One feature per test, named as a sentence:

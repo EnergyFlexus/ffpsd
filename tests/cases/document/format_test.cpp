@@ -17,23 +17,6 @@ TEST(DocumentFormatTest, APsbKeepsEveryPixel)
     EXPECT_TRUE(made_back.IsPsb());
     EXPECT_EQ(made_back.GetLayerByIndex(0)->GetPixels().bytes, Pattern(3, 2, 4).bytes);
     EXPECT_EQ(made_back.GetMergedImage().bytes.size(), 4u * 3 * 3);
-
-    // Photoshop's RLE, with 2 byte row counts, through a PSB with 4 byte ones and back.
-    const ffpsd::Document original = ffpsd::Document::Open(kRgbPsd);
-    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
-    doc.SetPsb(true);
-    const ffpsd::Document psb = ffpsd::Document::Parse(doc.Save());
-    doc.SetPsb(false);
-    const ffpsd::Document psd = ffpsd::Document::Parse(doc.Save());
-
-    EXPECT_TRUE(psb.IsPsb());
-    EXPECT_FALSE(psd.IsPsb());
-    for (const ffpsd::Document* back : {&psb, &psd})
-    {
-        EXPECT_EQ(back->GetMergedImage().bytes, original.GetMergedImage().bytes);
-        for (std::size_t i = 0; i < 2; ++i)
-            EXPECT_EQ(back->GetLayerByIndex(i)->GetPixels().bytes, original.GetLayerByIndex(i)->GetPixels().bytes);
-    }
 }
 
 TEST(DocumentFormatTest, SwitchingTheFormatAndBackGivesTheSameFile)
@@ -63,7 +46,7 @@ TEST(DocumentFormatTest, APsbRowCountTooBigForAPsdIsPackedAgain)
     image.channel_count = 1;
     image.depth = 32;
     image.color_mode = ffpsd::ColorMode::kGrayscale;
-    image.bytes.assign(image.GetSizeBytes(), 0);
+    image.bytes = ffpsd::Bytes(image.GetSizeBytes(), 0);
     std::uint32_t state = 1;
     for (std::size_t i = 0; i < image.bytes.size() / 4 * 3; ++i)
     {

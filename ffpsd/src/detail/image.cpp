@@ -28,19 +28,7 @@ namespace ffpsd::detail
         image.channel_count = channel_count;
         image.depth = depth;
         image.color_mode = color_mode;
-        image.bytes.resize(image.GetSizeBytes());
-        return image;
-    }
-
-    Image ReserveImage(std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, ColorMode color_mode)
-    {
-        Image image;
-        image.width = width;
-        image.height = height;
-        image.channel_count = channel_count;
-        image.depth = depth;
-        image.color_mode = color_mode;
-        image.bytes.reserve(image.GetSizeBytes());
+        image.bytes = Bytes(image.GetSizeBytes(), 0);
         return image;
     }
 

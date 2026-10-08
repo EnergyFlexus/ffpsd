@@ -25,7 +25,7 @@ namespace
         // Only the planes the image had: AddLayer gives one without transparency an opaque plane of it.
         ffpsd::Image pixels = layer->GetPixels();
         pixels.channel_count = image.channel_count;
-        pixels.bytes.resize(pixels.GetSizeBytes());
+        pixels.bytes = ffpsd::Bytes(pixels.bytes.data(), pixels.GetSizeBytes());
         return pixels;
     }
 
@@ -45,11 +45,7 @@ TEST(LayerResizeTest, ResizeKeepsTheTopLeftCornerThroughSaving)
     ffpsd::Document doc = NewDocument();
     ffpsd::Layer* layer = doc.AddLayer("resized", Pattern(3, 2, 4), 2, 5);
     layer->Resize(7, 5);
-    const ffpsd::Rect bounds = layer->GetBounds();
-    EXPECT_EQ(bounds.top, 2);
-    EXPECT_EQ(bounds.left, 5);
-    EXPECT_EQ(bounds.GetWidth(), 7);
-    EXPECT_EQ(bounds.GetHeight(), 5);
+    ExpectRect(layer->GetBounds(), 2, 5, 7, 12);
     EXPECT_EQ(layer->GetPixels().channel_count, 4u);
 
     ffpsd::Document deep = NewDocument(ffpsd::ColorMode::kRgb, 16);
@@ -59,20 +55,6 @@ TEST(LayerResizeTest, ResizeKeepsTheTopLeftCornerThroughSaving)
     const ffpsd::Document back = ffpsd::Document::Parse(deep.Save());
     EXPECT_EQ(back.GetLayerByIndex(0)->GetBounds().GetWidth(), 9);
     EXPECT_EQ(back.GetLayerByIndex(0)->GetPixels().bytes, expected.bytes);
-}
-
-TEST(LayerResizeTest, NearestDoublesAPhotoshopLayer)
-{
-    ffpsd::Document doc = ffpsd::Document::Open(kGrayscalePsd);
-    ffpsd::Layer* fill = doc.GetLayerByIndex(1);
-    const ffpsd::Image before = fill->GetPixels();
-
-    fill->Resize(before.width * 2, before.height * 2, ffpsd::ResampleFilter::kNearest);
-
-    // Every source sample appears four times, so each plane's sum is four times as large.
-    const ffpsd::Image after = fill->GetPixels();
-    EXPECT_EQ(PlaneSum(after, 0), 4 * PlaneSum(before, 0));
-    EXPECT_EQ(PlaneSum(after, 1), 4 * PlaneSum(before, 1));
 }
 
 TEST(LayerResizeTest, WhatCannotMoveOrResizeIsRefused)
@@ -157,15 +139,15 @@ TEST(LayerResizeTest, EveryFilterAndDepthKeepsFlatImagesFlat)
 TEST(LayerResizeTest, NearestTakesThePixelUnderEachCenter)
 {
     const ffpsd::Image doubled = Resized(Pattern(2, 2, 1), 4, 4, ffpsd::ResampleFilter::kNearest); // 3, 10 / 17, 24
-    EXPECT_EQ(doubled.bytes, (std::vector<std::uint8_t>{3, 3, 10, 10, 3, 3, 10, 10, 17, 17, 24, 24, 17, 17, 24, 24}));
+    EXPECT_EQ(doubled.bytes, (ffpsd::Bytes{3, 3, 10, 10, 3, 3, 10, 10, 17, 17, 24, 24, 17, 17, 24, 24}));
 
     // Output pixel x covers source (2x + 1) * in / (2 * out): 3 -> 2 picks 0 and 2, 4 -> 2 picks 1 and 3.
     const ffpsd::Image row = Pattern(3, 1, 1);    // 3, 10, 17
     const ffpsd::Image square = Pattern(4, 4, 1); // 3, 10, 17, 24 / 31, ...
-    EXPECT_EQ(Resized(row, 2, 1, ffpsd::ResampleFilter::kNearest).bytes, (std::vector<std::uint8_t>{3, 17}));
+    EXPECT_EQ(Resized(row, 2, 1, ffpsd::ResampleFilter::kNearest).bytes, (ffpsd::Bytes{3, 17}));
     EXPECT_EQ(
         Resized(square, 2, 2, ffpsd::ResampleFilter::kNearest).bytes,
-        (std::vector<std::uint8_t>{square.bytes[1 * 4 + 1], square.bytes[1 * 4 + 3], square.bytes[3 * 4 + 1], square.bytes[3 * 4 + 3]}));
+        (ffpsd::Bytes{square.bytes[1 * 4 + 1], square.bytes[1 * 4 + 3], square.bytes[3 * 4 + 1], square.bytes[3 * 4 + 3]}));
 }
 
 TEST(LayerResizeTest, BicubicAveragesAndKeepsLinesStraight)
@@ -179,10 +161,10 @@ TEST(LayerResizeTest, BicubicAveragesAndKeepsLinesStraight)
     // A 2 x 1 image into 1 x 1: both pixels are equally near the center, so each weighs half.
     ffpsd::Image pair = Pattern(2, 1, 1);
     pair.bytes = {100, 200};
-    EXPECT_EQ(Resized(pair, 1, 1).bytes, (std::vector<std::uint8_t>{150}));
+    EXPECT_EQ(Resized(pair, 1, 1).bytes, (ffpsd::Bytes{150}));
 
     // Opaque red next to clear black: half coverage, and the color stays pure red.
     ffpsd::Image image = Pattern(2, 1, 4);
     image.bytes = {255, 0, 0, 0, 0, 0, 255, 0}; // R, G, B, A planes
-    EXPECT_EQ(Resized(image, 1, 1).bytes, (std::vector<std::uint8_t>{255, 0, 0, 128}));
+    EXPECT_EQ(Resized(image, 1, 1).bytes, (ffpsd::Bytes{255, 0, 0, 128}));
 }

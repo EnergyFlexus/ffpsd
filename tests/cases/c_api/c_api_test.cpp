@@ -49,18 +49,18 @@ namespace
         return name;
     }
 
-    std::vector<std::uint8_t> Bytes(const ffpsd_image_t* image)
+    ffpsd::Bytes Bytes(const ffpsd_image_t* image)
     {
         ffpsd_image_view_t view = {};
         EXPECT_EQ(ffpsd_image_get_view(image, &view), FFPSD_STATUS_OK);
-        return std::vector<std::uint8_t>(view.data, view.data + view.size);
+        return ffpsd::Bytes(view.data, view.size);
     }
 
-    std::vector<std::uint8_t> Pixels(const ffpsd_layer_t* layer)
+    ffpsd::Bytes Pixels(const ffpsd_layer_t* layer)
     {
         ffpsd_image_t* image = nullptr;
         EXPECT_EQ(ffpsd_layer_get_pixels(layer, &image), FFPSD_STATUS_OK) << ffpsd_last_error();
-        std::vector<std::uint8_t> bytes = Bytes(image);
+        ffpsd::Bytes bytes = Bytes(image);
         ffpsd_image_destroy(image);
         return bytes;
     }
@@ -540,14 +540,14 @@ TEST(CApiTest, PixelsIntoTheCallersMemory)
     EXPECT_EQ(info.data, nullptr);
     EXPECT_EQ(info.size, std::size_t{info.width} * info.height * info.channel_count * (info.depth / 8));
 
-    std::vector<std::uint8_t> bytes(info.size);
+    ffpsd::Bytes bytes(info.size);
     ASSERT_EQ(ffpsd_layer_get_pixels_bytes(layer, bytes.data(), bytes.size()), FFPSD_STATUS_OK) << ffpsd_last_error();
     EXPECT_EQ(bytes, Pixels(layer));
     EXPECT_EQ(ffpsd_layer_get_pixels_bytes(layer, bytes.data(), bytes.size() - 1), FFPSD_STATUS_INVALID_ARGUMENT);
 
     ffpsd_image_view_t merged_info = {};
     ASSERT_EQ(ffpsd_document_get_merged_image_info(file.doc, &merged_info), FFPSD_STATUS_OK) << ffpsd_last_error();
-    std::vector<std::uint8_t> merged(merged_info.size);
+    ffpsd::Bytes merged(merged_info.size);
     ASSERT_EQ(ffpsd_document_get_merged_image_bytes(file.doc, merged.data(), merged.size()), FFPSD_STATUS_OK) << ffpsd_last_error();
     ffpsd_image_t* image = nullptr;
     ASSERT_EQ(ffpsd_document_get_merged_image(file.doc, &image), FFPSD_STATUS_OK);

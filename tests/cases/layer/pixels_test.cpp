@@ -1,7 +1,6 @@
 #include "support/test_support.hpp"
 
 #include <cstdint>
-#include <cstring>
 #include <ffpsd/ffpsd.hpp>
 #include <gtest/gtest.h>
 #include <limits>
@@ -23,32 +22,21 @@ TEST(LayerPixelsTest, AddLayerKeepsThePlanesWhereTheyWerePut)
     const ffpsd::Layer* transparent = doc.AddLayer("off canvas", Pattern(3, 2, 4), -5, 7);
     EXPECT_EQ(transparent->GetPixels().channel_count, 4u);
     EXPECT_EQ(transparent->GetPixels().bytes, Pattern(3, 2, 4).bytes);
-    const ffpsd::Rect bounds = transparent->GetBounds();
-    EXPECT_EQ(bounds.top, -5);
-    EXPECT_EQ(bounds.left, 7);
-    EXPECT_EQ(bounds.bottom, -3);
-    EXPECT_EQ(bounds.right, 10);
+    ExpectRect(transparent->GetBounds(), -5, 7, -3, 10);
 
     // A view borrows a buffer that is no Image.
-    const std::vector<std::uint8_t> planes = Pattern(3, 2, 4).bytes;
+    const ffpsd::Image pattern = Pattern(3, 2, 4);
+    const std::vector<std::uint8_t> planes(pattern.bytes.begin(), pattern.bytes.end());
     const ffpsd::ImageView view(3, 2, 4, 8, ffpsd::ColorMode::kRgb, planes.data(), planes.size());
-    EXPECT_EQ(doc.AddLayer("planar", view)->GetPixels().bytes, planes);
+    EXPECT_EQ(doc.AddLayer("planar", view)->GetPixels().bytes, pattern.bytes);
 
     const ffpsd::Layer* empty = doc.AddLayer("empty", ffpsd::Image(), 2, 1);
-    EXPECT_EQ(empty->GetBounds().GetWidth(), 0);
-    EXPECT_EQ(empty->GetBounds().top, 2);
+    ExpectRect(empty->GetBounds(), 2, 1, 2, 1);
     EXPECT_TRUE(empty->GetPixels().bytes.empty());
 
     // 16 bit samples stay in native order.
     ffpsd::Document deep = NewDocument(ffpsd::ColorMode::kRgb, 16);
-    ffpsd::Image image = Pattern(2, 1, 3, 16);
-    const std::uint16_t first = 0x1234;
-    std::memcpy(image.bytes.data(), &first, sizeof(first));
-    const ffpsd::Image back = deep.AddLayer("deep", image)->GetPixels();
-    std::uint16_t read = 0;
-    std::memcpy(&read, back.bytes.data(), sizeof(read));
-    EXPECT_EQ(read, 0x1234);
-    EXPECT_EQ(back.bytes, WithOpaqueAlpha(image).bytes);
+    EXPECT_EQ(deep.AddLayer("deep", Pattern(2, 1, 3, 16))->GetPixels().bytes, WithOpaqueAlpha(Pattern(2, 1, 3, 16)).bytes);
 }
 
 TEST(LayerPixelsTest, AddLayerRefusesWhatDoesNotFit)
@@ -103,10 +91,7 @@ TEST(LayerPixelsTest, SetPixelsReplacesColorAndTransparencyOnly)
     ffpsd::Document made = NewDocument();
     ffpsd::Layer* moved = made.AddLayer("moved", Pattern(4, 3, 3), 5, 6);
     moved->SetPixels(Pattern(2, 1, 4));
-    EXPECT_EQ(moved->GetBounds().top, 5);
-    EXPECT_EQ(moved->GetBounds().left, 6);
-    EXPECT_EQ(moved->GetBounds().GetWidth(), 2);
-    EXPECT_EQ(moved->GetBounds().GetHeight(), 1);
+    ExpectRect(moved->GetBounds(), 5, 6, 6, 8);
     EXPECT_EQ(moved->GetPixels().bytes, Pattern(2, 1, 4).bytes);
 
     // Photoshop's Levels layer has a layer mask channel next to its empty ones, and keeps it.
@@ -125,11 +110,7 @@ TEST(LayerPixelsTest, SetPositionMovesThePixelsAsTheyAre)
 
     layer->SetPosition(-4, 7);
 
-    const ffpsd::Rect bounds = layer->GetBounds();
-    EXPECT_EQ(bounds.top, -4);
-    EXPECT_EQ(bounds.left, 7);
-    EXPECT_EQ(bounds.bottom, -2);
-    EXPECT_EQ(bounds.right, 10);
+    ExpectRect(layer->GetBounds(), -4, 7, -2, 10);
     EXPECT_EQ(layer->GetPixels().bytes, Pattern(3, 2, 4).bytes);
     EXPECT_FALSE(doc.HasRealMergedData());
 
@@ -153,7 +134,7 @@ TEST(LayerPixelsTest, BytesIntoTheCallersMemoryMatchGetPixels)
             EXPECT_EQ(info.color_mode, image.color_mode) << i;
 
             // Filled with a pattern first, so a byte left unwritten would show.
-            std::vector<std::uint8_t> bytes(info.GetSizeBytes(), 0xAB);
+            ffpsd::Bytes bytes(info.GetSizeBytes(), 0xAB);
             layer.GetPixelsBytes(bytes.data(), bytes.size());
             EXPECT_EQ(bytes, image.bytes) << i;
         }
@@ -166,10 +147,8 @@ TEST(LayerPixelsTest, BytesIntoTheCallersMemoryMatchGetPixels)
         check(doc);
         check(ffpsd::Document::Parse(doc.Save(ffpsd::Compression::kRaw)));
     }
-}
 
-TEST(LayerPixelsTest, BytesNeedExactlyTheSize)
-{
+    // Exactly the size, and a view over them is the Image's view.
     const ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
     const ffpsd::Layer& layer = *doc.GetLayerByIndex(1);
     const std::size_t size = layer.GetPixelsInfo().GetSizeBytes();
@@ -177,10 +156,8 @@ TEST(LayerPixelsTest, BytesNeedExactlyTheSize)
     EXPECT_THROW(layer.GetPixelsBytes(bytes.data(), size - 1), std::invalid_argument);
     EXPECT_THROW(layer.GetPixelsBytes(bytes.data(), size + 1), std::invalid_argument);
     EXPECT_THROW(layer.GetPixelsBytes(nullptr, size), std::invalid_argument);
-
-    // A view over them is the Image's view.
     layer.GetPixelsBytes(bytes.data(), size);
     const ffpsd::ImageView view(layer.GetPixelsInfo(), bytes.data(), size);
     EXPECT_EQ(view.GetSizeBytes(), size);
-    EXPECT_EQ(view.channel_count, layer.GetPixels().channel_count);
+    EXPECT_EQ(view.channel_count, 4u);
 }

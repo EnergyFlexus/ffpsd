@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <ffpsd/bytes.hpp>
 #include <limits>
 #include <optional>
 #include <stdexcept>
@@ -43,76 +44,6 @@ namespace ffpsd::detail
         {
             return compression == kCompressionRaw || compression == kCompressionRle;
         }
-
-        // Stored rows in order, each checked against the data: raw ones where they lie, RLE ones unpacked into the caller's scratch.
-        class RowReader
-        {
-        public:
-            struct Rows
-            {
-                const std::uint8_t* bytes;
-                std::size_t count;
-            };
-
-            RowReader(const std::vector<std::uint8_t>& bytes, std::size_t rows, std::size_t row_bytes, bool is_psb)
-                : bytes_(bytes)
-                , reader_(bytes)
-                , rows_(rows)
-                , row_bytes_(row_bytes)
-            {
-                compression_ = reader_.ReadU16();
-                if (compression_ == kCompressionRaw)
-                {
-                    if (reader_.GetRemaining() < rows * row_bytes)
-                        throw std::runtime_error(
-                            "ffpsd: raw pixel data holds " + std::to_string(reader_.GetRemaining()) + " bytes, needs " +
-                            std::to_string(rows * row_bytes));
-                }
-                else if (compression_ == kCompressionRle)
-                {
-                    // One byte count per row, all of them before any row.
-                    counts_.resize(rows);
-                    for (std::size_t& count : counts_)
-                        count = is_psb ? reader_.ReadU32() : reader_.ReadU16();
-                }
-                else
-                {
-                    throw std::runtime_error("ffpsd: pixel compression " + std::to_string(compression_) + " is not supported yet");
-                }
-            }
-
-            // All raw rows left at once, where they lie, as one big copy beats many; or one RLE row, unpacked in scratch.
-            Rows ReadRows(std::uint8_t* scratch)
-            {
-                const std::uint8_t* at = bytes_.data() + reader_.Tell();
-                if (compression_ == kCompressionRaw)
-                {
-                    const std::size_t count = rows_ - row_;
-                    reader_.Skip(count * row_bytes_);
-                    row_ = rows_;
-                    return {at, count};
-                }
-
-                const std::size_t count = counts_[row_];
-                if (count > reader_.GetRemaining())
-                    throw std::runtime_error(
-                        "ffpsd: pixel row " + std::to_string(row_) + " claims " + std::to_string(count) + " bytes, only " +
-                        std::to_string(reader_.GetRemaining()) + " left");
-                UnpackBits(at, count, scratch, row_bytes_);
-                reader_.Skip(count);
-                ++row_;
-                return {scratch, 1};
-            }
-
-        private:
-            const std::vector<std::uint8_t>& bytes_;
-            BigEndianReader reader_;
-            std::size_t rows_ = 0;
-            std::size_t row_bytes_ = 0;
-            std::uint16_t compression_ = 0;
-            std::vector<std::size_t> counts_;
-            std::size_t row_ = 0;
-        };
 
         // The same packed rows behind counts of the other width; empty when a PSB count does not fit a PSD.
         std::optional<std::vector<std::uint8_t>>
@@ -247,31 +178,37 @@ namespace ffpsd::detail
 
     void PixelData::Decode(bool is_psb, std::uint8_t* out) const
     {
-        RowReader rows(bytes_, rows_, row_bytes_, is_psb);
-        for (std::size_t row = 0; row < rows_;)
+        BigEndianReader reader(bytes_);
+        const std::size_t total = rows_ * row_bytes_;
+        const std::uint16_t compression = reader.ReadU16();
+        if (compression == kCompressionRaw)
         {
-            std::uint8_t* target = out + row * row_bytes_;
-            const RowReader::Rows got = rows.ReadRows(target);
-            if (got.bytes != target)
-                std::memcpy(target, got.bytes, got.count * row_bytes_);
-            row += got.count;
+            if (reader.GetRemaining() < total)
+                throw std::runtime_error(
+                    "ffpsd: raw pixel data holds " + std::to_string(reader.GetRemaining()) + " bytes, needs " + std::to_string(total));
+            std::memcpy(out, bytes_.data() + reader.Tell(), total);
         }
-        SwapSampleBytes(out, rows_ * row_bytes_, sample_size_);
-    }
-
-    void PixelData::Decode(bool is_psb, std::vector<std::uint8_t>& out) const
-    {
-        // A vector takes rows only appended: packed ones unpack in a line that stays in cache, as an insert per run costs more.
-        RowReader rows(bytes_, rows_, row_bytes_, is_psb);
-        const std::size_t start = out.size();
-        std::vector<std::uint8_t> line(row_bytes_);
-        for (std::size_t row = 0; row < rows_;)
+        else if (compression == kCompressionRle)
         {
-            const RowReader::Rows got = rows.ReadRows(line.data());
-            out.insert(out.end(), got.bytes, got.bytes + got.count * row_bytes_);
-            row += got.count;
+            // One byte count per row, all of them before any row: one cursor walks the counts, the other the rows.
+            BigEndianReader counts = reader;
+            reader.Skip(rows_ * (is_psb ? sizeof(std::uint32_t) : sizeof(std::uint16_t)));
+            for (std::size_t row = 0; row < rows_; ++row)
+            {
+                const std::size_t count = is_psb ? counts.ReadU32() : counts.ReadU16();
+                if (count > reader.GetRemaining())
+                    throw std::runtime_error(
+                        "ffpsd: pixel row " + std::to_string(row) + " claims " + std::to_string(count) + " bytes, only " +
+                        std::to_string(reader.GetRemaining()) + " left");
+                UnpackBits(bytes_.data() + reader.Tell(), count, out + row * row_bytes_, row_bytes_);
+                reader.Skip(count);
+            }
         }
-        SwapSampleBytes(out.data() + start, rows_ * row_bytes_, sample_size_);
+        else
+        {
+            throw std::runtime_error("ffpsd: pixel compression " + std::to_string(compression) + " is not supported yet");
+        }
+        SwapSampleBytes(out, total, sample_size_);
     }
 
     bool PixelData::NeedsConversion(bool from_psb, bool to_psb, Compression compression) const noexcept
@@ -322,9 +259,8 @@ namespace ffpsd::detail
             return packed;
         }
 
-        std::vector<std::uint8_t> samples;
-        samples.reserve(rows_ * row_bytes_);
-        Decode(from_psb, samples);
+        Bytes samples(rows_ * row_bytes_);
+        Decode(from_psb, samples.data());
         return Encode(samples.data(), rows_, row_bytes_, sample_size_, to_psb, compression);
     }
 } // namespace ffpsd::detail

@@ -374,9 +374,9 @@ namespace
             // A layer loses its transparency, the plane after the color ones.
             ffpsd::Image& image = images[i];
             image.channel_count = color_count;
-            image.bytes.resize(image.GetSizeBytes());
+            const ffpsd::ImageView colors(image, image.bytes.data(), image.GetSizeBytes());
 
-            ffpsd::Layer* layer = doc.AddLayer(Label(folders[i]), image);
+            ffpsd::Layer* layer = doc.AddLayer(Label(folders[i]), colors);
             const bool resized = image.width != width || image.height != height;
             if (resized)
                 layer->Resize(width, height, filter);
@@ -387,7 +387,7 @@ namespace
                 if (resized)
                     doc.SetMergedImage(layer->GetPixels());
                 else
-                    doc.SetMergedImage(image); // a ternary would copy the picture
+                    doc.SetMergedImage(colors); // a ternary would copy the picture
             }
         }
 

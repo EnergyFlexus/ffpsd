@@ -45,9 +45,8 @@ namespace ffpsd::detail
         // The compression field, or raw for data too short to have one.
         std::uint16_t GetCompression() const noexcept;
 
-        // Raw and RLE, rows * row_bytes bytes in native byte order: straight into out, or appended, so a vector is reserved, not zeroed.
+        // Raw and RLE, rows * row_bytes bytes in native byte order.
         void Decode(bool is_psb, std::uint8_t* out) const;
-        void Decode(bool is_psb, std::vector<std::uint8_t>& out) const;
 
         // None while the stored bytes stay, raw RLE could not shrink included; RLE changing format rewrites only the counts.
         std::optional<PixelData> Converted(bool from_psb, bool to_psb, Compression compression) const;

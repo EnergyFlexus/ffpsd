@@ -32,7 +32,7 @@ namespace
     // The sample of an 8 bit image at x, y in a channel.
     int At(const ffpsd::Image& image, std::uint32_t x, std::uint32_t y, std::uint16_t channel = 0)
     {
-        return image.bytes.at((std::size_t{channel} * image.height + y) * image.width + x);
+        return image.bytes[(std::size_t{channel} * image.height + y) * image.width + x];
     }
 
     Color RgbAt(const ffpsd::Image& image, std::uint32_t x, std::uint32_t y)
@@ -68,7 +68,7 @@ namespace
         image.channel_count = channels;
         image.depth = depth;
         image.color_mode = channels <= 2 ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb;
-        image.bytes.resize(image.GetSizeBytes());
+        image.bytes = ffpsd::Bytes(image.GetSizeBytes());
         for (std::uint16_t channel = 0; channel < channels; ++channel)
         {
             for (std::uint32_t y = 0; y < 16; ++y)
@@ -235,17 +235,8 @@ TEST(FormatsJpegTest, EncodeThenLoadGivesTheColorsBack)
 
 TEST(FormatsJpegTest, EncodingRefusesWhatJpegCannotHold)
 {
-    ffpsd::Image cut = Pattern(2, 2, 3);
-    cut.bytes.pop_back();
-
-    EXPECT_THROW(ffpsd::EncodeJpeg(ffpsd::Image()), std::invalid_argument);
-    EXPECT_THROW(ffpsd::EncodeJpeg(Pattern(2, 2, 3, 32)), std::invalid_argument);
-    EXPECT_THROW(ffpsd::EncodeJpeg(Pattern(2, 2, 5)), std::invalid_argument);
+    for (const ffpsd::Image& image : ImagesNoCodecTakes())
+        EXPECT_THROW(ffpsd::EncodeJpeg(image), std::invalid_argument) << image.channel_count << " x " << image.depth;
     EXPECT_THROW(ffpsd::EncodeJpeg(Pattern(2, 2, 3), 0), std::invalid_argument);
     EXPECT_THROW(ffpsd::EncodeJpeg(Pattern(2, 2, 3), 101), std::invalid_argument);
-    EXPECT_THROW(ffpsd::EncodeJpeg(cut), std::invalid_argument);
-
-    // Channels alone would pass for RGB with alpha and RGB.
-    EXPECT_THROW(ffpsd::EncodeJpeg(Pattern(2, 2, 4, 8, ffpsd::ColorMode::kCmyk)), std::invalid_argument);
-    EXPECT_THROW(ffpsd::EncodeJpeg(Pattern(2, 2, 3, 8, ffpsd::ColorMode::kLab)), std::invalid_argument);
 }

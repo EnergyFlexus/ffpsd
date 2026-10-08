@@ -76,7 +76,7 @@ TEST(DocumentSaveTest, TheCompositeStaysOrIsWrittenBlank)
         EXPECT_EQ(back.GetHeight(), 3u);
         ASSERT_EQ(back.GetLayerCount(), 1u);
         EXPECT_EQ(back.GetLayerByIndex(0)->GetPixels().bytes, Pattern(4, 3, 2).bytes);
-        EXPECT_EQ(back.GetMergedImage().bytes, std::vector<std::uint8_t>(4 * 3, 0));
+        EXPECT_EQ(back.GetMergedImage().bytes, ffpsd::Bytes(4 * 3, 0));
     }
 }
 

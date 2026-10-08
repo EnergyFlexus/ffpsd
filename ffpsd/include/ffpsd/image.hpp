@@ -3,8 +3,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <ffpsd/bytes.hpp>
 #include <ffpsd/types.hpp>
-#include <vector>
 
 namespace ffpsd
 {
@@ -34,7 +34,15 @@ namespace ffpsd
     // Planar, as PSD stores channels; 16 and 32 bit samples are in native byte order.
     struct Image : ImageInfo
     {
-        std::vector<std::uint8_t> bytes;
+        Bytes bytes;
+
+        Image() = default;
+        // Room for every sample, not yet written.
+        explicit Image(const ImageInfo& info)
+            : ImageInfo(info)
+            , bytes(info.GetSizeBytes())
+        {
+        }
     };
 
     // An Image's fields over borrowed bytes; a view of a temporary Image dangles after the statement.

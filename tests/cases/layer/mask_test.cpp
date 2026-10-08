@@ -79,7 +79,7 @@ TEST(LayerMaskTest, AMaskMovesAndScalesWithItsLayer)
     const std::uint8_t b = Pattern(2, 2, 1).bytes[1];
     const std::uint8_t c = Pattern(2, 2, 1).bytes[2];
     const std::uint8_t d = Pattern(2, 2, 1).bytes[3];
-    EXPECT_EQ(mask.image.bytes, (std::vector<std::uint8_t>{a, a, b, b, a, a, b, b, c, c, d, d, c, c, d, d}));
+    EXPECT_EQ(mask.image.bytes, (ffpsd::Bytes{a, a, b, b, a, a, b, b, c, c, d, d, c, c, d, d}));
 
     // Photoshop's masked layer moves now, its mask along.
     ffpsd::Document photoshop = ffpsd::Document::Open(kRgbMasksPsd);

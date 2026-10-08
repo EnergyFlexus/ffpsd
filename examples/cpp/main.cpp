@@ -46,7 +46,7 @@ int main(int argc, char** argv)
         gradient.height = doc.GetHeight();
         gradient.color_mode = doc.GetColorMode();
         gradient.channel_count = gradient.color_mode == ffpsd::ColorMode::kGrayscale ? 1 : 3;
-        gradient.bytes.resize(gradient.GetSizeBytes());
+        gradient.bytes = ffpsd::Bytes(gradient.GetSizeBytes());
         const std::size_t plane = std::size_t{gradient.width} * gradient.height;
         for (std::uint32_t y = 0; y < gradient.height; ++y)
         {

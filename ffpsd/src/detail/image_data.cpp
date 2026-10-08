@@ -36,8 +36,8 @@ namespace ffpsd::detail
         if (data.IsEmpty())
             return Image();
 
-        Image image = ReserveImage(info.width, info.height, info.channel_count, info.depth, info.color_mode);
-        data.Decode(is_psb, image.bytes);
+        Image image(info);
+        data.Decode(is_psb, image.bytes.data());
         return image;
     }
 

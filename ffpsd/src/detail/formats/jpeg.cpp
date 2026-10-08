@@ -233,9 +233,9 @@ namespace ffpsd::detail
 
         Image WidenTo16(const Image& image)
         {
-            Image wide = image;
-            wide.depth = 16;
-            wide.bytes.resize(image.bytes.size() * 2);
+            ImageInfo info = image;
+            info.depth = 16;
+            Image wide(info);
             for (std::size_t i = 0; i < image.bytes.size(); ++i)
             {
                 const auto sample = static_cast<std::uint16_t>(image.bytes[i] * 257);

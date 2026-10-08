@@ -34,7 +34,8 @@ ffpsd/src/detail/      everything not in the public API
 apps/                  the apps, a folder each: img2ffpsd
 docs/                  PSD.md, the format reference
 vendor/                libpng, zlib-ng, libjpeg-turbo, imgui, SDL, googletest, benchmark: submodules pinned to tags
-tests/                 GoogleTest, built with FFPSD_BUILD_TESTS
+tests/cases/           GoogleTest, built with FFPSD_BUILD_TESTS
+tests/data/            the files they read; tests/scripts/ writes generated/
 benchmarks/            Google Benchmark, built with FFPSD_BUILD_BENCHMARKS
 examples/              programs that use the installed package
 scripts/   build.py    tooling
@@ -80,7 +81,7 @@ commit.
 | Public C++ header | `.hpp` | `ffpsd/include/ffpsd/image_resources.hpp` |
 | Public C header | `.h` | `ffpsd/include/ffpsd/c_api.h` |
 | Implementation | `.cpp` | `ffpsd/src/detail/io/big_endian_reader.cpp` |
-| C source | `.c` | `tests/c_api/c_header_check.c` |
+| C source | `.c` | `tests/cases/c_api/c_header_check.c` |
 | Directory | - | `apps/img2ffpsd/`, `scripts/`, `docs/` |
 
 * The name matches `^[a-z][a-z0-9_]*\.(h|hpp|c|cpp)$`; `.cc`, `.cxx` and `.hxx`
@@ -290,8 +291,8 @@ Tests, `tests/README.md` has the folders:
 
 * Expected values come from an independent source - a dump of the file, an
   encoder of our own, arithmetic by hand - never from ffpsd.
-* Shared helpers go into `tests/support/test_support.hpp`.
-* `<folder>/<part>_test.cpp` with the suite `<Folder><Part>Test`; the name reads
+* Shared helpers go into `tests/cases/support/test_support.hpp`.
+* `tests/cases/<folder>/<part>_test.cpp` with the suite `<Folder><Part>Test`; the name reads
   as a sentence: `DocumentStackTest.MoveLayerKeepsEveryPointer`.
 * New `.psd` and `.psb` files go to Git LFS by themselves.
 * A `detail` function links only in the static build: a DLL does not export it.

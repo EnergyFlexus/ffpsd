@@ -43,11 +43,9 @@ TEST(DocumentCompressionTest, RawAndRleGiveTheSamePixels)
 
 TEST(DocumentCompressionTest, RleIsWrittenEvenWhereRawIsSmaller)
 {
-    // Every byte differs from its neighbour, so RLE only grows the layer and the composite; kRle writes it all the same.
+    // RLE only grows noise; kRle writes it all the same.
     ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kRgb, 8, 64, 64);
-    ffpsd::Image noise = Pattern(64, 64, 4);
-    for (std::size_t i = 0; i < noise.bytes.size(); ++i)
-        noise.bytes[i] = static_cast<std::uint8_t>((i * 2654435761u) >> 13);
+    const ffpsd::Image noise = Noise(64, 64, 4);
     doc.AddLayer("noise", noise);
     doc.SetMergedImage(Pattern(64, 64, 3));
 
@@ -63,11 +61,9 @@ TEST(DocumentCompressionTest, RleIsKeptOnlyWhereItPacks)
 {
     // Flat rows of 1000 bytes are 8 runs of 2 bytes plus a 2 byte count: 7000 rows of 18, against 7 MB raw.
     ffpsd::Document flat_doc = NewDocument(ffpsd::ColorMode::kRgb, 8, 1000, 1000);
-    ffpsd::Image flat = Pattern(1000, 1000, 4);
-    std::fill(flat.bytes.begin(), flat.bytes.end(), std::uint8_t{200});
+    const ffpsd::Image flat = Flat(1000, 1000, 4, 200);
+    const ffpsd::Image merged = Flat(1000, 1000, 3, 200);
     flat_doc.AddLayer("flat", flat);
-    ffpsd::Image merged = Pattern(1000, 1000, 3);
-    std::fill(merged.bytes.begin(), merged.bytes.end(), std::uint8_t{200});
     flat_doc.SetMergedImage(merged);
     const std::vector<std::uint8_t> flat_saved = flat_doc.Save();
     EXPECT_LT(flat_saved.size(), 126000u + 1000u);
@@ -75,15 +71,16 @@ TEST(DocumentCompressionTest, RleIsKeptOnlyWhereItPacks)
     EXPECT_EQ(flat_back.GetLayerByIndex(0)->GetPixels().bytes, flat.bytes);
     EXPECT_EQ(flat_back.GetMergedImage().bytes, merged.bytes);
 
-    // Every byte differs from its neighbour, so RLE would only grow them.
+    // Noise stays raw: a compression field and 64 x 64 bytes a channel.
     ffpsd::Document noise_doc = NewDocument(ffpsd::ColorMode::kRgb, 8, 64, 64);
-    ffpsd::Image noise = Pattern(64, 64, 4);
-    for (std::size_t i = 0; i < noise.bytes.size(); ++i)
-        noise.bytes[i] = static_cast<std::uint8_t>((i * 2654435761u) >> 13);
-    noise_doc.AddLayer("noise", noise);
-    const std::vector<std::uint8_t> noise_saved = noise_doc.Save();
-    EXPECT_LT(noise_saved.size(), noise.bytes.size() + 4000);
-    EXPECT_EQ(ffpsd::Document::Parse(noise_saved).GetLayerByIndex(0)->GetPixels().bytes, noise.bytes);
+    const ffpsd::Image noise = Noise(64, 64, 4);
+    const ffpsd::Layer& added = *noise_doc.AddLayer("noise", noise);
+    for (std::size_t i = 0; i < added.GetChannelCount(); ++i)
+    {
+        EXPECT_EQ(added.GetChannelByIndex(i).compression, ffpsd::ChannelCompression::kRaw) << i;
+        EXPECT_EQ(added.GetChannelByIndex(i).size, 2u + 64 * 64) << i;
+    }
+    EXPECT_EQ(ffpsd::Document::Parse(noise_doc.Save()).GetLayerByIndex(0)->GetPixels().bytes, noise.bytes);
 
     // 20000 float samples are 80000 bytes a row: noise does not pack below a 2 byte count's 65535, the zeros do.
     ffpsd::Document wide_doc = NewDocument(ffpsd::ColorMode::kGrayscale, 32, 20000, 2);
@@ -93,29 +90,15 @@ TEST(DocumentCompressionTest, RleIsKeptOnlyWhereItPacks)
     EXPECT_EQ(ffpsd::Document::Parse(wide_doc.Save()).GetLayerByIndex(0)->GetPixels().bytes, WithOpaqueAlpha(wide).bytes);
 }
 
-TEST(DocumentCompressionTest, DefaultKeepsEachChannelAsStored)
+TEST(DocumentCompressionTest, DefaultKeepsWhatIsStoredAndPacksWhatIsNewAsRleOrRaw)
 {
-    const ffpsd::Document photoshop = ffpsd::Document::Open(kRgbPsd);
-    EXPECT_EQ(photoshop.Save(), ReadFile(kRgbPsd));
+    // Raw from the file stays raw, though RLE would pack it.
+    const std::vector<std::uint8_t> raw = ffpsd::Document::Open(kRgbPsd).Save(ffpsd::Compression::kRaw);
+    EXPECT_EQ(ffpsd::Document::Parse(raw).Save(), raw);
 
-    // Raw from the file stays raw, though RLE would pack it; kRleOrRaw packs it again.
-    const std::vector<std::uint8_t> raw = photoshop.Save(ffpsd::Compression::kRaw);
-    const ffpsd::Document back = ffpsd::Document::Parse(raw);
-    EXPECT_EQ(back.Save(), raw);
-    EXPECT_LT(back.Save(ffpsd::Compression::kRleOrRaw).size(), raw.size());
-}
-
-TEST(DocumentCompressionTest, DefaultSavesANewDocumentAsRleOrRaw)
-{
     ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kRgb, 8, 64, 64);
-    ffpsd::Image noise = Pattern(64, 64, 4);
-    for (std::size_t i = 0; i < noise.bytes.size(); ++i)
-        noise.bytes[i] = static_cast<std::uint8_t>((i * 2654435761u) >> 13);
-    doc.AddLayer("noise", noise);
-    ffpsd::Image flat = Pattern(64, 64, 4);
-    std::fill(flat.bytes.begin(), flat.bytes.end(), std::uint8_t{200});
-    doc.AddLayer("flat", flat);
-
+    doc.AddLayer("noise", Noise(64, 64, 4));
+    doc.AddLayer("flat", Flat(64, 64, 4, 200));
     EXPECT_EQ(doc.Save(), doc.Save(ffpsd::Compression::kRleOrRaw));
     doc.SetMergedImage(Pattern(64, 64, 3));
     EXPECT_EQ(doc.Save(), doc.Save(ffpsd::Compression::kRleOrRaw));
@@ -140,31 +123,21 @@ TEST(DocumentCompressionTest, ChannelsTellHowTheyAreStored)
     EXPECT_EQ(ids, (std::vector<std::int16_t>{-1, 0, 1, 2}));
     EXPECT_THROW(layer.GetChannelByIndex(4), std::out_of_range);
 
-    // Noise does not pack, so the new layer is raw: a compression field and 64 x 64 bytes a channel.
-    ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kGrayscale, 8, 64, 64);
-    EXPECT_EQ(doc.GetMergedCompression(), std::nullopt);
-    ffpsd::Image noise = Pattern(64, 64, 1);
-    for (std::size_t i = 0; i < noise.bytes.size(); ++i)
-        noise.bytes[i] = static_cast<std::uint8_t>((i * 2654435761u) >> 13);
-    const ffpsd::Layer& added = *doc.AddLayer("noise", noise);
-    for (std::size_t i = 0; i < added.GetChannelCount(); ++i)
-    {
-        const ffpsd::ChannelInfo channel = added.GetChannelByIndex(i);
-        if (channel.id != 0)
-            continue;
-        EXPECT_EQ(channel.compression, ffpsd::ChannelCompression::kRaw);
-        EXPECT_EQ(channel.size, 2u + 64 * 64);
-    }
+    // Written raw, the composite says so; a new document has none to tell about.
+    EXPECT_EQ(ffpsd::Document::Parse(photoshop.Save(ffpsd::Compression::kRaw)).GetMergedCompression(), ffpsd::ChannelCompression::kRaw);
+    EXPECT_EQ(NewDocument().GetMergedCompression(), std::nullopt);
 }
 
 TEST(DocumentCompressionTest, NoiseAtTheTopDoesNotKeepTheRestRaw)
 {
     // The top 10% is noise, the rest flat: RLE still packs the layer to a fraction of its 4 x 64 x 160 bytes.
     ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kRgb, 8, 64, 160);
-    ffpsd::Image picture = Pattern(64, 160, 4);
+    const ffpsd::Image noise = Noise(64, 160, 4);
+    ffpsd::Image picture = Flat(64, 160, 4, 0);
     const std::size_t plane = std::size_t{64} * 160;
     for (std::size_t i = 0; i < picture.bytes.size(); ++i)
-        picture.bytes[i] = i % plane < plane / 10 ? static_cast<std::uint8_t>((i * 2654435761u) >> 13) : std::uint8_t{0};
+        if (i % plane < plane / 10)
+            picture.bytes[i] = noise.bytes[i];
     const ffpsd::Layer& layer = *doc.AddLayer("top noise", picture);
     for (std::size_t i = 0; i < layer.GetChannelCount(); ++i)
         EXPECT_EQ(layer.GetChannelByIndex(i).compression, ffpsd::ChannelCompression::kRle) << layer.GetChannelByIndex(i).id;

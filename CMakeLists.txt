@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.23)
 
 project(ffpsd
-    VERSION 0.3.8
+    VERSION 0.3.9
     DESCRIPTION "ffpsd library"
     LANGUAGES CXX)
 
@@ -105,7 +105,7 @@ endif()
 
 if(FFPSD_BUILD_TESTS)
     enable_testing()
-    add_subdirectory(tests)
+    add_subdirectory(tests/cases)
 endif()
 
 if(FFPSD_BUILD_BENCHMARKS)

@@ -2,6 +2,7 @@
 #define FFPSD_FFPSD_HPP_
 
 #include <ffpsd/adjustments.hpp>
+#include <ffpsd/bytes.hpp>
 #include <ffpsd/document.hpp>
 #include <ffpsd/export.h>
 #include <ffpsd/formats.hpp>

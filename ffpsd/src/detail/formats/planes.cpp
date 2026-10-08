@@ -9,11 +9,11 @@
 
 #if defined(_M_X64) || defined(__x86_64__)
 #define FFPSD_SPLIT_SSSE3
+#include <tmmintrin.h>
 #if defined(_MSC_VER)
 #include <intrin.h>
 #else
 #include <cpuid.h>
-#include <tmmintrin.h>
 #endif
 #if defined(__GNUC__) || defined(__clang__)
 #define FFPSD_TARGET_SSSE3 __attribute__((target("ssse3")))

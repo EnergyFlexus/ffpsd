@@ -118,7 +118,7 @@ TEST(DocumentTest, TheCompositeIntoTheCallersMemoryMatchesGetMergedImage)
         EXPECT_EQ(info.depth, image.depth);
         EXPECT_EQ(info.GetSizeBytes(), image.bytes.size());
 
-        std::vector<std::uint8_t> bytes(info.GetSizeBytes(), 0xAB);
+        ffpsd::Bytes bytes(info.GetSizeBytes(), 0xAB);
         doc->GetMergedImageBytes(bytes.data(), bytes.size());
         EXPECT_EQ(bytes, image.bytes);
         EXPECT_THROW(doc->GetMergedImageBytes(bytes.data(), bytes.size() - 1), std::invalid_argument);
