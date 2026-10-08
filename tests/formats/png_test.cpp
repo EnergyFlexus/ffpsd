@@ -142,3 +142,17 @@ TEST(FormatsPngTest, EncodingRefusesWhatPngCannotHold)
     EXPECT_THROW(ffpsd::EncodePng(Pattern(2, 2, 4, 8, ffpsd::ColorMode::kCmyk)), std::invalid_argument);
     EXPECT_THROW(ffpsd::EncodePng(Pattern(2, 2, 3, 8, ffpsd::ColorMode::kLab)), std::invalid_argument);
 }
+
+TEST(FormatsPngTest, PlanesSplitTheSameAtAnyWidth)
+{
+    // Widths around the 16 pixel step of the vector loop, so it and the plain loop for the rest meet without a seam.
+    for (const std::uint32_t width : {1u, 15u, 16u, 17u, 33u, 100u})
+    {
+        for (const std::uint16_t channels : {std::uint16_t{3}, std::uint16_t{4}})
+        {
+            const ffpsd::Image image = Pattern(width, 3, channels);
+            const std::vector<std::uint8_t> png = ffpsd::EncodePng(image);
+            EXPECT_EQ(ffpsd::LoadPng(png.data(), png.size(), ffpsd::ColorMode::kRgb, 8).bytes, image.bytes) << width << " x " << channels;
+        }
+    }
+}

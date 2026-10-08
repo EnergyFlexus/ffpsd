@@ -7,6 +7,24 @@
 #include <cstring>
 #include <stdexcept>
 
+#if defined(_M_X64) || defined(__x86_64__)
+#define FFPSD_SPLIT_SSSE3
+#if defined(_MSC_VER)
+#include <intrin.h>
+#else
+#include <cpuid.h>
+#include <tmmintrin.h>
+#endif
+#if defined(__GNUC__) || defined(__clang__)
+#define FFPSD_TARGET_SSSE3 __attribute__((target("ssse3")))
+#else
+#define FFPSD_TARGET_SSSE3
+#endif
+#elif defined(_M_ARM64) || defined(__aarch64__)
+#define FFPSD_SPLIT_NEON
+#include <arm_neon.h>
+#endif
+
 namespace ffpsd::detail
 {
     namespace
@@ -69,13 +87,107 @@ namespace ffpsd::detail
             }
         }
 
+#if defined(FFPSD_SPLIT_SSSE3)
+        // SSSE3 is missing from some x86-64 processors, so its loop runs only where cpuid reports it.
+        bool HasSsse3() noexcept
+        {
+            static const bool has = [] {
+#if defined(_MSC_VER)
+                int registers[4] = {};
+                __cpuid(registers, 1);
+                return (registers[2] & (1 << 9)) != 0;
+#else
+                unsigned eax = 0, ebx = 0, ecx = 0, edx = 0;
+                return __get_cpuid(1, &eax, &ebx, &ecx, &edx) != 0 && (ecx & (1u << 9)) != 0;
+#endif
+            }();
+            return has;
+        }
+
+        // For 16 pixels: which byte of each 16 byte block holds a channel's sample, 0x80 where none does.
+        template <std::uint16_t kChannels> struct SplitMasks
+        {
+            alignas(16) std::int8_t bytes[kChannels][kChannels][16];
+
+            SplitMasks() noexcept
+            {
+                for (int channel = 0; channel < kChannels; ++channel)
+                    for (int block = 0; block < kChannels; ++block)
+                        for (int pixel = 0; pixel < 16; ++pixel)
+                        {
+                            const int at = kChannels * pixel + channel - 16 * block;
+                            bytes[channel][block][pixel] = static_cast<std::int8_t>(at >= 0 && at < 16 ? at : -128);
+                        }
+            }
+        };
+
+        // 16 pixels a step; returns how many it split, the rest being left to the plain loop.
+        template <std::uint16_t kChannels>
+        FFPSD_TARGET_SSSE3 std::uint32_t
+        SplitRowSimd(const std::uint8_t* in, std::uint32_t width, std::size_t plane_bytes, std::uint8_t* out)
+        {
+            static const SplitMasks<kChannels> masks;
+            std::uint32_t x = 0;
+            for (; x + 16 <= width; x += 16)
+            {
+                __m128i blocks[kChannels];
+                for (int block = 0; block < kChannels; ++block)
+                    blocks[block] = _mm_loadu_si128(reinterpret_cast<const __m128i*>(in + std::size_t{x} * kChannels + 16 * block));
+                for (int channel = 0; channel < kChannels; ++channel)
+                {
+                    __m128i plane = _mm_setzero_si128();
+                    for (int block = 0; block < kChannels; ++block)
+                    {
+                        const __m128i mask = _mm_load_si128(reinterpret_cast<const __m128i*>(masks.bytes[channel][block]));
+                        plane = _mm_or_si128(plane, _mm_shuffle_epi8(blocks[block], mask));
+                    }
+                    _mm_storeu_si128(reinterpret_cast<__m128i*>(out + channel * plane_bytes + x), plane);
+                }
+            }
+            return x;
+        }
+#elif defined(FFPSD_SPLIT_NEON)
+        // 16 pixels a step; returns how many it split, the rest being left to the plain loop.
+        template <std::uint16_t kChannels>
+        std::uint32_t SplitRowSimd(const std::uint8_t* in, std::uint32_t width, std::size_t plane_bytes, std::uint8_t* out)
+        {
+            std::uint32_t x = 0;
+            for (; x + 16 <= width; x += 16)
+            {
+                if constexpr (kChannels == 3)
+                {
+                    const uint8x16x3_t pixels = vld3q_u8(in + std::size_t{x} * 3);
+                    for (int channel = 0; channel < 3; ++channel)
+                        vst1q_u8(out + channel * plane_bytes + x, pixels.val[channel]);
+                }
+                else
+                {
+                    const uint8x16x4_t pixels = vld4q_u8(in + std::size_t{x} * 4);
+                    for (int channel = 0; channel < 4; ++channel)
+                        vst1q_u8(out + channel * plane_bytes + x, pixels.val[channel]);
+                }
+            }
+            return x;
+        }
+#endif
+
         // A row goes out one plane after another, so the stores run straight and the row stays in cache.
         template <std::size_t kSample, std::uint16_t kChannels>
         void SplitRow(const std::uint8_t* in, std::uint32_t width, std::size_t plane_bytes, std::uint8_t* out)
         {
+            std::uint32_t done = 0;
+            if constexpr (kSample == 1 && (kChannels == 3 || kChannels == 4))
+            {
+#if defined(FFPSD_SPLIT_SSSE3)
+                if (HasSsse3())
+                    done = SplitRowSimd<kChannels>(in, width, plane_bytes, out);
+#elif defined(FFPSD_SPLIT_NEON)
+                done = SplitRowSimd<kChannels>(in, width, plane_bytes, out);
+#endif
+            }
             for (std::uint16_t channel = 0; channel < kChannels; ++channel, out += plane_bytes)
             {
-                for (std::uint32_t x = 0; x < width; ++x)
+                for (std::uint32_t x = done; x < width; ++x)
                     std::memcpy(out + x * kSample, in + (x * kChannels + channel) * kSample, kSample);
             }
         }
