@@ -182,7 +182,8 @@ namespace ffpsd
 
         Apply(
             detail::Transform::Scale(
-                static_cast<double>(width) / bounds.GetWidth(), static_cast<double>(height) / bounds.GetHeight(), bounds.left, bounds.top),
+                static_cast<double>(width) / static_cast<double>(bounds.GetWidth()),
+                static_cast<double>(height) / static_cast<double>(bounds.GetHeight()), bounds.left, bounds.top),
             filter);
     }
 
