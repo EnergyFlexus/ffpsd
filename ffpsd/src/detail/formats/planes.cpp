@@ -133,7 +133,7 @@ namespace ffpsd::detail
                 __m128i blocks[kChannels];
                 for (int block = 0; block < kChannels; ++block)
                     blocks[block] = _mm_loadu_si128(reinterpret_cast<const __m128i*>(in + std::size_t{x} * kChannels + 16 * block));
-                for (int channel = 0; channel < kChannels; ++channel)
+                for (std::size_t channel = 0; channel < kChannels; ++channel)
                 {
                     __m128i plane = _mm_setzero_si128();
                     for (int block = 0; block < kChannels; ++block)
@@ -157,13 +157,13 @@ namespace ffpsd::detail
                 if constexpr (kChannels == 3)
                 {
                     const uint8x16x3_t pixels = vld3q_u8(in + std::size_t{x} * 3);
-                    for (int channel = 0; channel < 3; ++channel)
+                    for (std::size_t channel = 0; channel < 3; ++channel)
                         vst1q_u8(out + channel * plane_bytes + x, pixels.val[channel]);
                 }
                 else
                 {
                     const uint8x16x4_t pixels = vld4q_u8(in + std::size_t{x} * 4);
-                    for (int channel = 0; channel < 4; ++channel)
+                    for (std::size_t channel = 0; channel < 4; ++channel)
                         vst1q_u8(out + channel * plane_bytes + x, pixels.val[channel]);
                 }
             }
