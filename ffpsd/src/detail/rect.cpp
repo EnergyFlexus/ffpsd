@@ -26,7 +26,7 @@ namespace ffpsd::detail
         writer.WriteI32(rect.right);
     }
 
-    Rect MakeRect(std::int64_t top, std::int64_t left, std::int64_t bottom, std::int64_t right)
+    Rect CheckedRect(std::int64_t top, std::int64_t left, std::int64_t bottom, std::int64_t right)
     {
         constexpr std::int64_t kLowest = std::numeric_limits<std::int32_t>::min();
         constexpr std::int64_t kHighest = std::numeric_limits<std::int32_t>::max();

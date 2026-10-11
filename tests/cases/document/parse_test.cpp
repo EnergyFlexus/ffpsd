@@ -34,6 +34,18 @@ TEST(DocumentParseTest, WhatIsNotAPsdIsRefused)
     EXPECT_THROW(ffpsd::Document::Parse(cut), std::runtime_error);
 }
 
+TEST(DocumentParseTest, AHeaderNoPsdHoldsIsRefused)
+{
+    // Big endian depth at bytes 22 and 23, color mode at 24 and 25.
+    std::vector<std::uint8_t> unknown_mode = ReadFile(kRgbPsd);
+    unknown_mode[25] = 5;
+    std::vector<std::uint8_t> one_bit_rgb = ReadFile(kRgbPsd);
+    one_bit_rgb[23] = 1;
+
+    EXPECT_THROW(ffpsd::Document::Parse(unknown_mode), std::runtime_error);
+    EXPECT_THROW(ffpsd::Document::Parse(one_bit_rgb), std::runtime_error);
+}
+
 TEST(DocumentParseTest, ABlockPaddedToTwoAsTheSpecificationSaysIsReadToo)
 {
     // Without the 2 bytes that pad the 6 byte block after its length, the next block starts right after it.

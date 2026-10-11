@@ -30,6 +30,8 @@ namespace ffpsd::detail
 
         // Reads past the end throw std::runtime_error.
         void Skip(std::size_t count);
+        // Skips until the distance from start is a multiple of alignment, as BigEndianWriter::PadFrom pads.
+        void SkipPaddingFrom(std::size_t start, std::size_t alignment);
         std::size_t Tell() const noexcept;
         std::size_t GetSize() const noexcept;
         std::size_t GetRemaining() const noexcept;
@@ -114,6 +116,8 @@ namespace ffpsd::detail
         }
         template <typename T> void ReadInto(T* dst, std::size_t count)
         {
+            if (count == 0)
+                return;
             if (count > (size_ - offset_) / sizeof(T))
                 ThrowPastEnd(count * sizeof(T));
 

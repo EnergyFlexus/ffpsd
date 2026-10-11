@@ -19,11 +19,6 @@ namespace ffpsd::detail
         constexpr std::uint32_t kSupplementaryFirst = 0x10000;
         constexpr std::uint32_t kCodePointLast = 0x10FFFF;
 
-        std::size_t PaddingFor(std::size_t size, std::size_t alignment) noexcept
-        {
-            return alignment > 1 ? (alignment - size % alignment) % alignment : 0;
-        }
-
         bool IsSurrogate(std::uint32_t code) noexcept
         {
             return code >= kLeadSurrogateFirst && code <= kTrailSurrogateLast;
@@ -111,13 +106,13 @@ namespace ffpsd::detail
 
     std::string ReadPascalString(BigEndianReader& reader, std::size_t alignment)
     {
+        const std::size_t start = reader.Tell();
         const std::uint8_t length = reader.ReadU8();
 
         std::string text(length, '\0');
-        if (length != 0)
-            reader.ReadU8Array(reinterpret_cast<std::uint8_t*>(text.data()), length);
+        reader.ReadU8Array(reinterpret_cast<std::uint8_t*>(text.data()), length);
 
-        reader.Skip(PaddingFor(1 + text.size(), alignment));
+        reader.SkipPaddingFrom(start, alignment);
         return text;
     }
 
@@ -129,11 +124,11 @@ namespace ffpsd::detail
         while (length > 0 && length < text.size() && (static_cast<unsigned char>(text[length]) & 0xC0) == 0x80)
             --length;
 
+        const std::size_t start = writer.Tell();
         writer.WriteU8(static_cast<std::uint8_t>(length));
-        if (length != 0)
-            writer.WriteU8Array(reinterpret_cast<const std::uint8_t*>(text.data()), length);
+        writer.WriteU8Array(reinterpret_cast<const std::uint8_t*>(text.data()), length);
 
-        writer.WriteZeros(PaddingFor(1 + length, alignment));
+        writer.PadFrom(start, alignment);
     }
 
     std::optional<std::string> TryReadUnicodeString(BigEndianReader& reader)

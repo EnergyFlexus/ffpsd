@@ -11,9 +11,9 @@
 #include <cstdio> // jpeglib.h uses FILE and size_t without including them
 #include <cstdlib>
 #include <cstring>
+#include <ffpsd/bytes.hpp>
 #include <jpeglib.h>
 #include <limits>
-#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -81,7 +81,7 @@ namespace ffpsd::detail
             std::uint16_t channels = 0;
             bool adobe = false; // Adobe's CMYK is stored inverted
             Orientation orientation = Orientation::kNormal;
-            std::unique_ptr<std::uint8_t[]> bytes; // not zeroed first: libjpeg writes every byte
+            Bytes bytes; // libjpeg writes every byte
         };
 
         struct Compressor
@@ -104,11 +104,10 @@ namespace ffpsd::detail
             }
         };
 
-        // The picture and its row buffers for libjpeg, made before the setjmp; narrow holds 16 bit rows taken to 8.
+        // The color planes and their row buffers for libjpeg, made before the setjmp; narrow holds 16 bit rows taken to 8.
         struct Interleaved
         {
             const ImageView* image = nullptr;
-            std::uint16_t colors = 0;
             std::vector<std::uint8_t> row;
             std::vector<std::uint8_t> narrow;
         };
@@ -168,10 +167,10 @@ namespace ffpsd::detail
             out.adobe = info->saw_Adobe_marker != 0;
 
             const std::size_t row_bytes = std::size_t{out.width} * out.channels;
-            out.bytes.reset(new std::uint8_t[row_bytes * out.height]);
+            out.bytes = Bytes(row_bytes * out.height);
             while (info->output_scanline < info->output_height)
             {
-                JSAMPROW row = out.bytes.get() + std::size_t{info->output_scanline} * row_bytes;
+                JSAMPROW row = out.bytes.data() + std::size_t{info->output_scanline} * row_bytes;
                 jpeg_read_scanlines(info, &row, 1);
             }
             jpeg_finish_decompress(info);
@@ -189,8 +188,8 @@ namespace ffpsd::detail
             jpeg_mem_dest(info, &compressor.buffer, &compressor.size);
             info->image_width = image.width;
             info->image_height = image.height;
-            info->input_components = interleaved.colors;
-            info->in_color_space = interleaved.colors == 1 ? JCS_GRAYSCALE : JCS_RGB;
+            info->input_components = image.channel_count;
+            info->in_color_space = image.channel_count == 1 ? JCS_GRAYSCALE : JCS_RGB;
             jpeg_set_defaults(info);
             jpeg_set_quality(info, quality, TRUE);
             info->optimize_coding = TRUE;
@@ -199,7 +198,7 @@ namespace ffpsd::detail
             // A row at a time, so the interleaved picture is never held whole.
             while (info->next_scanline < info->image_height)
             {
-                InterleaveRow(image, interleaved.colors, info->next_scanline, interleaved.row.data());
+                InterleaveRow(image, info->next_scanline, interleaved.row.data());
                 JSAMPROW row = interleaved.row.data();
                 if (image.depth == 16)
                 {
@@ -219,7 +218,7 @@ namespace ffpsd::detail
         void CmykToRgb(Decoded& decoded)
         {
             const std::size_t pixels = std::size_t{decoded.width} * decoded.height;
-            std::uint8_t* bytes = decoded.bytes.get();
+            std::uint8_t* bytes = decoded.bytes.data();
             for (std::size_t i = 0; i < pixels; ++i)
             {
                 unsigned light[4];
@@ -263,7 +262,7 @@ namespace ffpsd::detail
 
         const Orientation orientation = apply_orientation ? decoded.orientation : Orientation::kNormal;
         Image image = ConvertColorMode(
-            Deinterleave(decoded.bytes.get(), decoded.width, decoded.height, decoded.channels, 8, orientation), color_mode);
+            Deinterleave(decoded.bytes.data(), decoded.width, decoded.height, decoded.channels, 8, orientation), color_mode);
         if (depth == 16)
             return WidenTo16(image);
         return image;
@@ -277,12 +276,16 @@ namespace ffpsd::detail
             throw std::invalid_argument("ffpsd: a JPEG side is at most " + std::to_string(JPEG_MAX_DIMENSION) + " pixels");
         CheckPicture(image, "JPEG");
 
+        // JPEG has no transparency, and it is the plane after the colors.
+        ImageInfo info = image;
+        info.channel_count = ColorChannelCount(image.color_mode);
+        const ImageView colors(info, image.data, info.GetSizeBytes());
+
         Interleaved interleaved;
-        interleaved.image = &image;
-        interleaved.colors = ColorChannelCount(image.color_mode);
-        interleaved.row.resize(std::size_t{image.width} * interleaved.colors * image.GetBytesPerSample());
-        if (image.depth == 16)
-            interleaved.narrow.resize(std::size_t{image.width} * interleaved.colors);
+        interleaved.image = &colors;
+        interleaved.row.resize(std::size_t{colors.width} * colors.channel_count * colors.GetBytesPerSample());
+        if (colors.depth == 16)
+            interleaved.narrow.resize(std::size_t{colors.width} * colors.channel_count);
 
         Compressor compressor;
         if (!Encode(compressor, interleaved, quality))

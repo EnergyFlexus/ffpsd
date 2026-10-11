@@ -22,6 +22,12 @@ namespace ffpsd::detail
             ThrowPastEnd(count);
         offset_ += count;
     }
+    void BigEndianReader::SkipPaddingFrom(std::size_t start, std::size_t alignment)
+    {
+        const std::size_t read = offset_ - start;
+        Skip((alignment - read % alignment) % alignment);
+    }
+
     std::size_t BigEndianReader::Tell() const noexcept
     {
         return offset_;

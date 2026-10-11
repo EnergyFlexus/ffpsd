@@ -3,7 +3,7 @@
 #include "detail/samples.hpp"
 
 #include <algorithm>
-#include <cstring>
+#include <ffpsd/bytes.hpp>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -27,29 +27,23 @@ namespace ffpsd::detail
         return channel;
     }
 
-    ChannelImageData ChannelImageData::Opaque(std::int16_t id, std::size_t width, std::size_t height, std::uint16_t depth, bool is_psb)
+    ChannelImageData ChannelImageData::Opaque(std::int16_t id, std::uint32_t width, std::uint32_t height, std::uint16_t depth, bool is_psb)
     {
-        const std::size_t sample_size = SampleBytes(depth);
-        std::vector<std::uint8_t> samples(width * height * sample_size, 0xFF);
-        if (depth == 32)
-        {
-            const float full = 1.0f;
-            for (std::size_t at = 0; at < samples.size(); at += sizeof(full))
-                std::memcpy(samples.data() + at, &full, sizeof(full));
-        }
+        const std::size_t count = std::size_t{width} * height;
+        Bytes samples(count * SampleBytes(depth));
+        FillFull(samples.data(), count, depth);
         return Encode(id, samples.data(), width, height, depth, is_psb);
     }
 
     ChannelImageData ChannelImageData::Encode(
-        std::int16_t id, const std::uint8_t* samples, std::size_t width, std::size_t height, std::uint16_t depth, bool is_psb)
+        std::int16_t id, const std::uint8_t* samples, std::uint32_t width, std::uint32_t height, std::uint16_t depth, bool is_psb)
     {
         if (width == 0 || height == 0)
             return Empty(id);
 
-        const std::size_t sample_size = SampleBytes(depth);
         ChannelImageData channel;
         channel.id = id;
-        channel.data = PixelData::Encode(samples, height, width * sample_size, sample_size, is_psb, Compression::kRleOrRaw);
+        channel.data = PixelData::Encode(samples, height, RowBytes(width, depth), SampleBytes(depth), is_psb, Compression::kRleOrRaw);
         return channel;
     }
 

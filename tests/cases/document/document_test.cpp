@@ -42,6 +42,9 @@ TEST(DocumentTest, ANewOneOfASizeAndModeHasTheModesChannels)
     EXPECT_THROW(ffpsd::Document(4, 3, ffpsd::ColorMode::kMultichannel), std::invalid_argument);
     EXPECT_THROW(ffpsd::Document(0, 3, ffpsd::ColorMode::kRgb), std::invalid_argument);
     EXPECT_THROW(ffpsd::Document(4, 3, ffpsd::ColorMode::kRgb, 12), std::invalid_argument);
+    EXPECT_THROW(ffpsd::Document(4, 3, ffpsd::ColorMode::kRgb, 1), std::invalid_argument);
+    EXPECT_THROW(ffpsd::Document(4, 3, ffpsd::ColorMode::kBitmap, 8), std::invalid_argument);
+    EXPECT_THROW(ffpsd::Document(4, 3, static_cast<ffpsd::ColorMode>(5)), std::invalid_argument);
 
     EXPECT_FALSE(ffpsd::Document(30000, 3, ffpsd::ColorMode::kRgb).IsPsb());
     EXPECT_TRUE(ffpsd::Document(3, 30001, ffpsd::ColorMode::kRgb).IsPsb());

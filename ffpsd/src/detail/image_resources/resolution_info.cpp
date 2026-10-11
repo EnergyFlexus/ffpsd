@@ -3,11 +3,17 @@
 #include "detail/io/big_endian_writer.hpp"
 #include "detail/io/fixed.hpp"
 
+#include <stdexcept>
+#include <string>
+
 namespace ffpsd::detail
 {
     namespace
     {
         constexpr std::size_t kBlockSize = 16;
+
+        // Signed 16.16 cannot hold 32768.
+        constexpr double kMaxResolution = 32767.0;
     } // namespace
 
     template <> std::optional<ResolutionInfo> DecodeImageResource<ResolutionInfo>(const std::vector<std::uint8_t>& data)
@@ -38,5 +44,12 @@ namespace ffpsd::detail
         writer.WriteI16(value.height_unit);
 
         return writer.Take();
+    }
+
+    void CheckResolution(double dpi)
+    {
+        // Written as a negated comparison so that a NaN is rejected too.
+        if (!(dpi > 0.0) || dpi > kMaxResolution)
+            throw std::invalid_argument("ffpsd: resolution out of range: " + std::to_string(dpi));
     }
 } // namespace ffpsd::detail

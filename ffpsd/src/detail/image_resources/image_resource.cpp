@@ -14,6 +14,9 @@ namespace ffpsd::detail
     {
         // The Pascal name with its length byte, padded to it.
         constexpr std::size_t kNameAlignment = 2;
+
+        // The data is padded to an even size, the pad left out of its length.
+        constexpr std::size_t kDataAlignment = 2;
     } // namespace
 
     ImageResources ParseImageResources(BigEndianReader& reader)
@@ -37,9 +40,9 @@ namespace ffpsd::detail
             entry.name = ReadPascalString(reader, kNameAlignment);
 
             const std::uint32_t size = reader.ReadU32();
+            const std::size_t data_start = reader.Tell();
             entry.data = reader.ReadBytes(size);
-            if (size % 2 != 0)
-                reader.Skip(1); // the pad byte is not counted in size
+            reader.SkipPaddingFrom(data_start, kDataAlignment);
 
             if (reader.Tell() > section_end)
                 throw std::runtime_error(
@@ -62,10 +65,9 @@ namespace ffpsd::detail
             WritePascalString(writer, entry->name, kNameAlignment);
 
             const std::size_t size = writer.ReserveLength(false);
-            if (!entry->data.empty())
-                writer.WriteU8Array(entry->data.data(), entry->data.size());
+            writer.WriteBytes(entry->data);
             writer.PatchLength(size, false);
-            writer.PadFrom(size, 2);
+            writer.PadFrom(size, kDataAlignment);
         }
         writer.PatchLength(section_length, false);
     }

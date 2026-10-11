@@ -76,6 +76,6 @@ namespace ffpsd::detail
             right = std::max(right, left + 1);
             bottom = std::max(bottom, top + 1);
         }
-        return MakeRect(top, left, bottom, right);
+        return CheckedRect(top, left, bottom, right);
     }
 } // namespace ffpsd::detail

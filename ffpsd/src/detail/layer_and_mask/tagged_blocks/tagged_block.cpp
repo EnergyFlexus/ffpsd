@@ -48,8 +48,7 @@ namespace ffpsd::detail
             const bool wide = is_psb && UsesLongLength(block.key);
             const std::size_t length = writer.ReserveLength(wide);
             const std::size_t data_start = writer.Tell();
-            if (!block.data.empty())
-                writer.WriteU8Array(block.data.data(), block.data.size());
+            writer.WriteBytes(block.data);
 
             if (pad_in_length)
             {

@@ -96,11 +96,7 @@ namespace ffpsd::detail
         for (const LayerToWrite& layer : layers)
         {
             for (const PixelData* channel : layer.channels)
-            {
-                const std::vector<std::uint8_t>& bytes = channel->GetBytes();
-                if (!bytes.empty())
-                    writer.WriteU8Array(bytes.data(), bytes.size());
-            }
+                writer.WriteBytes(channel->GetBytes());
         }
     }
 } // namespace ffpsd::detail

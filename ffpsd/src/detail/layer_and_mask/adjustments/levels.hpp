@@ -15,6 +15,9 @@ namespace ffpsd::detail
 
     // As Photoshop writes it: 29 records, then 'Lvls' with 62 in all; missing records are the identity.
     template <> std::vector<std::uint8_t> EncodeAdjustment<LevelsInfo>(const LevelsInfo& levels);
+
+    // The same levels for the other of gray and RGB; RGB's record 0 is every channel at once, gray keeps its one in record 1.
+    LevelsInfo ConvertLevels(const LevelsInfo& levels, bool to_gray);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_LAYER_AND_MASK_ADJUSTMENTS_LEVELS_HPP_

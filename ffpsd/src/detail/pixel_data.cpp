@@ -43,6 +43,39 @@ namespace ffpsd::detail
                 SwapSamples<std::uint32_t>(bytes, size);
         }
 
+        // RLE row counts: 2 bytes in a PSD, 4 in a PSB.
+        std::size_t RowCountSize(bool is_psb) noexcept
+        {
+            return is_psb ? sizeof(std::uint32_t) : sizeof(std::uint16_t);
+        }
+
+        std::size_t MaxRowCount(bool is_psb) noexcept
+        {
+            return is_psb ? std::numeric_limits<std::uint32_t>::max() : std::numeric_limits<std::uint16_t>::max();
+        }
+
+        std::uint32_t ReadRowCount(BigEndianReader& reader, bool is_psb)
+        {
+            return is_psb ? reader.ReadU32() : reader.ReadU16();
+        }
+
+        void WriteRowCount(BigEndianWriter& writer, std::size_t count, bool is_psb)
+        {
+            if (is_psb)
+                writer.WriteU32(static_cast<std::uint32_t>(count));
+            else
+                writer.WriteU16(static_cast<std::uint16_t>(count));
+        }
+
+        // Into a field reserved for it, big endian.
+        void PutRowCount(std::uint8_t* field, std::size_t count, bool is_psb) noexcept
+        {
+            if (is_psb)
+                Store(field, Swapped(static_cast<std::uint32_t>(count)));
+            else
+                Store(field, Swapped(static_cast<std::uint16_t>(count)));
+        }
+
         bool IsRawOrRle(std::uint16_t compression) noexcept
         {
             return compression == kCompressionRaw || compression == kCompressionRle;
@@ -56,21 +89,16 @@ namespace ffpsd::detail
             reader.Skip(sizeof(std::uint16_t));
             std::vector<std::uint32_t> counts(rows);
             for (std::uint32_t& count : counts)
-                count = from_psb ? reader.ReadU32() : reader.ReadU16();
+                count = ReadRowCount(reader, from_psb);
 
-            const auto too_big = [](std::uint32_t count) { return count > std::numeric_limits<std::uint16_t>::max(); };
-            if (!to_psb && std::any_of(counts.begin(), counts.end(), too_big))
+            const auto too_big = [to_psb](std::uint32_t count) { return count > MaxRowCount(to_psb); };
+            if (std::any_of(counts.begin(), counts.end(), too_big))
                 return std::nullopt;
 
             BigEndianWriter writer(bytes.size() + rows * sizeof(std::uint16_t));
             writer.WriteU16(kCompressionRle);
             for (const std::uint32_t count : counts)
-            {
-                if (to_psb)
-                    writer.WriteU32(count);
-                else
-                    writer.WriteU16(static_cast<std::uint16_t>(count));
-            }
+                WriteRowCount(writer, count, to_psb);
             writer.WriteU8Array(bytes.data() + reader.Tell(), reader.GetRemaining());
             return writer.Take();
         }
@@ -88,8 +116,7 @@ namespace ffpsd::detail
         const std::uint8_t* data, std::size_t rows, std::size_t row_bytes, std::size_t sample_size, bool is_psb, bool smallest, bool& fits)
     {
         const std::size_t total = rows * row_bytes;
-        const std::size_t count_size = is_psb ? sizeof(std::uint32_t) : sizeof(std::uint16_t);
-        const std::size_t count_max = is_psb ? std::numeric_limits<std::uint32_t>::max() : std::numeric_limits<std::uint16_t>::max();
+        const std::size_t count_size = RowCountSize(is_psb);
         const std::size_t header = sizeof(std::uint16_t);
         const std::size_t table = rows * count_size;
 
@@ -122,20 +149,18 @@ namespace ffpsd::detail
         }
 
         // Room for the row counts, then the packed rows straight after.
-        std::vector<std::uint8_t> out(header + table, 0);
-        out[1] = static_cast<std::uint8_t>(kCompressionRle);
+        std::vector<std::uint8_t> out(header + table);
+        Store(out.data(), Swapped(kCompressionRle));
         for (std::size_t row = 0; row < rows; ++row)
         {
             const std::size_t start = out.size();
             pack_row(row, out);
             const std::size_t count = out.size() - start;
 
-            std::uint8_t* field = out.data() + header + row * count_size;
-            for (std::size_t i = 0; i < count_size; ++i)
-                field[i] = static_cast<std::uint8_t>(count >> (8 * (count_size - 1 - i)));
+            PutRowCount(out.data() + header + row * count_size, count, is_psb);
 
             // Stops as soon as RLE cannot win or a count does not fit its field.
-            fits = count <= count_max;
+            fits = count <= MaxRowCount(is_psb);
             if (!fits || (smallest && out.size() >= header + total))
                 return std::nullopt;
         }
@@ -167,15 +192,14 @@ namespace ffpsd::detail
         CheckImage(image);
 
         const std::size_t rows = std::size_t{image.height} * image.channel_count;
-        return Encode(image.data, rows, RowBytes(image.width, image.depth), image.GetBytesPerSample(), is_psb, Compression::kRleOrRaw);
+        return Encode(image.data, rows, RowBytes(image.width, image.depth), SampleBytes(image.depth), is_psb, Compression::kRleOrRaw);
     }
 
-    PixelData PixelData::Blank(
-        std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, bool is_psb, Compression compression)
+    PixelData PixelData::Blank(const ImageInfo& info, bool is_psb, Compression compression)
     {
-        const std::size_t row_bytes = RowBytes(width, depth);
-        const std::size_t sample_size = SampleBytes(depth);
-        const std::size_t rows = std::size_t{height} * channel_count;
+        const std::size_t row_bytes = RowBytes(info.width, info.depth);
+        const std::size_t sample_size = SampleBytes(info.depth);
+        const std::size_t rows = std::size_t{info.height} * info.channel_count;
         if (compression == Compression::kRaw)
             return PixelData(std::vector<std::uint8_t>(sizeof(std::uint16_t) + rows * row_bytes, 0), rows, row_bytes, sample_size);
 
@@ -186,12 +210,7 @@ namespace ffpsd::detail
         BigEndianWriter writer;
         writer.WriteU16(kCompressionRle);
         for (std::size_t i = 0; i < rows; ++i)
-        {
-            if (is_psb)
-                writer.WriteU32(static_cast<std::uint32_t>(packed.size()));
-            else
-                writer.WriteU16(static_cast<std::uint16_t>(packed.size()));
-        }
+            WriteRowCount(writer, packed.size(), is_psb);
         for (std::size_t i = 0; i < rows; ++i)
             writer.WriteU8Array(packed.data(), packed.size());
         return PixelData(writer.Take(), rows, row_bytes, sample_size);
@@ -230,10 +249,10 @@ namespace ffpsd::detail
         {
             // One byte count per row, all of them before any row: one cursor walks the counts, the other the rows.
             BigEndianReader counts = reader;
-            reader.Skip(rows_ * (is_psb ? sizeof(std::uint32_t) : sizeof(std::uint16_t)));
+            reader.Skip(rows_ * RowCountSize(is_psb));
             for (std::size_t row = 0; row < rows_; ++row)
             {
-                const std::size_t count = is_psb ? counts.ReadU32() : counts.ReadU16();
+                const std::size_t count = ReadRowCount(counts, is_psb);
                 if (count > reader.GetRemaining())
                     throw std::runtime_error(
                         "ffpsd: pixel row " + std::to_string(row) + " claims " + std::to_string(count) + " bytes, only " +

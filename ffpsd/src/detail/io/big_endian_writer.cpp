@@ -1,11 +1,22 @@
 #include "detail/io/big_endian_writer.hpp"
 
 #include <limits>
+#include <stdexcept>
 #include <string>
 #include <utility>
 
 namespace ffpsd::detail
 {
+    namespace
+    {
+        std::uint32_t NarrowLength(std::uint64_t length)
+        {
+            if (length > std::numeric_limits<std::uint32_t>::max())
+                throw std::length_error("ffpsd: " + std::to_string(length) + " bytes do not fit a 4 byte length");
+            return static_cast<std::uint32_t>(length);
+        }
+    } // namespace
+
     BigEndianWriter::BigEndianWriter(std::size_t reserve_bytes)
     {
         data_.reserve(reserve_bytes);
@@ -88,9 +99,13 @@ namespace ffpsd::detail
     void BigEndianWriter::WriteBlob(const std::vector<std::uint8_t>& data)
     {
         const std::size_t length = ReserveLength(false);
-        if (!data.empty())
-            WriteU8Array(data.data(), data.size());
+        WriteBytes(data);
         PatchLength(length, false);
+    }
+
+    void BigEndianWriter::WriteBytes(const std::vector<std::uint8_t>& data)
+    {
+        WriteU8Array(data.data(), data.size());
     }
 
     void BigEndianWriter::WriteZeros(std::size_t count)
@@ -124,6 +139,14 @@ namespace ffpsd::detail
         Patch(position, value);
     }
 
+    void BigEndianWriter::WriteLength(std::uint64_t length, bool wide)
+    {
+        if (wide)
+            WriteU64(length);
+        else
+            WriteU32(NarrowLength(length));
+    }
+
     std::size_t BigEndianWriter::ReserveLength(bool wide)
     {
         return wide ? ReserveU64() : ReserveU32();
@@ -137,9 +160,7 @@ namespace ffpsd::detail
             PatchU64(position, length);
             return;
         }
-        if (length > std::numeric_limits<std::uint32_t>::max())
-            throw std::length_error("ffpsd: " + std::to_string(length) + " bytes do not fit a 4 byte length");
-        PatchU32(position, static_cast<std::uint32_t>(length));
+        PatchU32(position, NarrowLength(length));
     }
 
     std::size_t BigEndianWriter::Tell() const noexcept

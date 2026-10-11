@@ -27,7 +27,7 @@ namespace ffpsd::detail
         constexpr std::size_t kMaskDataSize = 20;
     } // namespace
 
-    MaskData MaskData::NewLayerMask()
+    MaskData MaskData::BlankLayerMask()
     {
         return MaskData(std::vector<std::uint8_t>(kMaskDataSize, 0));
     }

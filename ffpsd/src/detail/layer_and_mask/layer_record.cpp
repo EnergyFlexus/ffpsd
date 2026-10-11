@@ -10,7 +10,7 @@
 #include "detail/rect.hpp"
 
 #include <algorithm>
-#include <limits>
+#include <iterator>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -29,6 +29,24 @@ namespace ffpsd::detail
         constexpr std::size_t kNameAlignment = 4;
 
         constexpr std::uint32_t kVectorMaskKeys[] = {Fourcc('v', 'm', 's', 'k'), Fourcc('v', 's', 'm', 's')};
+
+        // Bit 3, written by Photoshop 5.0 and later: Photoshop sets it on every layer.
+        constexpr std::uint8_t kFlagsPhotoshop5 = 0x08;
+
+        // Black low, black high, white low, white high, twice: source, then destination.
+        constexpr std::uint8_t kPassEverything[] = {0, 0, 255, 255, 0, 0, 255, 255};
+
+        // Photoshop writes five pairs whatever the color mode and the channel count.
+        constexpr std::size_t kBlendingRangePairs = 5;
+
+        std::vector<std::uint8_t> DefaultBlendingRanges()
+        {
+            std::vector<std::uint8_t> ranges;
+            ranges.reserve(kBlendingRangePairs * sizeof(kPassEverything));
+            for (std::size_t i = 0; i < kBlendingRangePairs; ++i)
+                ranges.insert(ranges.end(), std::begin(kPassEverything), std::end(kPassEverything));
+            return ranges;
+        }
     } // namespace
 
     LayerRecord ParseLayerRecord(BigEndianReader& reader, bool is_psb, std::vector<std::uint64_t>& channel_lengths)
@@ -84,14 +102,8 @@ namespace ffpsd::detail
         writer.WriteU16(static_cast<std::uint16_t>(record.channels.size()));
         for (std::size_t i = 0; i < record.channels.size(); ++i)
         {
-            const std::size_t size = channels.at(i)->GetBytes().size();
             writer.WriteI16(record.channels[i].id);
-            if (is_psb)
-                writer.WriteU64(size);
-            else if (size > std::numeric_limits<std::uint32_t>::max())
-                throw std::length_error("ffpsd: a channel of more than 4 GB needs a PSB");
-            else
-                writer.WriteU32(static_cast<std::uint32_t>(size));
+            writer.WriteLength(channels.at(i)->GetBytes().size(), is_psb);
         }
 
         writer.WriteU32(record.blend_signature);
@@ -107,6 +119,16 @@ namespace ffpsd::detail
         WritePascalString(writer, record.name, kNameAlignment);
         WriteLayerTaggedBlocks(writer, record.blocks, is_psb);
         writer.PatchLength(extra_length, false);
+    }
+
+    LayerRecord LayerRecord::Empty(const std::string& name, std::int32_t top, std::int32_t left)
+    {
+        LayerRecord record;
+        record.bounds = {top, left, top, left};
+        record.flags = kFlagsPhotoshop5;
+        record.blending_ranges = DefaultBlendingRanges();
+        record.SetName(name);
+        return record;
     }
 
     LayerRecord LayerRecord::Copy() const
@@ -163,7 +185,7 @@ namespace ffpsd::detail
         return false;
     }
 
-    std::int16_t LayerRecord::FindPixelMaskId() const noexcept
+    std::optional<std::int16_t> LayerRecord::FindPixelMaskId() const noexcept
     {
         bool has_layer_mask = false;
         for (const ChannelImageData& channel : channels)
@@ -172,7 +194,9 @@ namespace ffpsd::detail
                 return kRealMaskId;
             has_layer_mask = has_layer_mask || channel.id == kLayerMaskId;
         }
-        return has_layer_mask && !mask_data.IsRendered() ? kLayerMaskId : 0;
+        if (has_layer_mask && !mask_data.IsRendered())
+            return kLayerMaskId;
+        return std::nullopt;
     }
 
     void LayerRecord::SetName(const std::string& new_name)
@@ -203,8 +227,8 @@ namespace ffpsd::detail
 
         if (FindChannel(kTransparencyId) == nullptr)
         {
-            const auto width = static_cast<std::size_t>(std::max<std::int64_t>(bounds.GetWidth(), 0));
-            const auto height = static_cast<std::size_t>(std::max<std::int64_t>(bounds.GetHeight(), 0));
+            const auto width = static_cast<std::uint32_t>(std::max<std::int64_t>(bounds.GetWidth(), 0));
+            const auto height = static_cast<std::uint32_t>(std::max<std::int64_t>(bounds.GetHeight(), 0));
             channels.insert(channels.begin(), ChannelImageData::Opaque(kTransparencyId, width, height, depth, is_psb));
         }
     }

@@ -39,7 +39,7 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    FileData ReadFile(const std::string& path)
+    Bytes ReadFile(const std::string& path)
     {
         // UTF-8 whatever the system's code page: Windows gets the path as UTF-16.
         const std::filesystem::path file_path = std::filesystem::u8path(path);
@@ -53,10 +53,8 @@ namespace ffpsd::detail
         if (!file)
             throw std::system_error(errno, std::generic_category(), "ffpsd: cannot open " + path);
 
-        FileData data;
-        data.size = static_cast<std::size_t>(size);
-        data.bytes.reset(new std::uint8_t[data.size]);
-        if (data.size != 0 && std::fread(data.bytes.get(), 1, data.size, file.get()) != data.size)
+        Bytes data(static_cast<std::size_t>(size));
+        if (!data.empty() && std::fread(data.data(), 1, data.size(), file.get()) != data.size())
             throw std::system_error(errno, std::generic_category(), "ffpsd: cannot read " + path);
         return data;
     }

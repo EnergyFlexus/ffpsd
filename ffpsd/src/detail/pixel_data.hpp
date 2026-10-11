@@ -32,9 +32,7 @@ namespace ffpsd::detail
         static PixelData Encode(const ImageView& image, bool is_psb);
 
         // Zeros, for a file without a composite; in RLE a large document costs a few bytes a row.
-        static PixelData Blank(
-            std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, bool is_psb,
-            Compression compression);
+        static PixelData Blank(const ImageInfo& info, bool is_psb, Compression compression);
 
         const std::vector<std::uint8_t>& GetBytes() const noexcept;
         bool IsEmpty() const noexcept;

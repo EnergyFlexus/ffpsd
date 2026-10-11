@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <ffpsd/types.hpp>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -17,8 +18,8 @@ namespace ffpsd::detail
     template <class T> T DecodeAdjustment(const std::vector<std::uint8_t>& data, std::size_t channel_count);
     template <class T> std::vector<std::uint8_t> EncodeAdjustment(const T& value);
 
-    // The key of the block that makes the layer an adjustment, such as 'levl', or 0.
-    std::uint32_t FindAdjustmentKey(const TaggedBlocks& blocks) noexcept;
+    // The key of the block that makes the layer an adjustment, such as 'levl'.
+    std::optional<std::uint32_t> FindAdjustmentKey(const TaggedBlocks& blocks) noexcept;
 
     // No pixels, empty channels and a white mask, as Photoshop writes it; settings is the adjustment block.
     LayerRecord CreateAdjustmentLayerRecord(const std::string& name, std::unique_ptr<TaggedBlock> settings, ColorMode color_mode);

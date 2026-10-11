@@ -25,6 +25,12 @@ namespace ffpsd::detail
             return BigEndianReader(data).TryReadU32().value_or(0);
         }
 
+        // A version 1 block long enough for the flag byte.
+        bool HoldsFlag(const ImageResource* resource)
+        {
+            return resource != nullptr && resource->data.size() > kFlagOffset && BlockVersion(resource->data) == kBlockVersion;
+        }
+
         // False when the length does not fit: nothing after the name can be located.
         bool ReadName(BigEndianReader& reader, std::string& text)
         {
@@ -75,7 +81,7 @@ namespace ffpsd::detail
     {
         // Reads the flag byte directly, without allocating for the names.
         const ImageResource* resource = FindImageResource(image_resources, VersionInfo::kId);
-        if (resource == nullptr || resource->data.size() <= kFlagOffset || BlockVersion(resource->data) != kBlockVersion)
+        if (!HoldsFlag(resource))
             return true;
 
         return resource->data[kFlagOffset] != 0;
@@ -84,7 +90,7 @@ namespace ffpsd::detail
     void SetHasRealMergedData(ImageResources& image_resources, bool value)
     {
         ImageResource* resource = FindImageResource(image_resources, VersionInfo::kId);
-        if (resource != nullptr && resource->data.size() > kFlagOffset && BlockVersion(resource->data) == kBlockVersion)
+        if (HoldsFlag(resource))
         {
             // One byte, so that the names of whoever wrote the file stay.
             resource->data[kFlagOffset] = value ? 1 : 0;

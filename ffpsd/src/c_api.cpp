@@ -957,8 +957,8 @@ extern "C"
     {
         return Guard([&] {
             ffpsd_image_t*& target = NeedOut(out);
-            const ffpsd::detail::FileData file = ffpsd::detail::ReadFile(std::string(&Need(path, "path")));
-            target = NewImage(LoadPicture(file.bytes.get(), file.size, color_mode, depth));
+            const ffpsd::Bytes file = ffpsd::detail::ReadFile(std::string(&Need(path, "path")));
+            target = NewImage(LoadPicture(file.data(), file.size(), color_mode, depth));
         });
     }
     ffpsd_status_t

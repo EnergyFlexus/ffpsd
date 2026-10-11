@@ -11,10 +11,10 @@ namespace ffpsd::detail
     std::uint16_t ColorChannelCount(ColorMode color_mode);
 
     // Rec. 709 luma of the encoded samples, no color profiles; planes after the colors, such as alpha, stay as they are.
-    Image RgbToGray(const Image& rgb);
+    Image RgbToGray(const ImageView& rgb);
 
     // The gray plane three times; planes after the colors, such as alpha, stay as they are.
-    Image GrayToRgb(const Image& gray);
+    Image GrayToRgb(const ImageView& gray);
 
     // The image as it is in its own mode, otherwise through RgbToGray or GrayToRgb, which refuse anything else.
     Image ConvertColorMode(Image image, ColorMode color_mode);

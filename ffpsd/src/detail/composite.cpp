@@ -35,14 +35,6 @@ namespace ffpsd::detail
                 return static_cast<T>((std::uint64_t{alpha} * opacity + 127) / 255);
         }
 
-        template <typename T> void Fill(Image& image, std::size_t channel, T value)
-        {
-            const std::size_t plane = std::size_t{image.width} * image.height;
-            std::uint8_t* first = image.bytes.data() + channel * plane * sizeof(T);
-            for (std::size_t i = 0; i < plane; ++i)
-                Store<T>(first + i * sizeof(T), value);
-        }
-
         // The neutral a and b of Lab: 128 of 255, 32768 of 65535.
         template <typename T> constexpr T Middle() noexcept
         {
@@ -55,8 +47,12 @@ namespace ffpsd::detail
         template <typename T> void WhiteChannels(Image& image, ColorMode color_mode)
         {
             const T middle = Middle<T>();
+            const std::size_t plane = std::size_t{image.width} * image.height;
             for (std::size_t channel = 0; channel < image.channel_count; ++channel)
-                Fill<T>(image, channel, color_mode == ColorMode::kLab && channel > 0 ? middle : Full<T>());
+            {
+                const T value = color_mode == ColorMode::kLab && channel > 0 ? middle : Full<T>();
+                FillSamples(image.bytes.data() + channel * plane * sizeof(T), plane, value);
+            }
         }
 
         template <typename T>
@@ -99,7 +95,7 @@ namespace ffpsd::detail
         if (!IsSampleDepth(depth))
             throw std::invalid_argument(UnsupportedDepth(depth));
 
-        Image image = MakeImage(width, height, ColorChannelCount(color_mode), depth, color_mode);
+        Image image(ImageInfo{width, height, ColorChannelCount(color_mode), depth, color_mode});
         switch (depth)
         {
         case 8:
@@ -113,6 +109,20 @@ namespace ffpsd::detail
             break;
         }
         return image;
+    }
+
+    Image MakeBlankComposite(std::uint32_t width, std::uint32_t height, const ImageInfo& like)
+    {
+        Image white = MakeWhiteImage(width, height, like.color_mode, like.depth);
+        if (white.channel_count == like.channel_count)
+            return white;
+
+        ImageInfo info = white;
+        info.channel_count = like.channel_count;
+        Image composite(info);
+        std::memcpy(composite.bytes.data(), white.bytes.data(), white.bytes.size());
+        std::memset(composite.bytes.data() + white.bytes.size(), 0, composite.bytes.size() - white.bytes.size());
+        return composite;
     }
 
     void BlendNormal(Image& target, const ImageView& source, std::int32_t top, std::int32_t left, std::uint8_t opacity)

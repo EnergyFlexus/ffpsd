@@ -59,8 +59,8 @@ namespace ffpsd
 
     Image LoadPicture(const std::string& path, ColorMode color_mode, std::uint16_t depth)
     {
-        const detail::FileData file = detail::ReadFile(path);
-        return LoadPicture(file.bytes.get(), file.size, color_mode, depth);
+        const Bytes file = detail::ReadFile(path);
+        return LoadPicture(file.data(), file.size(), color_mode, depth);
     }
 
 #if defined(FFPSD_HAS_PNG)
@@ -71,8 +71,8 @@ namespace ffpsd
 
     Image LoadPng(const std::string& path, ColorMode color_mode, std::uint16_t depth)
     {
-        const detail::FileData file = detail::ReadFile(path);
-        return detail::DecodePng(file.bytes.get(), file.size, color_mode, depth);
+        const Bytes file = detail::ReadFile(path);
+        return detail::DecodePng(file.data(), file.size(), color_mode, depth);
     }
 
     std::vector<std::uint8_t> EncodePng(const ImageView& image, PngCompression compression)
@@ -94,8 +94,8 @@ namespace ffpsd
 
     Image LoadJpeg(const std::string& path, ColorMode color_mode, std::uint16_t depth, bool apply_orientation)
     {
-        const detail::FileData file = detail::ReadFile(path);
-        return detail::DecodeJpeg(file.bytes.get(), file.size, color_mode, depth, apply_orientation);
+        const Bytes file = detail::ReadFile(path);
+        return detail::DecodeJpeg(file.data(), file.size(), color_mode, depth, apply_orientation);
     }
 
     std::vector<std::uint8_t> EncodeJpeg(const ImageView& image, int quality)

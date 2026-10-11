@@ -253,7 +253,7 @@ namespace ffpsd::detail
         if (!IsSampleDepth(depth))
             throw std::invalid_argument(UnsupportedDepth(depth));
 
-        return MakeImage(width, height, channel_count, depth, channel_count >= 3 ? ColorMode::kRgb : ColorMode::kGrayscale);
+        return Image(ImageInfo{width, height, channel_count, depth, channel_count >= 3 ? ColorMode::kRgb : ColorMode::kGrayscale});
     }
 
     void DeinterleaveRow(const std::uint8_t* row, Image& image, std::uint32_t y)
@@ -303,7 +303,7 @@ namespace ffpsd::detail
         return image;
     }
 
-    void InterleaveRow(const ImageView& image, std::uint16_t channel_count, std::uint32_t y, std::uint8_t* out) noexcept
+    void InterleaveRow(const ImageView& image, std::uint32_t y, std::uint8_t* out) noexcept
     {
         const std::size_t row_bytes = std::size_t{image.width} * image.GetBytesPerSample();
         const std::size_t plane_bytes = row_bytes * image.height;
@@ -311,11 +311,11 @@ namespace ffpsd::detail
         switch (image.GetBytesPerSample())
         {
         case 1:
-            return JoinRow<1>(in, image.width, channel_count, plane_bytes, out);
+            return JoinRow<1>(in, image.width, image.channel_count, plane_bytes, out);
         case 2:
-            return JoinRow<2>(in, image.width, channel_count, plane_bytes, out);
+            return JoinRow<2>(in, image.width, image.channel_count, plane_bytes, out);
         default:
-            return JoinRow<4>(in, image.width, channel_count, plane_bytes, out);
+            return JoinRow<4>(in, image.width, image.channel_count, plane_bytes, out);
         }
     }
 } // namespace ffpsd::detail

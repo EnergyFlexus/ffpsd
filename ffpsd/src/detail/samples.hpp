@@ -42,6 +42,29 @@ namespace ffpsd::detail
         else
             return std::numeric_limits<T>::max();
     }
+
+    template <typename T> void FillSamples(std::uint8_t* at, std::size_t count, T value) noexcept
+    {
+        for (std::size_t i = 0; i < count; ++i)
+            Store<T>(at + i * sizeof(T), value);
+    }
+
+    // Samples of an 8, 16 or 32 bit depth at full coverage, Full of their type.
+    inline void FillFull(std::uint8_t* at, std::size_t count, std::uint16_t depth) noexcept
+    {
+        switch (depth)
+        {
+        case 8:
+            std::memset(at, 0xFF, count);
+            return;
+        case 16:
+            FillSamples(at, count, Full<std::uint16_t>());
+            return;
+        default:
+            FillSamples(at, count, Full<float>());
+            return;
+        }
+    }
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_SAMPLES_HPP_

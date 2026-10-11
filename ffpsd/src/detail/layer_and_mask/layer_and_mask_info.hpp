@@ -28,7 +28,13 @@ namespace ffpsd::detail
         std::uint32_t layers_key = 0;
     };
 
-    LayerAndMaskInfo ParseLayerAndMaskInfo(BigEndianReader& reader, bool is_psb, std::uint16_t depth, std::vector<LayerRecord>& records);
+    // What the section holds: the part kept to write it back, and the records, which become the layers.
+    struct ParsedLayerAndMaskInfo
+    {
+        LayerAndMaskInfo info;
+        std::vector<LayerRecord> records;
+    };
+    ParsedLayerAndMaskInfo ParseLayerAndMaskInfo(BigEndianReader& reader, bool is_psb, std::uint16_t depth);
 
     // A 16 or 32 bit document gets its layers in 'Lr16' or 'Lr32' and an empty layer info.
     void WriteLayerAndMaskInfo(

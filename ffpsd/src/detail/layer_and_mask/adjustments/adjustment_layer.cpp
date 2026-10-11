@@ -26,24 +26,23 @@ namespace ffpsd::detail
 
     } // namespace
 
-    std::uint32_t FindAdjustmentKey(const TaggedBlocks& blocks) noexcept
+    std::optional<std::uint32_t> FindAdjustmentKey(const TaggedBlocks& blocks) noexcept
     {
         for (const std::unique_ptr<TaggedBlock>& block : blocks)
         {
             if (std::find(std::begin(kAdjustmentKeys), std::end(kAdjustmentKeys), block->key) != std::end(kAdjustmentKeys))
                 return block->key;
         }
-        return 0;
+        return std::nullopt;
     }
 
     LayerRecord CreateAdjustmentLayerRecord(const std::string& name, std::unique_ptr<TaggedBlock> settings, ColorMode color_mode)
     {
         // No pixels: each channel is just its compression field, the same in PSD and PSB.
-        ImageView empty;
-        empty.color_mode = color_mode;
-        LayerRecord record = CreateLayerRecord(name, empty, 0, 0, false, false);
+        LayerRecord record = LayerRecord::Empty(name, 0, 0);
+        ReplaceLayerPixels(record, ImageView{}, color_mode, false, false);
         record.channels.push_back(ChannelImageData::Empty(kLayerMaskId));
-        record.mask_data = MaskData::NewLayerMask();
+        record.mask_data = MaskData::BlankLayerMask();
         record.mask_data.SetDefaultColor(kLayerMaskId, 255);
         record.flags = kAdjustmentFlags;
 

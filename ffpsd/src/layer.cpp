@@ -1,3 +1,4 @@
+#include "detail/file_header.hpp"
 #include "detail/image.hpp"
 #include "detail/layer_and_mask/adjustments/adjustment_layer.hpp"
 #include "detail/layer_and_mask/adjustments/levels.hpp"
@@ -99,7 +100,7 @@ namespace ffpsd
 
     std::uint32_t Layer::GetAdjustmentKey() const noexcept
     {
-        return detail::FindAdjustmentKey(record_->blocks);
+        return detail::FindAdjustmentKey(record_->blocks).value_or(0);
     }
 
     template <class T> std::optional<T> Layer::GetAdjustment() const
@@ -140,13 +141,14 @@ namespace ffpsd
 
     void Layer::SetPixels(const ImageView& image)
     {
-        const ImageView view = detail::CheckLayerImage(image, document_->GetColorMode(), document_->GetDepth(), document_->IsPsb());
+        detail::CheckLayerSides(image.width, image.height, document_->IsPsb());
+        detail::CheckImageFormat(image, document_->GetColorMode(), document_->GetDepth());
 
         // Transparency would make it an ordinary layer, so it stays as AddBackgroundLayer made it.
         if (IsBackground() && (image.IsEmpty() || image.width != document_->GetWidth() || image.height != document_->GetHeight() ||
-                               detail::HasTransparency(view)))
+                               detail::HasTransparency(image)))
             throw std::invalid_argument("ffpsd: the background takes an opaque image of the canvas size");
-        detail::ReplaceLayerPixels(*record_, view, IsBackground(), document_->IsPsb());
+        detail::ReplaceLayerPixels(*record_, image, document_->GetColorMode(), IsBackground(), document_->IsPsb());
         document_->SetHasRealMergedData(false);
     }
 
@@ -240,15 +242,9 @@ namespace ffpsd
         if (default_color != 0 && default_color != 255)
             throw std::invalid_argument("ffpsd: a mask's default color is 0 or 255, not " + std::to_string(default_color));
         detail::CheckLayerSides(image.width, image.height, document_->IsPsb());
-        if (!image.IsEmpty())
-        {
-            if (image.channel_count != 1 || image.color_mode != ColorMode::kGrayscale || image.depth != document_->GetDepth())
-                throw std::invalid_argument(
-                    "ffpsd: a mask is one gray plane of " + std::to_string(document_->GetDepth()) + " bit, not " +
-                    std::to_string(image.channel_count) + " of " + std::to_string(image.depth) + " bit in color mode " +
-                    std::to_string(static_cast<int>(image.color_mode)));
-            detail::CheckImage(image);
-        }
+        detail::CheckImageFormat(image, ColorMode::kGrayscale, document_->GetDepth());
+        if (!image.IsEmpty() && image.channel_count != 1)
+            throw std::invalid_argument("ffpsd: a mask is one gray plane, not " + std::to_string(image.channel_count));
 
         detail::ReplaceLayerMask(*record_, image, top, left, default_color, document_->IsPsb());
         document_->SetHasRealMergedData(false);
@@ -256,7 +252,7 @@ namespace ffpsd
 
     bool Layer::RemoveMask()
     {
-        if (record_->FindPixelMaskId() == 0)
+        if (!record_->FindPixelMaskId().has_value())
             return false;
         if (record_->HasVectorMask())
             throw std::logic_error("ffpsd: the mask of a layer with a vector mask is not supported yet");

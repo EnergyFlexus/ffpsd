@@ -20,18 +20,6 @@ namespace ffpsd::detail
         return "ffpsd: " + std::to_string(depth) + " bit samples are not supported";
     }
 
-    Image MakeImage(std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, ColorMode color_mode)
-    {
-        Image image;
-        image.width = width;
-        image.height = height;
-        image.channel_count = channel_count;
-        image.depth = depth;
-        image.color_mode = color_mode;
-        image.bytes = Bytes(image.GetSizeBytes(), 0);
-        return image;
-    }
-
     void CheckBytesSize(const ImageInfo& info, const std::uint8_t* out, std::size_t size)
     {
         if (size != info.GetSizeBytes())
@@ -61,12 +49,27 @@ namespace ffpsd::detail
                 " color channels, the image has " + std::to_string(image.channel_count));
     }
 
+    void CheckImageFormat(const ImageView& image, ColorMode color_mode, std::uint16_t depth)
+    {
+        if (image.IsEmpty())
+            return;
+        if (image.color_mode != color_mode)
+            throw std::invalid_argument(
+                "ffpsd: a color mode " + std::to_string(static_cast<int>(image.color_mode)) + " image, color mode " +
+                std::to_string(static_cast<int>(color_mode)) + " expected");
+        if (image.depth != depth)
+            throw std::invalid_argument(
+                "ffpsd: a " + std::to_string(image.depth) + " bit image, " + std::to_string(depth) + " bit expected");
+        CheckImage(image);
+        CheckColorChannels(image);
+    }
+
     bool HasTransparency(const ImageView& image)
     {
         return image.channel_count > ColorChannelCount(image.color_mode);
     }
 
-    void PlaceImage(const ImageView& source, Image& target, std::int64_t top, std::int64_t left)
+    void PlaceImage(Image& target, const ImageView& source, std::int64_t top, std::int64_t left)
     {
         const std::int64_t first_row = std::max<std::int64_t>(top, 0);
         const std::int64_t last_row = std::min<std::int64_t>(top + source.height, target.height);

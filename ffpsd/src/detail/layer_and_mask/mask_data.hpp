@@ -21,7 +21,7 @@ namespace ffpsd::detail
         }
 
         // Just a layer mask: its rectangle, default color, flags and padding.
-        static MaskData NewLayerMask();
+        static MaskData BlankLayerMask();
 
         const std::vector<std::uint8_t>& GetBytes() const noexcept
         {

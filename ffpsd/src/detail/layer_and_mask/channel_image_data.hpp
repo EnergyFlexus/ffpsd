@@ -21,11 +21,11 @@ namespace ffpsd::detail
         static ChannelImageData Empty(std::int16_t id);
 
         // Every sample at full coverage, 255, 65535 or 1.0: the transparency of an opaque layer.
-        static ChannelImageData Opaque(std::int16_t id, std::size_t width, std::size_t height, std::uint16_t depth, bool is_psb);
+        static ChannelImageData Opaque(std::int16_t id, std::uint32_t width, std::uint32_t height, std::uint16_t depth, bool is_psb);
 
         // Planar native samples, RLE when smaller.
         static ChannelImageData
-        Encode(std::int16_t id, const std::uint8_t* samples, std::size_t width, std::size_t height, std::uint16_t depth, bool is_psb);
+        Encode(std::int16_t id, const std::uint8_t* samples, std::uint32_t width, std::uint32_t height, std::uint16_t depth, bool is_psb);
     };
 
     // Pass two of the layer info; bounds is what the channel covers, the layer's or a mask's own rectangle.

@@ -20,16 +20,15 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    LayerAndMaskInfo ParseLayerAndMaskInfo(BigEndianReader& reader, bool is_psb, std::uint16_t depth, std::vector<LayerRecord>& records)
+    ParsedLayerAndMaskInfo ParseLayerAndMaskInfo(BigEndianReader& reader, bool is_psb, std::uint16_t depth)
     {
-        records.clear();
-
         const std::size_t length = reader.CheckLength(reader.ReadLength(is_psb), reader.GetSize(), "layer and mask information");
         const std::size_t end = reader.Tell() + length;
 
-        LayerAndMaskInfo info;
+        ParsedLayerAndMaskInfo parsed;
+        LayerAndMaskInfo& info = parsed.info;
         if (length == 0)
-            return info;
+            return parsed;
 
         LayerInfo layers = ParseLayerInfo(reader, is_psb, depth);
         if (reader.Tell() > end)
@@ -53,8 +52,8 @@ namespace ffpsd::detail
         }
 
         info.merged_alpha = layers.merged_alpha;
-        records = std::move(layers.records);
-        return info;
+        parsed.records = std::move(layers.records);
+        return parsed;
     }
 
     void WriteLayerAndMaskInfo(

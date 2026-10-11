@@ -9,21 +9,24 @@
 
 namespace ffpsd::detail
 {
-    PixelData
-    ParseImageData(BigEndianReader& reader, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth)
+    PixelData ParseImageData(BigEndianReader& reader, const ImageInfo& info)
     {
         std::vector<std::uint8_t> bytes = reader.ReadBytes(reader.GetRemaining());
-        return PixelData(std::move(bytes), std::size_t{height} * channel_count, RowBytes(width, depth), SampleBytes(depth));
+        return PixelData(
+            std::move(bytes), std::size_t{info.height} * info.channel_count, RowBytes(info.width, info.depth), SampleBytes(info.depth));
     }
 
-    ImageInfo ImageDataInfo(
-        const PixelData& data, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth,
-        ColorMode color_mode)
+    void WriteImageData(BigEndianWriter& writer, const PixelData& data)
+    {
+        writer.WriteBytes(data.GetBytes());
+    }
+
+    ImageInfo ImageDataInfo(const PixelData& data, const ImageInfo& info)
     {
         if (data.IsEmpty())
             return ImageInfo();
-        if (!IsSampleDepth(depth))
-            throw std::runtime_error(UnsupportedDepth(depth));
-        return ImageInfo{width, height, channel_count, depth, color_mode};
+        if (!IsSampleDepth(info.depth))
+            throw std::runtime_error(UnsupportedDepth(info.depth));
+        return info;
     }
 } // namespace ffpsd::detail

@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <ffpsd/types.hpp>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -50,6 +51,9 @@ namespace ffpsd::detail
 
         TaggedBlocks blocks;
 
+        // No channels, at top and left, with the flags and blending ranges Photoshop gives a new layer.
+        static LayerRecord Empty(const std::string& name, std::int32_t top, std::int32_t left);
+
         // A deep copy, blocks included; a new field has to be added here too.
         LayerRecord Copy() const;
 
@@ -61,8 +65,8 @@ namespace ffpsd::detail
         bool HasLayerMask() const noexcept;
         bool HasVectorMask() const noexcept;
 
-        // The channel of the pixel mask, 0 when there is none; a -2 rendered from a vector mask is not one.
-        std::int16_t FindPixelMaskId() const noexcept;
+        // The channel of the pixel mask; a -2 rendered from a vector mask is not one.
+        std::optional<std::int16_t> FindPixelMaskId() const noexcept;
 
         // The 'luni' block and the legacy Pascal copy, which is cut to 255 bytes on writing.
         void SetName(const std::string& new_name);

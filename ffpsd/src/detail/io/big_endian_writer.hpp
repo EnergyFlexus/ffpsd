@@ -49,6 +49,8 @@ namespace ffpsd::detail
         void WriteF64Array(const double* src, std::size_t count);
 
         void WriteZeros(std::size_t count);
+        // The bytes as they are, the pair of BigEndianReader::ReadBytes.
+        void WriteBytes(const std::vector<std::uint8_t>& data);
 
         // A 4 byte length, then the bytes.
         void WriteBlob(const std::vector<std::uint8_t>& data);
@@ -61,7 +63,9 @@ namespace ffpsd::detail
         void PatchU32(std::size_t position, std::uint32_t value);
         void PatchU64(std::size_t position, std::uint64_t value);
 
-        // A length field of 4 bytes, or 8 when wide, patched with the bytes written after it.
+        // A length field of 4 bytes, or 8 when wide; a length too long for 4 throws std::length_error.
+        void WriteLength(std::uint64_t length, bool wide);
+        // The same, patched with the bytes written after it.
         std::size_t ReserveLength(bool wide);
         void PatchLength(std::size_t position, bool wide);
 
@@ -81,6 +85,8 @@ namespace ffpsd::detail
 
         template <typename T> void WriteArray(const T* src, std::size_t count)
         {
+            if (count == 0)
+                return;
             if (count > (data_.max_size() - data_.size()) / sizeof(T))
                 throw std::length_error("ffpsd: array too large to write");
 

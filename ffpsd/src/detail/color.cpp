@@ -43,7 +43,7 @@ namespace ffpsd::detail
         }
 
         // A composite may hold more than one plane past the colors, so only the fewest and the most are fixed.
-        void CheckSource(const Image& image, ColorMode color_mode, std::uint16_t most, const char* what)
+        void CheckSource(const ImageView& image, ColorMode color_mode, std::uint16_t most, const char* what)
         {
             const std::uint16_t fewest = ColorChannelCount(color_mode);
             if (image.color_mode != color_mode || image.channel_count < fewest || image.channel_count > most)
@@ -76,49 +76,55 @@ namespace ffpsd::detail
         }
     }
 
-    Image RgbToGray(const Image& rgb)
+    Image RgbToGray(const ImageView& rgb)
     {
         CheckSource(rgb, ColorMode::kRgb, std::numeric_limits<std::uint16_t>::max(), "RGB to gray");
-        Image gray = MakeImage(rgb.width, rgb.height, static_cast<std::uint16_t>(rgb.channel_count - 2), rgb.depth, ColorMode::kGrayscale);
+        ImageInfo info = rgb;
+        info.channel_count = static_cast<std::uint16_t>(rgb.channel_count - 2);
+        info.color_mode = ColorMode::kGrayscale;
+        Image gray(info);
 
         const std::size_t pixels = std::size_t{rgb.width} * rgb.height;
         const std::size_t plane = pixels * rgb.GetBytesPerSample();
         switch (rgb.depth)
         {
         case 8:
-            LumaPlane<std::uint8_t>(rgb.bytes.data(), gray.bytes.data(), pixels);
+            LumaPlane<std::uint8_t>(rgb.data, gray.bytes.data(), pixels);
             break;
         case 16:
-            LumaPlane<std::uint16_t>(rgb.bytes.data(), gray.bytes.data(), pixels);
+            LumaPlane<std::uint16_t>(rgb.data, gray.bytes.data(), pixels);
             break;
         default:
-            LumaPlane<float>(rgb.bytes.data(), gray.bytes.data(), pixels);
+            LumaPlane<float>(rgb.data, gray.bytes.data(), pixels);
             break;
         }
 
         // Transparency, or a composite's alpha channels.
         const std::size_t extra = std::size_t{rgb.channel_count} - 3;
         if (extra != 0 && plane != 0)
-            std::memcpy(gray.bytes.data() + plane, rgb.bytes.data() + 3 * plane, extra * plane);
+            std::memcpy(gray.bytes.data() + plane, rgb.data + 3 * plane, extra * plane);
         return gray;
     }
 
-    Image GrayToRgb(const Image& gray)
+    Image GrayToRgb(const ImageView& gray)
     {
         CheckSource(gray, ColorMode::kGrayscale, std::numeric_limits<std::uint16_t>::max() - 2, "gray to RGB");
-        Image rgb = MakeImage(gray.width, gray.height, static_cast<std::uint16_t>(gray.channel_count + 2), gray.depth, ColorMode::kRgb);
+        ImageInfo info = gray;
+        info.channel_count = static_cast<std::uint16_t>(gray.channel_count + 2);
+        info.color_mode = ColorMode::kRgb;
+        Image rgb(info);
 
         const std::size_t plane = std::size_t{gray.width} * gray.height * gray.GetBytesPerSample();
         if (plane == 0)
             return rgb;
 
         for (std::size_t channel = 0; channel < 3; ++channel)
-            std::memcpy(rgb.bytes.data() + channel * plane, gray.bytes.data(), plane);
+            std::memcpy(rgb.bytes.data() + channel * plane, gray.data, plane);
 
         // Transparency, or a composite's alpha channels.
         const std::size_t extra = std::size_t{gray.channel_count} - 1;
         if (extra != 0)
-            std::memcpy(rgb.bytes.data() + 3 * plane, gray.bytes.data() + plane, extra * plane);
+            std::memcpy(rgb.bytes.data() + 3 * plane, gray.data + plane, extra * plane);
         return rgb;
     }
 

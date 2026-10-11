@@ -1,6 +1,7 @@
 #include "detail/layer_and_mask/layer_geometry.hpp"
 
 #include "detail/composite.hpp"
+#include "detail/file_header.hpp"
 #include "detail/image.hpp"
 #include "detail/io/fourcc.hpp"
 #include "detail/layer_and_mask/channel_ids.hpp"
@@ -80,13 +81,13 @@ namespace ffpsd::detail
             {
                 Image white = MakeWhiteImage(
                     static_cast<std::uint32_t>(canvas->GetWidth()), static_cast<std::uint32_t>(canvas->GetHeight()), color_mode, depth);
-                PlaceImage(moved, white, std::int64_t{result.bounds.top} - canvas->top, std::int64_t{result.bounds.left} - canvas->left);
+                PlaceImage(white, moved, std::int64_t{result.bounds.top} - canvas->top, std::int64_t{result.bounds.left} - canvas->left);
                 result.bounds = *canvas;
-                channels = EncodeLayerPixels(white, true, is_psb);
+                channels = EncodeLayerPixels(white, color_mode, true, is_psb);
             }
             else
             {
-                channels = EncodeLayerPixels(moved, false, is_psb);
+                channels = EncodeLayerPixels(moved, color_mode, false, is_psb);
             }
         }
         else

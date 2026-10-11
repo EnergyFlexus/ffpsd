@@ -1,13 +1,11 @@
 #include "detail/layer_and_mask/layer_pixels.hpp"
 
 #include "detail/color.hpp"
-#include "detail/file_header.hpp"
 #include "detail/image.hpp"
 #include "detail/layer_and_mask/channel_ids.hpp"
 #include "detail/pixel_data.hpp"
 #include "detail/rect.hpp"
 
-#include <iterator>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -16,24 +14,6 @@ namespace ffpsd::detail
 {
     namespace
     {
-        // Bit 3, written by Photoshop 5.0 and later: Photoshop sets it on every layer.
-        constexpr std::uint8_t kFlagsPhotoshop5 = 0x08;
-
-        // Black low, black high, white low, white high, twice: source, then destination.
-        constexpr std::uint8_t kPassEverything[] = {0, 0, 255, 255, 0, 0, 255, 255};
-
-        // Photoshop writes five pairs whatever the color mode and the channel count.
-        constexpr std::size_t kBlendingRangePairs = 5;
-
-        std::vector<std::uint8_t> DefaultBlendingRanges()
-        {
-            std::vector<std::uint8_t> ranges;
-            ranges.reserve(kBlendingRangePairs * sizeof(kPassEverything));
-            for (std::size_t i = 0; i < kBlendingRangePairs; ++i)
-                ranges.insert(ranges.end(), std::begin(kPassEverything), std::end(kPassEverything));
-            return ranges;
-        }
-
         // The color planes by channel id, then transparency; empty for a layer without area.
         struct LayerPlanes
         {
@@ -79,39 +59,9 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    void CheckLayerSides(std::uint32_t width, std::uint32_t height, bool is_psb)
+    std::vector<ChannelImageData> EncodeLayerPixels(const ImageView& image, ColorMode color_mode, bool is_background, bool is_psb)
     {
-        const std::uint32_t max_side = MaxSide(is_psb);
-        if (width > max_side || height > max_side)
-            throw std::invalid_argument(
-                "ffpsd: a " + std::to_string(width) + " x " + std::to_string(height) + " layer exceeds " + std::to_string(max_side) +
-                " pixels a side");
-    }
-
-    ImageView CheckLayerImage(const ImageView& image, ColorMode color_mode, std::uint16_t depth, bool is_psb)
-    {
-        // First, so the size arithmetic below stays far from overflow.
-        CheckLayerSides(image.width, image.height, is_psb);
-        ImageView view = image;
-        view.color_mode = color_mode;
-        if (image.IsEmpty())
-            return view;
-
-        if (image.color_mode != color_mode)
-            throw std::invalid_argument(
-                "ffpsd: a color mode " + std::to_string(static_cast<int>(image.color_mode)) + " image in a color mode " +
-                std::to_string(static_cast<int>(color_mode)) + " document");
-        if (image.depth != depth)
-            throw std::invalid_argument(
-                "ffpsd: a " + std::to_string(image.depth) + " bit image in a " + std::to_string(depth) + " bit document");
-        CheckImage(image);
-        CheckColorChannels(image);
-        return view;
-    }
-
-    std::vector<ChannelImageData> EncodeLayerPixels(const ImageView& image, bool is_background, bool is_psb)
-    {
-        const std::size_t color_count = ColorChannelCount(image.color_mode);
+        const std::size_t color_count = ColorChannelCount(color_mode);
         std::vector<ChannelImageData> channels;
         if (image.IsEmpty())
         {
@@ -123,11 +73,11 @@ namespace ffpsd::detail
         }
 
         const std::size_t plane_samples = std::size_t{image.width} * image.height;
-        const std::size_t sample_size = image.depth / 8u;
+        const std::size_t sample_size = image.GetBytesPerSample();
         const auto plane = [&](std::size_t index) { return image.data + index * plane_samples * sample_size; };
 
         // Transparency is declared first, as Photoshop writes it; without it the bottom layer would become the background.
-        if (image.channel_count > color_count)
+        if (HasTransparency(image))
             channels.push_back(
                 ChannelImageData::Encode(kTransparencyId, plane(color_count), image.width, image.height, image.depth, is_psb));
         else if (!is_background)
@@ -142,7 +92,7 @@ namespace ffpsd::detail
     {
         if (image.IsEmpty())
             return {top, left, top, left};
-        return MakeRect(top, left, std::int64_t{top} + image.height, std::int64_t{left} + image.width);
+        return CheckedRect(top, left, std::int64_t{top} + image.height, std::int64_t{left} + image.width);
     }
 
     ImageInfo LayerPixelsInfo(const LayerRecord& record, ColorMode color_mode, std::uint16_t depth)
@@ -167,9 +117,9 @@ namespace ffpsd::detail
             planes.channels[i]->data.Decode(is_psb, out + i * plane);
     }
 
-    void ReplaceLayerPixels(LayerRecord& record, const ImageView& image, bool is_background, bool is_psb)
+    void ReplaceLayerPixels(LayerRecord& record, const ImageView& image, ColorMode color_mode, bool is_background, bool is_psb)
     {
-        std::vector<ChannelImageData> channels = EncodeLayerPixels(image, is_background, is_psb);
+        std::vector<ChannelImageData> channels = EncodeLayerPixels(image, color_mode, is_background, is_psb);
         const Rect bounds = BoundsAt(image, record.bounds.top, record.bounds.left);
 
         // Masks have their own rectangle, so new pixels leave them as they were.
@@ -182,15 +132,4 @@ namespace ffpsd::detail
         record.bounds = bounds;
     }
 
-    LayerRecord
-    CreateLayerRecord(const std::string& name, const ImageView& image, std::int32_t top, std::int32_t left, bool is_background, bool is_psb)
-    {
-        LayerRecord record;
-        record.channels = EncodeLayerPixels(image, is_background, is_psb);
-        record.bounds = BoundsAt(image, top, left);
-        record.flags = kFlagsPhotoshop5;
-        record.blending_ranges = DefaultBlendingRanges();
-        record.SetName(name);
-        return record;
-    }
 } // namespace ffpsd::detail

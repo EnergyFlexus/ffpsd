@@ -1,7 +1,6 @@
 #include "detail/formats/png.hpp"
 
 #include "detail/color.hpp"
-#include "detail/file_header.hpp"
 #include "detail/formats/picture.hpp"
 #include "detail/formats/planes.hpp"
 #include "detail/image.hpp"
@@ -10,7 +9,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <memory>
+#include <ffpsd/bytes.hpp>
 #include <new>
 #include <png.h>
 #include <stdexcept>
@@ -23,6 +22,9 @@ namespace ffpsd::detail
 {
     namespace
     {
+        // Refused before the rows are allocated, read or written.
+        constexpr std::uint32_t kMaxSide = 300000;
+
         constexpr std::size_t kErrorSize = 256;
 
         struct Source
@@ -55,8 +57,8 @@ namespace ffpsd::detail
             std::uint32_t height = 0;
             std::uint8_t channels = 0;
 
-            // Rows of a progressive picture come in passes, so it is read whole, without zeros first, then split.
-            std::unique_ptr<std::uint8_t[]> bytes;
+            // Rows of a progressive picture come in passes, so it is read whole, then split.
+            Bytes bytes;
             std::vector<png_bytep> rows;
 
             // Any other goes row by row straight into its planes.
@@ -123,8 +125,8 @@ namespace ffpsd::detail
             out.width = png_get_image_width(png, info);
             out.height = png_get_image_height(png, info);
             out.channels = png_get_channels(png, info);
-            if (out.width > kMaxSidePsb || out.height > kMaxSidePsb)
-                png_error(png, "image is larger than a PSB allows");
+            if (out.width > kMaxSide || out.height > kMaxSide)
+                png_error(png, "a PNG side is at most 300000 pixels");
 
             const std::size_t row_bytes = png_get_rowbytes(png, info);
             if (png_get_interlace_type(png, info) == PNG_INTERLACE_NONE)
@@ -139,10 +141,10 @@ namespace ffpsd::detail
             }
             else
             {
-                out.bytes.reset(new std::uint8_t[row_bytes * out.height]);
+                out.bytes = Bytes(row_bytes * out.height);
                 out.rows.resize(out.height);
                 for (std::size_t y = 0; y < out.height; ++y)
-                    out.rows[y] = out.bytes.get() + y * row_bytes;
+                    out.rows[y] = out.bytes.data() + y * row_bytes;
                 png_read_image(png, out.rows.data());
             }
             png_read_end(png, nullptr);
@@ -226,7 +228,7 @@ namespace ffpsd::detail
             // A row at a time, so the interleaved picture is never held whole.
             for (std::uint32_t y = 0; y < image.height; ++y)
             {
-                InterleaveRow(image, image.channel_count, y, interleaved.row.data());
+                InterleaveRow(image, y, interleaved.row.data());
                 png_write_row(png, interleaved.row.data());
             }
             png_write_end(png, nullptr);
@@ -265,15 +267,15 @@ namespace ffpsd::detail
         if (!Decode(reader, depth, decoded))
             throw std::runtime_error(std::string("ffpsd: PNG: ") + reader.error);
 
-        if (decoded.bytes)
-            decoded.planes = Deinterleave(decoded.bytes.get(), decoded.width, decoded.height, decoded.channels, depth);
+        if (!decoded.bytes.empty())
+            decoded.planes = Deinterleave(decoded.bytes.data(), decoded.width, decoded.height, decoded.channels, depth);
         return ConvertColorMode(std::move(decoded.planes), color_mode);
     }
 
     std::vector<std::uint8_t> EncodePng(const ImageView& image, PngCompression compression)
     {
-        if (image.width > kMaxSidePsb || image.height > kMaxSidePsb)
-            throw std::invalid_argument("ffpsd: image is larger than a PSB allows");
+        if (image.width > kMaxSide || image.height > kMaxSide)
+            throw std::invalid_argument("ffpsd: a PNG side is at most " + std::to_string(kMaxSide) + " pixels");
         CheckPicture(image, "PNG");
 
         Interleaved interleaved;

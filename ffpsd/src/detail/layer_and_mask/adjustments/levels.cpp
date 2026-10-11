@@ -44,6 +44,15 @@ namespace ffpsd::detail
                 throw std::invalid_argument("ffpsd: Levels record " + std::to_string(index) + " is out of range");
         }
 
+        // A record that changes nothing, as LevelsInfo::Channel starts.
+        bool IsIdentity(const LevelsInfo::Channel& channel) noexcept
+        {
+            const LevelsInfo::Channel identity;
+            return channel.input_floor == identity.input_floor && channel.input_ceiling == identity.input_ceiling &&
+                   channel.output_floor == identity.output_floor && channel.output_ceiling == identity.output_ceiling &&
+                   channel.gamma == identity.gamma;
+        }
+
         void WriteRecord(BigEndianWriter& writer, const LevelsInfo::Channel& channel)
         {
             writer.WriteU16(channel.input_floor);
@@ -101,5 +110,25 @@ namespace ffpsd::detail
         // Counted in the declared length.
         writer.PadFrom(0, kAlignment);
         return writer.Take();
+    }
+
+    LevelsInfo ConvertLevels(const LevelsInfo& levels, bool to_gray)
+    {
+        LevelsInfo converted;
+        if (to_gray)
+        {
+            // Photoshop writes gray's one channel in record 1.
+            converted.channels = {LevelsInfo::Channel(), levels.channels.at(0)};
+            return converted;
+        }
+
+        // Gray's record 1 as RGB's record 0 applies to every channel; with record 0 set too, each channel gets record 1.
+        const LevelsInfo::Channel all = levels.channels.at(0);
+        const LevelsInfo::Channel one = levels.channels.at(1);
+        if (IsIdentity(all))
+            converted.channels = {one};
+        else
+            converted.channels = {all, one, one, one};
+        return converted;
     }
 } // namespace ffpsd::detail
