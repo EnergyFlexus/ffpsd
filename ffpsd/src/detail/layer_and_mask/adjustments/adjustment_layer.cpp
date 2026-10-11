@@ -1,6 +1,7 @@
 #include "detail/layer_and_mask/adjustments/adjustment_layer.hpp"
 
 #include "detail/io/fourcc.hpp"
+#include "detail/layer_and_mask/channel_ids.hpp"
 #include "detail/layer_and_mask/layer_pixels.hpp"
 
 #include <algorithm>
@@ -41,9 +42,9 @@ namespace ffpsd::detail
         ImageView empty;
         empty.color_mode = color_mode;
         LayerRecord record = CreateLayerRecord(name, empty, 0, 0, false, false);
-        record.channels.push_back(EmptyChannel(kLayerMaskId));
-        record.mask_data = NewMaskData();
-        SetMaskDefaultColor(record.mask_data, kLayerMaskId, 255);
+        record.channels.push_back(ChannelImageData::Empty(kLayerMaskId));
+        record.mask_data = MaskData::NewLayerMask();
+        record.mask_data.SetDefaultColor(kLayerMaskId, 255);
         record.flags = kAdjustmentFlags;
 
         // Photoshop writes the settings first.

@@ -1,0 +1,5 @@
+add_executable(img2ffpsd_cli main.cpp)
+set_target_properties(img2ffpsd_cli PROPERTIES OUTPUT_NAME img2ffpsd-cli)
+target_link_libraries(img2ffpsd_cli PRIVATE img2ffpsd_common)
+
+img2ffpsd_install(img2ffpsd_cli)

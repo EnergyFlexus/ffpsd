@@ -32,13 +32,6 @@ namespace ffpsd
         kAdjustment
     };
 
-    // How Layer::Resize computes the new pixels.
-    enum class ResampleFilter : std::uint8_t
-    {
-        kNearest, // the nearest source pixel: hard edges, no new values
-        kBicubic  // Catmull-Rom; shrinking averages every source pixel under an output one
-    };
-
     // One gray plane at the document's depth over bounds; default_color, 0 or 255, is everywhere else.
     struct LayerMask
     {

@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <ffpsd/image.hpp>
 #include <ffpsd/types.hpp>
 #include <optional>
 #include <vector>
@@ -12,18 +13,6 @@ namespace ffpsd::detail
     // The compression field; ZIP, 2 and 3, is kept as it is.
     constexpr std::uint16_t kCompressionRaw = 0;
     constexpr std::uint16_t kCompressionRle = 1;
-
-    // A bitmap's bits count as one byte samples, which need no swap.
-    constexpr std::size_t SampleBytes(std::uint16_t depth) noexcept
-    {
-        return depth <= 8 ? 1 : depth / 8u;
-    }
-
-    // Bitmap rows are padded to a whole byte.
-    constexpr std::size_t RowBytes(std::uint32_t width, std::uint16_t depth) noexcept
-    {
-        return depth == 1 ? (std::size_t{width} + 7) / 8 : std::size_t{width} * SampleBytes(depth);
-    }
 
     // A layer channel or section 5 as stored, big endian; RLE row counts are 2 bytes in a PSD and 4 in a PSB.
     class PixelData
@@ -39,6 +28,14 @@ namespace ffpsd::detail
             const std::uint8_t* data, std::size_t rows, std::size_t row_bytes, std::size_t sample_size, bool is_psb,
             Compression compression);
 
+        // A planar image, every plane's rows one after another, RLE when smaller.
+        static PixelData Encode(const ImageView& image, bool is_psb);
+
+        // Zeros, for a file without a composite; in RLE a large document costs a few bytes a row.
+        static PixelData Blank(
+            std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, bool is_psb,
+            Compression compression);
+
         const std::vector<std::uint8_t>& GetBytes() const noexcept;
         bool IsEmpty() const noexcept;
 
@@ -47,6 +44,12 @@ namespace ffpsd::detail
 
         // Raw and RLE, rows * row_bytes bytes in native byte order.
         void Decode(bool is_psb, std::uint8_t* out) const;
+
+        // The pixels in the shape info gives, which matches the rows; empty data leaves them as they are.
+        Image Decode(const ImageInfo& info, bool is_psb) const;
+
+        // The same into the caller's memory, exactly info's GetSizeBytes of it.
+        void Decode(const ImageInfo& info, bool is_psb, std::uint8_t* out, std::size_t size) const;
 
         // None while the stored bytes stay, raw RLE could not shrink included; RLE changing format rewrites only the counts.
         std::optional<PixelData> Converted(bool from_psb, bool to_psb, Compression compression) const;

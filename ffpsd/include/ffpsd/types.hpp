@@ -64,6 +64,13 @@ namespace ffpsd
         kVertical = 1
     };
 
+    // How Layer::Resize and Document::Resize compute the new pixels.
+    enum class ResampleFilter : std::uint8_t
+    {
+        kNearest, // the nearest source pixel: hard edges, no new values
+        kBicubic  // Catmull-Rom; shrinking averages every source pixel under an output one
+    };
+
     // Signed: a layer may extend past the canvas.
     struct Rect
     {
@@ -80,6 +87,15 @@ namespace ffpsd
         std::int64_t GetHeight() const noexcept
         {
             return std::int64_t{bottom} - top;
+        }
+
+        friend bool operator==(const Rect& x, const Rect& y) noexcept
+        {
+            return x.top == y.top && x.left == y.left && x.bottom == y.bottom && x.right == y.right;
+        }
+        friend bool operator!=(const Rect& x, const Rect& y) noexcept
+        {
+            return !(x == y);
         }
     };
 } // namespace ffpsd

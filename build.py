@@ -160,8 +160,8 @@ def show(directory):
 
 
 def smoke_test(directory, env):
-    """Run the installed img2ffpsd once: it links the library, so this proves it works."""
-    tool = directory / "bin" / ("img2ffpsd.exe" if IS_WINDOWS else "img2ffpsd")
+    """Run the installed img2ffpsd-cli once: it links the library, so this proves it works."""
+    tool = directory / "bin" / ("img2ffpsd-cli.exe" if IS_WINDOWS else "img2ffpsd-cli")
     if not tool.is_file():
         return
     print()
@@ -169,7 +169,7 @@ def smoke_test(directory, env):
 
 
 def check_vendor(names=PNG_VENDORED + JPEG_VENDORED):
-    """PNG, JPEG and the window of img2ffpsd_ui build what they need from the submodules under vendor/."""
+    """PNG, JPEG and the window of img2ffpsd-ui build what they need from the submodules under vendor/."""
     # Dear ImGui has no CMakeLists.txt of its own, so its header shows the submodule is there.
     missing = [name for name in names if not (ROOT / "vendor" / name / "CMakeLists.txt").is_file()
                and not (ROOT / "vendor" / name / f"{name}.h").is_file()]
@@ -187,7 +187,7 @@ def main():
     parser.add_argument("--static", action="store_true",
                         help="build a static library instead of a shared one")
     parser.add_argument("--no-apps", action="store_true",
-                        help="skip the apps in apps/: img2ffpsd and img2ffpsd_ui")
+                        help="skip the apps in apps/: img2ffpsd-cli and img2ffpsd-ui")
     parser.add_argument("--no-png", action="store_true",
                         help="build without PNG loading and saving, so without libpng, zlib-ng and img2ffpsd")
     parser.add_argument("--no-jpeg", action="store_true",
@@ -209,7 +209,7 @@ def main():
     print(f"== ffpsd release build: {kind}{crt_note}, {platform.system()} {platform.machine()}")
 
     cmake = check_cmake()
-    # img2ffpsd_ui reads PNG and JPEG too; without either there is no window to build.
+    # img2ffpsd-ui reads PNG and JPEG too; without either there is no window to build.
     ui = not (args.no_apps or args.no_png or args.no_jpeg)
     check_vendor((() if args.no_png else PNG_VENDORED) + (() if args.no_jpeg else JPEG_VENDORED) + (UI_VENDORED if ui else ()))
     generator = pick_generator()

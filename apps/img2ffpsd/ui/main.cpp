@@ -1,22 +1,20 @@
+#include "common/convert.hpp"
+#include "common/pictures.hpp"
+
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h> // turns main into WinMain for a window app on Windows
 #include <algorithm>
 #include <atomic>
-#include <cctype>
 #include <chrono>
-#include <cstdint>
 #include <cstdio>
-#include <exception>
 #include <ffpsd/ffpsd.hpp>
 #include <filesystem>
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
 #include <imgui_stdlib.h>
-#include <map>
 #include <memory>
 #include <mutex>
-#include <set>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -33,6 +31,10 @@ namespace
     constexpr float kFontSize = 18.0f;
     constexpr int kOutput = -1;
 
+    // In the order of img2ffpsd::ColorChoice: what the settings file keeps, and what the list shows.
+    const char* const kColorKeys[] = {"auto", "color", "gray"};
+    const char* const kColorNames[] = {"Auto", "Color", "Grayscale"};
+
     int Processors()
     {
         return static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
@@ -42,14 +44,14 @@ namespace
     {
         std::vector<std::string> inputs = {"", ""};
         std::string output;
-        bool gray = false;
+        img2ffpsd::ColorChoice color = img2ffpsd::ColorChoice::kAuto;
         bool bicubic = false;
         int jobs = Processors(); // not saved: every start has all the processors
     };
 
     std::string SettingsPath()
     {
-        char* folder = SDL_GetPrefPath("ffpsd", "img2ffpsd_ui");
+        char* folder = SDL_GetPrefPath("ffpsd", "img2ffpsd-ui");
         const std::string path = folder != nullptr ? std::string(folder) + "settings.txt" : "settings.txt";
         SDL_free(folder);
         return path;
@@ -78,8 +80,14 @@ namespace
                 settings.inputs.push_back(value);
             else if (key == "output")
                 settings.output = value;
-            else if (key == "gray")
-                settings.gray = value == "1";
+            else if (key == "color")
+            {
+                for (int i = 0; i < IM_ARRAYSIZE(kColorKeys); ++i)
+                {
+                    if (value == kColorKeys[i])
+                        settings.color = static_cast<img2ffpsd::ColorChoice>(i);
+                }
+            }
             else if (key == "resize")
                 settings.bicubic = value == "bicubic";
         }
@@ -93,7 +101,7 @@ namespace
         for (const std::string& input : settings.inputs)
             text += "input=" + input + "\n";
         text += "output=" + settings.output + "\n";
-        text += std::string("gray=") + (settings.gray ? "1" : "0") + "\n";
+        text += std::string("color=") + kColorKeys[static_cast<int>(settings.color)] + "\n";
         text += std::string("resize=") + (settings.bicubic ? "bicubic" : "nearest") + "\n";
         SDL_SaveFile(SettingsPath().c_str(), text.data(), text.size());
     }
@@ -143,74 +151,15 @@ namespace
         dialog.done = false;
     }
 
-    std::string Label(std::size_t folder)
-    {
-        return folder == 0 ? "Background" : "Layer " + std::to_string(folder);
-    }
-
-    // A folder's pictures: the relative path without the extension, which pairs them, to the file itself.
-    using Pictures = std::map<fs::path, fs::path>;
-
-    std::string Extension(const fs::path& path)
-    {
-        std::string extension = path.extension().u8string();
-        for (char& c : extension)
-            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return extension;
-    }
-
-    bool IsPicture(const fs::path& path)
-    {
-        const std::string extension = Extension(path);
-        return extension == ".png" || extension == ".jpg" || extension == ".jpeg";
-    }
-
-    // What the system leaves behind: Finder's .DS_Store and ._ files, which are no pictures, Thumbs.db and the like.
-    bool IsHidden(const fs::path& path)
-    {
-        const std::string name = path.filename().u8string();
-        return name.empty() || name[0] == '.' || name == "Thumbs.db" || name == "desktop.ini";
-    }
-
-    // The regular files under the folder, hidden files and whatever hidden folders hold left out.
-    std::vector<fs::path> VisibleFiles(const fs::path& folder)
-    {
-        std::vector<fs::path> files;
-        for (auto entry = fs::recursive_directory_iterator(folder); entry != fs::recursive_directory_iterator(); ++entry)
-        {
-            if (IsHidden(entry->path()))
-            {
-                if (entry->is_directory())
-                    entry.disable_recursion_pending();
-            }
-            else if (entry->is_regular_file())
-            {
-                files.push_back(entry->path());
-            }
-        }
-        return files;
-    }
+    using img2ffpsd::Pictures;
 
     // Adds an error for each name that more than one picture of the folder has, 01.png and 01.jpg.
     Pictures FindPictures(const fs::path& folder, std::vector<std::string>& errors)
     {
-        std::map<fs::path, std::vector<fs::path>> by_name;
-        for (const fs::path& file : VisibleFiles(folder))
+        std::vector<std::vector<fs::path>> duplicates;
+        Pictures pictures = img2ffpsd::FindPictures(folder, duplicates);
+        for (const std::vector<fs::path>& files : duplicates)
         {
-            if (!IsPicture(file))
-                continue;
-            const fs::path relative = file.lexically_relative(folder);
-            by_name[fs::path(relative).replace_extension()].push_back(relative);
-        }
-
-        Pictures pictures;
-        for (const auto& [name, files] : by_name)
-        {
-            if (files.size() == 1)
-            {
-                pictures[name] = files[0];
-                continue;
-            }
             std::string error = folder.u8string() + ": " + files[0].u8string();
             for (std::size_t i = 1; i < files.size(); ++i)
                 error += " and " + files[i].u8string();
@@ -219,67 +168,10 @@ namespace
         return pictures;
     }
 
-    // The pictures whose name the other folder lacks.
-    std::vector<fs::path> OnlyIn(const Pictures& pictures, const Pictures& other)
-    {
-        std::vector<fs::path> only;
-        for (const auto& [name, file] : pictures)
-        {
-            if (other.count(name) == 0)
-                only.push_back(file);
-        }
-        return only;
-    }
-
-    bool IsNumber(const std::string& text)
-    {
-        return !text.empty() && text.size() < 18 &&
-               std::all_of(text.begin(), text.end(), [](unsigned char c) { return std::isdigit(c) != 0; });
-    }
-
-    // A file named 12 is page 12; one named 12-13 is pages 12 and 13; any other name is no page.
-    void AddPages(const std::string& name, std::set<long long>& pages)
-    {
-        const std::size_t dash = name.find('-');
-        if (IsNumber(name))
-        {
-            pages.insert(std::stoll(name));
-        }
-        else if (dash != std::string::npos && IsNumber(name.substr(0, dash)) && IsNumber(name.substr(dash + 1)))
-        {
-            pages.insert(std::stoll(name.substr(0, dash)));
-            pages.insert(std::stoll(name.substr(dash + 1)));
-        }
-    }
-
-    // Pages missing between the first and the last page of each folder.
-    std::vector<std::string> FindGaps(const Pictures& pictures)
-    {
-        std::map<fs::path, std::set<long long>> pages_by_folder;
-        for (const auto& [name, file] : pictures)
-            AddPages(name.filename().u8string(), pages_by_folder[name.parent_path()]);
-
-        std::vector<std::string> gaps;
-        for (const auto& [folder, pages] : pages_by_folder)
-        {
-            if (pages.empty())
-                continue;
-            for (long long page = *pages.begin(); page < *pages.rbegin(); ++page)
-            {
-                if (pages.count(page) == 0)
-                    gaps.push_back((folder / std::to_string(page)).u8string());
-            }
-        }
-        return gaps;
-    }
-
     // What one run takes from the settings, and what checking the folders found.
     struct Job
     {
-        std::vector<fs::path> folders;
-        fs::path output;
-        bool gray = false;
-        bool bicubic = false;
+        img2ffpsd::Conversion conversion;
         int jobs = 1;
         std::vector<Pictures> found;
         std::vector<fs::path> names;
@@ -290,111 +182,47 @@ namespace
     Job Prepare(const Settings& settings)
     {
         Job job;
-        job.gray = settings.gray;
-        job.bicubic = settings.bicubic;
+        job.conversion.color = settings.color;
+        job.conversion.filter = settings.bicubic ? ffpsd::ResampleFilter::kBicubic : ffpsd::ResampleFilter::kNearest;
         job.jobs = settings.jobs;
         for (std::size_t i = 0; i < settings.inputs.size(); ++i)
         {
-            job.folders.push_back(fs::u8path(settings.inputs[i]));
+            job.conversion.folders.push_back(fs::u8path(settings.inputs[i]));
             if (settings.inputs[i].empty())
-                job.errors.push_back(Label(i) + ": no folder chosen");
-            else if (!fs::is_directory(job.folders[i]))
-                job.errors.push_back(Label(i) + ": " + settings.inputs[i] + " does not exist");
+                job.errors.push_back(img2ffpsd::LayerName(i) + ": no folder chosen");
+            else if (!fs::is_directory(job.conversion.folders[i]))
+                job.errors.push_back(img2ffpsd::LayerName(i) + ": " + settings.inputs[i] + " does not exist");
         }
-        job.output = fs::u8path(settings.output);
+        job.conversion.output = fs::u8path(settings.output);
         if (settings.output.empty())
             job.errors.push_back("Output: no folder chosen");
         if (!job.errors.empty())
             return job;
 
-        for (const fs::path& folder : job.folders)
+        for (const fs::path& folder : job.conversion.folders)
             job.found.push_back(FindPictures(folder, job.errors));
         const Pictures& bottoms = job.found[0];
         const Pictures& tops = job.found[1];
-        for (const fs::path& file : OnlyIn(bottoms, tops))
+        for (const fs::path& file : img2ffpsd::OnlyIn(bottoms, tops))
             job.errors.push_back("Missing in Layer 1: " + file.u8string());
-        for (const fs::path& file : OnlyIn(tops, bottoms))
+        for (const fs::path& file : img2ffpsd::OnlyIn(tops, bottoms))
             job.errors.push_back("Missing in Background: " + file.u8string());
         if (bottoms.empty())
-            job.errors.push_back("No pictures in " + job.folders[0].u8string());
+            job.errors.push_back("No pictures in " + job.conversion.folders[0].u8string());
 
         for (std::size_t i = 2; i < job.found.size(); ++i)
         {
-            for (const fs::path& file : OnlyIn(job.found[i], bottoms))
-                job.warnings.push_back("Missing in Background, skipped in " + Label(i) + ": " + file.u8string());
+            for (const fs::path& file : img2ffpsd::OnlyIn(job.found[i], bottoms))
+                job.warnings.push_back("Missing in Background, skipped in " + img2ffpsd::LayerName(i) + ": " + file.u8string());
         }
-        for (const std::string& gap : FindGaps(bottoms))
+        for (const std::string& gap : img2ffpsd::FindGaps(bottoms))
             job.warnings.push_back("Possible miss: " + gap);
-        if (fs::is_directory(job.output) && !VisibleFiles(job.output).empty())
+        if (fs::is_directory(job.conversion.output) && !img2ffpsd::VisibleFiles(job.conversion.output).empty())
             job.warnings.push_back(settings.output + " is not empty: files there may be replaced");
 
         for (const auto& [name, file] : bottoms)
             job.names.push_back(name);
         return job;
-    }
-
-    void Convert(const Job& job, const fs::path& name)
-    {
-        const ffpsd::ColorMode color_mode = job.gray ? ffpsd::ColorMode::kGrayscale : ffpsd::ColorMode::kRgb;
-        const std::uint16_t color_count = job.gray ? 1 : 3;
-        const ffpsd::ResampleFilter filter = job.bicubic ? ffpsd::ResampleFilter::kBicubic : ffpsd::ResampleFilter::kNearest;
-
-        // The bottom and the top pictures, then those of the further folders that have the file.
-        std::vector<ffpsd::Image> images;
-        std::vector<std::size_t> folders; // the folder of each picture, which names its layer
-        for (std::size_t i = 0; i < job.folders.size(); ++i)
-        {
-            const auto picture = job.found[i].find(name);
-            if (picture != job.found[i].end())
-            {
-                images.push_back(ffpsd::LoadPicture((job.folders[i] / picture->second).u8string(), color_mode, 8));
-                folders.push_back(i);
-            }
-        }
-
-        // The document is the size of the top picture; every other one is resized to it.
-        const ffpsd::Image& bottom = images[0];
-        const std::uint32_t width = images[1].width;
-        const std::uint32_t height = images[1].height;
-
-        ffpsd::Document doc(width, height, color_mode);
-
-        if (bottom.width == width && bottom.height == height)
-        {
-            doc.AddBackgroundLayer("Background", bottom);
-        }
-        else
-        {
-            doc.AddLayer("Background", bottom)->Resize(width, height, filter);
-            doc.SetBackgroundLayer(0);
-        }
-
-        for (std::size_t i = 1; i < images.size(); ++i)
-        {
-            // A layer loses its transparency, the plane after the color ones.
-            ffpsd::Image& image = images[i];
-            image.channel_count = color_count;
-            const ffpsd::ImageView colors(image, image.bytes.data(), image.GetSizeBytes());
-
-            ffpsd::Layer* layer = doc.AddLayer(Label(folders[i]), colors);
-            const bool resized = image.width != width || image.height != height;
-            if (resized)
-                layer->Resize(width, height, filter);
-
-            // The upper layer covers the rest, so it is the composite; a resized one is read back from its layer.
-            if (i + 1 == images.size())
-            {
-                if (resized)
-                    doc.SetMergedImage(layer->GetPixels());
-                else
-                    doc.SetMergedImage(colors); // a ternary would copy the picture
-            }
-        }
-
-        fs::path target = job.output / name;
-        target += ".psd"; // the name has no extension left to replace
-        fs::create_directories(target.parent_path());
-        doc.Save(target.u8string());
     }
 
     // Shared by the window and the threads that convert.
@@ -410,33 +238,20 @@ namespace
         double seconds = 0.0;
     };
 
-    // Every thread takes the next file until none are left.
     void ConvertAll(Run& run)
     {
         const auto started = std::chrono::steady_clock::now();
-        std::atomic<std::size_t> next{0};
-        const auto work = [&] {
-            for (std::size_t i = next++; i < run.job.names.size() && !run.cancel; i = next++)
-            {
-                try
-                {
-                    Convert(run.job, run.job.names[i]);
-                }
-                catch (const std::exception& e)
+        img2ffpsd::ConvertAll(
+            run.job.conversion, run.job.found, run.job.names, static_cast<unsigned>(run.job.jobs),
+            [&](const fs::path& name, const std::string& error) {
+                if (!error.empty())
                 {
                     const std::lock_guard<std::mutex> lock(run.mutex);
-                    run.failures.push_back(run.job.names[i].u8string() + ": " + e.what());
+                    run.failures.push_back(name.u8string() + ": " + error);
                 }
                 ++run.done;
-            }
-        };
-
-        std::vector<std::thread> threads;
-        for (int i = 1; i < run.job.jobs; ++i)
-            threads.emplace_back(work);
-        work();
-        for (std::thread& thread : threads)
-            thread.join();
+            },
+            &run.cancel);
 
         run.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
         run.finished = true;
@@ -599,7 +414,7 @@ namespace
         for (int i = 0; i < static_cast<int>(settings.inputs.size()); ++i)
         {
             ImGui::PushID(i);
-            const Pressed pressed = FolderField(Label(static_cast<std::size_t>(i)), settings.inputs[i], i >= 2);
+            const Pressed pressed = FolderField(img2ffpsd::LayerName(static_cast<std::size_t>(i)), settings.inputs[i], i >= 2);
             if (pressed == Pressed::kBrowse)
                 OpenFolderDialog(dialog, window, settings, i);
             else if (pressed == Pressed::kRemove)
@@ -618,7 +433,13 @@ namespace
         ImGui::PopID();
 
         ImGui::Separator();
-        ImGui::Checkbox("Grayscale", &settings.gray);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted("Colors");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
+        int color = static_cast<int>(settings.color);
+        if (ImGui::Combo("##colors", &color, kColorNames, IM_ARRAYSIZE(kColorNames)))
+            settings.color = static_cast<img2ffpsd::ColorChoice>(color);
         ImGui::AlignTextToFramePadding();
         const float right = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
         ImGui::TextUnformatted("Resize");

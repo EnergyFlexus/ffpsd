@@ -20,6 +20,8 @@
 #include "detail/layer_and_mask/layer_record.hpp"
 #include "detail/layer_and_mask/tagged_blocks/layer_id.hpp"
 #include "detail/pixel_data.hpp"
+#include "detail/rect.hpp"
+#include "detail/resample.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -42,11 +44,14 @@ namespace ffpsd
         using detail::kVersionPsb;
         using detail::kVersionPsd;
 
+        // One allocation per layer, so pointers survive inserts, removals and moves.
+        using Layers = std::vector<std::unique_ptr<Layer>>;
+
         // Resource 1005 stores signed 16.16, which cannot hold 32768.
         constexpr double kMaxResolution = 32767.0;
 
         // Why Photoshop could not open the stack, or null; bottom to top, a group's end marker comes first.
-        const char* FindStackProblem(const detail::Layers& layers)
+        const char* FindStackProblem(const Layers& layers)
         {
             std::size_t open = 0;
             for (std::size_t i = 0; i < layers.size(); ++i)
@@ -91,22 +96,12 @@ namespace ffpsd
                     std::to_string(max_side));
         }
 
-        Rect CanvasRect(std::uint32_t width, std::uint32_t height) noexcept
-        {
-            return {0, 0, static_cast<std::int32_t>(height), static_cast<std::int32_t>(width)};
-        }
-
         // Where the old side starts in the new one: 0, 1 and 2 are start, middle and end.
         std::int64_t AnchorOffset(std::uint32_t from, std::uint32_t to, int position)
         {
             // Truncated, so the odd pixel goes to the end whether the side grows or shrinks, as in Photoshop.
             const std::int64_t change = std::int64_t{to} - from;
             return position == 0 ? 0 : position == 2 ? change : change / 2;
-        }
-
-        bool SameRect(const Rect& x, const Rect& y) noexcept
-        {
-            return x.top == y.top && x.left == y.left && x.bottom == y.bottom && x.right == y.right;
         }
 
         // White colors; alpha and spot channels empty.
@@ -175,7 +170,7 @@ namespace ffpsd
         std::vector<std::uint8_t> color_mode_data;
         detail::ImageResources image_resources;
 
-        detail::Layers layers;
+        Layers layers;
 
         // The rest of section 4, kept to write it back.
         detail::LayerAndMaskInfo layer_and_mask;
@@ -302,12 +297,12 @@ namespace ffpsd
 
     void Document::FlipCanvas(FlipDirection direction)
     {
-        Apply(detail::Transform::Flip(direction, CanvasRect(impl_->width, impl_->height)), impl_->width, impl_->height);
+        Apply(detail::Transform::Flip(direction, detail::CanvasRect(impl_->width, impl_->height)), impl_->width, impl_->height);
     }
 
     void Document::RotateCanvas(Rotation rotation)
     {
-        const detail::Transform transform = detail::Transform::Rotate(rotation, CanvasRect(impl_->width, impl_->height));
+        const detail::Transform transform = detail::Transform::Rotate(rotation, detail::CanvasRect(impl_->width, impl_->height));
         if (transform.SwapsAxes())
             Apply(transform, impl_->height, impl_->width);
         else
@@ -316,14 +311,14 @@ namespace ffpsd
 
     void Document::Apply(const detail::Transform& transform, std::uint32_t width, std::uint32_t height, ResampleFilter filter)
     {
-        const Rect canvas = CanvasRect(width, height);
-        const Rect placed = detail::TransformRect(CanvasRect(impl_->width, impl_->height), transform);
-        const bool fills_canvas = SameRect(placed, canvas);
+        const Rect canvas = detail::CanvasRect(width, height);
+        const Rect placed = transform.Apply(detail::CanvasRect(impl_->width, impl_->height));
+        const bool fills_canvas = placed == canvas;
         const std::uint32_t old_width = transform.SwapsAxes() ? impl_->height : impl_->width;
         const bool resamples = placed.GetWidth() != static_cast<std::int64_t>(old_width) ||
                                placed.GetHeight() != static_cast<std::int64_t>(transform.SwapsAxes() ? impl_->width : impl_->height);
         const bool keeps_fractions = fills_canvas && !transform.SwapsAxes() && transform.a > 0 && transform.d > 0;
-        const detail::Layers& layers = impl_->layers;
+        const Layers& layers = impl_->layers;
 
         // Everything that can throw comes first, so a failure changes nothing.
         std::vector<detail::TransformedLayer> transformed;
@@ -345,13 +340,13 @@ namespace ffpsd
                 filter, true);
             if (fills_canvas)
             {
-                merged = detail::EncodeImageData(moved, IsPsb());
+                merged = detail::PixelData::Encode(moved, IsPsb());
             }
             else
             {
                 Image blank = MakeBlankComposite(width, height, moved);
                 detail::PlaceImage(moved, blank, placed.top, placed.left);
-                merged = detail::EncodeImageData(blank, IsPsb());
+                merged = detail::PixelData::Encode(blank, IsPsb());
             }
         }
 
@@ -395,7 +390,7 @@ namespace ffpsd
             throw std::invalid_argument("ffpsd: in RGB the document would have more than 56 channels");
 
         Image (*const convert)(const Image&) = to_gray ? detail::RgbToGray : detail::GrayToRgb;
-        const detail::Layers& layers = impl_->layers;
+        const Layers& layers = impl_->layers;
 
         // Everything that can throw comes first, while the document keeps its mode.
         std::vector<Image> pixels(layers.size());
@@ -550,7 +545,7 @@ namespace ffpsd
         const ImageView opaque = flattened.IsEmpty() ? image : ImageView(flattened);
 
         auto record = std::make_unique<detail::LayerRecord>(detail::CreateLayerRecord(name, opaque, 0, 0, true, IsPsb()));
-        detail::MarkAsBackground(*record);
+        record->MarkAsBackground();
         AssignLayerId(*record);
         impl_->layers.insert(impl_->layers.begin(), std::unique_ptr<Layer>(new Layer(std::move(record), this)));
         MarkStackChanged();
@@ -568,7 +563,7 @@ namespace ffpsd
             throw std::logic_error("ffpsd: the document has a background already");
         if (layer.GetKind() != LayerKind::kRaster)
             throw std::logic_error("ffpsd: only a raster layer can become the background");
-        if (detail::HasLayerMask(*layer.record_))
+        if (layer.record_->HasLayerMask())
             throw std::logic_error("ffpsd: a layer with a mask cannot become the background");
 
         Image canvas = detail::MakeWhiteImage(impl_->width, impl_->height, impl_->color_mode, impl_->depth);
@@ -579,10 +574,10 @@ namespace ffpsd
         std::vector<detail::ChannelImageData> channels = detail::EncodeLayerPixels(canvas, true, IsPsb());
         detail::LayerRecord& record = *layer.record_;
         record.channels = std::move(channels);
-        record.bounds = CanvasRect(impl_->width, impl_->height);
+        record.bounds = detail::CanvasRect(impl_->width, impl_->height);
         record.opacity = 255;
         record.blend_key = detail::Fourcc('n', 'o', 'r', 'm');
-        detail::MarkAsBackground(record);
+        record.MarkAsBackground();
 
         const auto first = layers.begin();
         std::rotate(first, first + static_cast<std::ptrdiff_t>(index), first + static_cast<std::ptrdiff_t>(index) + 1);
@@ -594,7 +589,7 @@ namespace ffpsd
         if (impl_->layers.empty() || !impl_->layers.front()->IsBackground())
             return false;
 
-        detail::UnmarkBackground(*impl_->layers.front()->record_, impl_->depth, IsPsb());
+        impl_->layers.front()->record_->UnmarkBackground(impl_->depth, IsPsb());
         return true;
     }
 
@@ -623,9 +618,9 @@ namespace ffpsd
         if (from.depth != impl_->depth || from.color_mode != impl_->color_mode || from.version != impl_->version)
             throw std::invalid_argument("ffpsd: the source layer comes from a document of another format");
 
-        auto record = std::make_unique<detail::LayerRecord>(detail::CopyLayerRecord(*source.record_));
+        auto record = std::make_unique<detail::LayerRecord>(source.record_->Copy());
         if (source.IsBackground())
-            detail::UnmarkBackground(*record, impl_->depth, IsPsb());
+            record->UnmarkBackground(impl_->depth, IsPsb());
 
         // The source's id stays with the source.
         AssignLayerId(*record);
@@ -718,8 +713,7 @@ namespace ffpsd
 
     Image Document::GetMergedImage() const
     {
-        return detail::DecodeImageData(
-            impl_->image_data, impl_->width, impl_->height, impl_->channel_count, impl_->depth, impl_->color_mode, IsPsb());
+        return impl_->image_data.Decode(GetMergedImageInfo(), IsPsb());
     }
     ImageInfo Document::GetMergedImageInfo() const
     {
@@ -727,7 +721,7 @@ namespace ffpsd
     }
     void Document::GetMergedImageBytes(std::uint8_t* out, std::size_t size) const
     {
-        detail::DecodeImageData(impl_->image_data, GetMergedImageInfo(), IsPsb(), out, size);
+        impl_->image_data.Decode(GetMergedImageInfo(), IsPsb(), out, size);
     }
 
     std::optional<ChannelCompression> Document::GetMergedCompression() const noexcept
@@ -750,7 +744,7 @@ namespace ffpsd
                 std::to_string(static_cast<int>(impl_->color_mode)) + " document with " + std::to_string(colors) + " to " +
                 std::to_string(kMaxChannels) + " channels");
 
-        impl_->image_data = detail::EncodeImageData(image, IsPsb());
+        impl_->image_data = detail::PixelData::Encode(image, IsPsb());
         impl_->channel_count = image.channel_count;
 
         // Merged alpha takes the first extra channel for transparency; without one it would take a color.
@@ -833,7 +827,7 @@ namespace ffpsd
         detail::PixelData blank;
         const detail::PixelData* composite = &blank;
         if (impl_->image_data.IsEmpty())
-            blank = detail::EncodeBlankImageData(impl_->width, impl_->height, impl_->channel_count, impl_->depth, IsPsb(), compression);
+            blank = detail::PixelData::Blank(impl_->width, impl_->height, impl_->channel_count, impl_->depth, IsPsb(), compression);
         else
             composite = choose(impl_->image_data);
 

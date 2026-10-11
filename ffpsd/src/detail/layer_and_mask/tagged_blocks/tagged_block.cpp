@@ -1,7 +1,7 @@
 #include "detail/layer_and_mask/tagged_blocks/tagged_block.hpp"
 
-#include "detail/file_header.hpp"
 #include "detail/io/fourcc.hpp"
+#include "detail/signatures.hpp"
 
 #include <algorithm>
 #include <iterator>

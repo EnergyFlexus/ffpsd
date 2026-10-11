@@ -7,15 +7,10 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <ffpsd/layer.hpp>
-#include <memory>
 #include <vector>
 
 namespace ffpsd::detail
 {
-    // One allocation per layer, so pointers survive inserts, removals and moves.
-    using Layers = std::vector<std::unique_ptr<Layer>>;
-
     // Empty in 16 and 32 bit documents: the layers are in an 'Lr16' or 'Lr32' block.
     struct LayerInfo
     {

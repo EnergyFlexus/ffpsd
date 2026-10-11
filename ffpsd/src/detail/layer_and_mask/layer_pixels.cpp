@@ -3,8 +3,9 @@
 #include "detail/color.hpp"
 #include "detail/file_header.hpp"
 #include "detail/image.hpp"
-#include "detail/io/fourcc.hpp"
+#include "detail/layer_and_mask/channel_ids.hpp"
 #include "detail/pixel_data.hpp"
+#include "detail/rect.hpp"
 
 #include <iterator>
 #include <stdexcept>
@@ -15,8 +16,6 @@ namespace ffpsd::detail
 {
     namespace
     {
-        constexpr std::uint32_t kVectorMaskKeys[] = {Fourcc('v', 'm', 's', 'k'), Fourcc('v', 's', 'm', 's')};
-
         // Bit 3, written by Photoshop 5.0 and later: Photoshop sets it on every layer.
         constexpr std::uint8_t kFlagsPhotoshop5 = 0x08;
 
@@ -80,79 +79,6 @@ namespace ffpsd::detail
         }
     } // namespace
 
-    bool HasLayerMask(const LayerRecord& record) noexcept
-    {
-        for (const ChannelImageData& channel : record.channels)
-        {
-            if (channel.id < kTransparencyId)
-                return true;
-        }
-        return false;
-    }
-
-    bool HasVectorMask(const LayerRecord& record) noexcept
-    {
-        for (const std::uint32_t key : kVectorMaskKeys)
-        {
-            if (FindTaggedBlock(record.blocks, key) != nullptr)
-                return true;
-        }
-        return false;
-    }
-
-    std::int16_t FindPixelMaskId(const LayerRecord& record) noexcept
-    {
-        bool has_layer_mask = false;
-        for (const ChannelImageData& channel : record.channels)
-        {
-            if (channel.id == kRealMaskId)
-                return kRealMaskId;
-            has_layer_mask = has_layer_mask || channel.id == kLayerMaskId;
-        }
-        return has_layer_mask && !IsRenderedMask(record.mask_data) ? kLayerMaskId : 0;
-    }
-
-    Image DecodeMask(const ChannelImageData& channel, const Rect& bounds, std::uint16_t depth, bool is_psb)
-    {
-        if (bounds.GetWidth() <= 0 || bounds.GetHeight() <= 0)
-            return MakeImage(0, 0, 1, depth, ColorMode::kGrayscale);
-
-        Image mask(
-            ImageInfo{
-                static_cast<std::uint32_t>(bounds.GetWidth()), static_cast<std::uint32_t>(bounds.GetHeight()), 1, depth,
-                ColorMode::kGrayscale});
-        channel.data.Decode(is_psb, mask.bytes.data());
-        return mask;
-    }
-
-    std::optional<LayerMask> DecodeLayerMask(const LayerRecord& record, std::uint16_t depth, bool is_psb)
-    {
-        const std::int16_t id = FindPixelMaskId(record);
-        if (id == 0)
-            return std::nullopt;
-
-        LayerMask mask;
-        mask.bounds = RequireMaskBounds(record.mask_data, id);
-        mask.default_color = FindMaskDefaultColor(record.mask_data, id).value_or(0);
-        mask.image = DecodeMask(*FindChannel(record, id), mask.bounds, depth, is_psb);
-        return mask;
-    }
-
-    void ReplaceLayerMask(
-        LayerRecord& record, const ImageView& image, std::int32_t top, std::int32_t left, std::uint8_t default_color, bool is_psb)
-    {
-        const Rect bounds = BoundsAt(image, top, left);
-        std::vector<std::uint8_t> mask_data = record.mask_data.empty() ? NewMaskData() : record.mask_data;
-        SetMaskBounds(mask_data, kLayerMaskId, bounds);
-        SetMaskDefaultColor(mask_data, kLayerMaskId, default_color);
-        ChannelImageData channel = image.IsEmpty()
-                                       ? EmptyChannel(kLayerMaskId)
-                                       : EncodeChannelImageData(kLayerMaskId, image.data, image.width, image.height, image.depth, is_psb);
-        RemoveChannels(record, kLayerMaskId);
-        record.channels.push_back(std::move(channel));
-        record.mask_data = std::move(mask_data);
-    }
-
     void CheckLayerSides(std::uint32_t width, std::uint32_t height, bool is_psb)
     {
         const std::uint32_t max_side = MaxSide(is_psb);
@@ -190,9 +116,9 @@ namespace ffpsd::detail
         if (image.IsEmpty())
         {
             // Photoshop gives an empty layer every channel, each just a compression field.
-            channels.push_back(EmptyChannel(kTransparencyId));
+            channels.push_back(ChannelImageData::Empty(kTransparencyId));
             for (std::size_t i = 0; i < color_count; ++i)
-                channels.push_back(EmptyChannel(static_cast<std::int16_t>(i)));
+                channels.push_back(ChannelImageData::Empty(static_cast<std::int16_t>(i)));
             return channels;
         }
 
@@ -202,12 +128,13 @@ namespace ffpsd::detail
 
         // Transparency is declared first, as Photoshop writes it; without it the bottom layer would become the background.
         if (image.channel_count > color_count)
-            channels.push_back(EncodeChannelImageData(kTransparencyId, plane(color_count), image.width, image.height, image.depth, is_psb));
+            channels.push_back(
+                ChannelImageData::Encode(kTransparencyId, plane(color_count), image.width, image.height, image.depth, is_psb));
         else if (!is_background)
-            channels.push_back(EncodeOpaqueChannel(kTransparencyId, image.width, image.height, image.depth, is_psb));
+            channels.push_back(ChannelImageData::Opaque(kTransparencyId, image.width, image.height, image.depth, is_psb));
         for (std::size_t i = 0; i < color_count; ++i)
             channels.push_back(
-                EncodeChannelImageData(static_cast<std::int16_t>(i), plane(i), image.width, image.height, image.depth, is_psb));
+                ChannelImageData::Encode(static_cast<std::int16_t>(i), plane(i), image.width, image.height, image.depth, is_psb));
         return channels;
     }
 
@@ -263,7 +190,7 @@ namespace ffpsd::detail
         record.bounds = BoundsAt(image, top, left);
         record.flags = kFlagsPhotoshop5;
         record.blending_ranges = DefaultBlendingRanges();
-        SetLayerName(record, name);
+        record.SetName(name);
         return record;
     }
 } // namespace ffpsd::detail

@@ -31,7 +31,7 @@ itself and fetches missing submodules. Flags: `--clean`, `--jobs N`,
 `--no-apps`, `--no-png`, `--no-jpeg`, `--crt static|dynamic`, `--out DIR`.
 
 ```
-ffpsd-out/bin/        ffpsd.dll, img2ffpsd, img2ffpsd_ui
+ffpsd-out/bin/        ffpsd.dll, img2ffpsd-cli, img2ffpsd-ui
 ffpsd-out/lib/        ffpsd.lib / libffpsd.a, cmake/ffpsd/
                       static only: libpng16_static.lib, zlibstatic.lib, jpeg-static.lib
 ffpsd-out/include/    ffpsd/*.hpp, ffpsd/c_api.h, ffpsd/export.h
@@ -46,8 +46,8 @@ libjpeg-turbo is plain C, without SIMD, so no assembler is needed.
 
 Built with `FFPSD_BUILD_APPS` and installed into `bin/`:
 
-* [img2ffpsd](apps/img2ffpsd/README.md) - folders of PNG and JPEG pictures into layered PSD files
-* [img2ffpsd_ui](apps/img2ffpsd_ui/) - the same in a window, with `FFPSD_WITH_IMGUI`; `build.py` builds it
+* [img2ffpsd](apps/img2ffpsd/README.md) - folders of PNG and JPEG pictures into layered PSD files:
+  `img2ffpsd-cli` on the command line, `img2ffpsd-ui` in a window with `FFPSD_WITH_IMGUI`; `build.py` builds both
 
 ## Build with CMake
 

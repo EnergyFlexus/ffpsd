@@ -71,7 +71,7 @@ namespace ffpsd::detail
         if (file == INVALID_HANDLE_VALUE)
             throw std::system_error(static_cast<int>(::GetLastError()), std::system_category(), "ffpsd: cannot create " + path);
 
-        // A call takes a 32 bit count, so a PSB goes in pieces.
+        // A call takes a 32 bit count, so 4 GB and more go in pieces.
         constexpr std::size_t kPiece = std::size_t{1} << 24;
         DWORD error = 0;
         for (std::size_t at = 0; at < data.size() && error == 0;)

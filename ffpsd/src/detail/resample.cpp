@@ -202,6 +202,32 @@ namespace ffpsd::detail
                 }
             }
         }
+
+        Image TurnImage(const Image& image, bool transpose, bool flip_x, bool flip_y)
+        {
+            Image result = MakeImage(
+                transpose ? image.height : image.width, transpose ? image.width : image.height, image.channel_count, image.depth,
+                image.color_mode);
+
+            const std::size_t sample = image.GetBytesPerSample();
+            const std::size_t plane = std::size_t{image.width} * image.height * sample;
+            for (std::size_t channel = 0; channel < image.channel_count; ++channel)
+            {
+                const std::uint8_t* in = image.bytes.data() + channel * plane;
+                std::uint8_t* out = result.bytes.data() + channel * plane;
+                for (std::size_t y = 0; y < result.height; ++y)
+                {
+                    for (std::size_t x = 0; x < result.width; ++x)
+                    {
+                        const std::size_t across = flip_x ? result.width - 1 - x : x;
+                        const std::size_t down = flip_y ? result.height - 1 - y : y;
+                        const std::size_t from = transpose ? across * image.width + down : down * image.width + across;
+                        std::memcpy(out + (y * result.width + x) * sample, in + from * sample, sample);
+                    }
+                }
+            }
+            return result;
+        }
     } // namespace
 
     Image Resample(const Image& image, std::uint32_t width, std::uint32_t height, ResampleFilter filter, bool planes_alone)
@@ -220,5 +246,18 @@ namespace ffpsd::detail
         else
             CubicImage<float>(image, result, planes_alone);
         return result;
+    }
+
+    Image TransformPixels(
+        Image image, const Transform& transform, std::uint32_t width, std::uint32_t height, ResampleFilter filter, bool planes_alone)
+    {
+        const bool transpose = transform.SwapsAxes();
+        const bool flip_x = (transpose ? transform.c : transform.a) < 0;
+        const bool flip_y = (transpose ? transform.b : transform.d) < 0;
+        if (transpose || flip_x || flip_y)
+            image = TurnImage(image, transpose, flip_x, flip_y);
+        if (image.width == width && image.height == height)
+            return image;
+        return Resample(image, width, height, filter, planes_alone);
     }
 } // namespace ffpsd::detail

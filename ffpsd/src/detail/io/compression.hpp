@@ -7,7 +7,7 @@
 
 namespace ffpsd::detail
 {
-    // PackBits, the RLE of PSD and TIFF; fills exactly out_size bytes or throws.
+    // PackBits, a byte RLE; fills exactly out_size bytes or throws.
     void UnpackBits(const std::uint8_t* data, std::size_t size, std::uint8_t* out, std::size_t out_size);
 
     // Runs of three or more repeat, everything else is literal; appends to out.

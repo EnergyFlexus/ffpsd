@@ -22,9 +22,14 @@ target_sources(ffpsd
         src/detail/image.hpp
         src/detail/pixel_data.cpp
         src/detail/pixel_data.hpp
+        src/detail/rect.cpp
+        src/detail/rect.hpp
         src/detail/resample.cpp
         src/detail/resample.hpp
         src/detail/samples.hpp
+        src/detail/signatures.hpp
+        src/detail/transform.cpp
+        src/detail/transform.hpp
         src/detail/file_header.hpp
         src/detail/io/big_endian_reader.cpp
         src/detail/io/big_endian_reader.hpp
@@ -41,6 +46,7 @@ target_sources(ffpsd
         src/detail/io/strings.hpp
         src/detail/layer_and_mask/adjustments/adjustment_layer.cpp
         src/detail/layer_and_mask/adjustments/adjustment_layer.hpp
+        src/detail/layer_and_mask/channel_ids.hpp
         src/detail/layer_and_mask/channel_image_data.cpp
         src/detail/layer_and_mask/channel_image_data.hpp
         src/detail/layer_and_mask/global_layer_mask_info.cpp
@@ -51,12 +57,16 @@ target_sources(ffpsd
         src/detail/layer_and_mask/layer_geometry.hpp
         src/detail/layer_and_mask/layer_info.cpp
         src/detail/layer_and_mask/layer_info.hpp
+        src/detail/layer_and_mask/layer_mask.cpp
+        src/detail/layer_and_mask/layer_mask.hpp
         src/detail/layer_and_mask/layer_pixels.cpp
         src/detail/layer_and_mask/layer_pixels.hpp
         src/detail/layer_and_mask/layer_record.cpp
+        src/detail/layer_and_mask/layer_record.hpp
+        src/detail/layer_and_mask/mask_data.cpp
+        src/detail/layer_and_mask/mask_data.hpp
         src/detail/layer_and_mask/adjustments/levels.cpp
         src/detail/layer_and_mask/adjustments/levels.hpp
-        src/detail/layer_and_mask/layer_record.hpp
         src/detail/layer_and_mask/tagged_blocks/layer_id.cpp
         src/detail/layer_and_mask/tagged_blocks/layer_id.hpp
         src/detail/layer_and_mask/tagged_blocks/layer_name_source_setting.cpp

@@ -1,8 +1,8 @@
 #include "detail/image_resources/image_resource.hpp"
 
-#include "detail/file_header.hpp"
 #include "detail/io/fourcc.hpp"
 #include "detail/io/strings.hpp"
+#include "detail/signatures.hpp"
 
 #include <algorithm>
 #include <stdexcept>
@@ -12,6 +12,8 @@ namespace ffpsd::detail
 {
     namespace
     {
+        // The Pascal name with its length byte, padded to it.
+        constexpr std::size_t kNameAlignment = 2;
     } // namespace
 
     ImageResources ParseImageResources(BigEndianReader& reader)
@@ -32,7 +34,7 @@ namespace ffpsd::detail
 
             ImageResource entry;
             entry.id = reader.ReadU16();
-            entry.name = ReadPascalString(reader, kImageResourceNameAlignment);
+            entry.name = ReadPascalString(reader, kNameAlignment);
 
             const std::uint32_t size = reader.ReadU32();
             entry.data = reader.ReadBytes(size);
@@ -57,7 +59,7 @@ namespace ffpsd::detail
         {
             writer.WriteU32(kBlockSignature);
             writer.WriteU16(entry->id);
-            WritePascalString(writer, entry->name, kImageResourceNameAlignment);
+            WritePascalString(writer, entry->name, kNameAlignment);
 
             const std::size_t size = writer.ReserveLength(false);
             if (!entry->data.empty())

@@ -1,5 +1,7 @@
 #include "detail/layer_and_mask/layer_info.hpp"
 
+#include "detail/layer_and_mask/channel_ids.hpp"
+
 #include <cstdint>
 #include <stdexcept>
 #include <string>
@@ -49,7 +51,7 @@ namespace ffpsd::detail
             for (std::size_t c = 0; c < record.channels.size(); ++c)
             {
                 ChannelImageData& channel = record.channels[c];
-                const Rect bounds = channel.id < kTransparencyId ? RequireMaskBounds(record.mask_data, channel.id) : record.bounds;
+                const Rect bounds = channel.id < kTransparencyId ? record.mask_data.RequireBounds(channel.id) : record.bounds;
                 channel = ParseChannelImageData(reader, end, channel.id, channel_lengths[i][c], bounds, depth);
             }
         }

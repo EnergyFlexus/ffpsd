@@ -27,15 +27,6 @@
       }
     },
     {
-      "name": "ui-debug",
-      "displayName": "UI · Debug",
-      "description": "Static Debug with the apps that have a window, Dear ImGui and SDL3 included",
-      "inherits": "static-debug",
-      "cacheVariables": {
-        "FFPSD_WITH_IMGUI": "ON"
-      }
-    },
-    {
       "name": "static-release",
       "displayName": "Static · Release",
       "inherits": "base",
@@ -79,20 +70,47 @@
         "BUILD_SHARED_LIBS": "ON",
         "FFPSD_MSVC_STATIC_RUNTIME": "OFF"
       }
+    },
+
+    {
+      "name": "everything",
+      "hidden": true,
+      "cacheVariables": {
+        "FFPSD_BUILD_TESTS": "ON",
+        "FFPSD_BUILD_EXAMPLES": "ON",
+        "FFPSD_BUILD_BENCHMARKS": "ON",
+        "FFPSD_BUILD_APPS": "ON",
+        "FFPSD_WITH_PNG": "ON",
+        "FFPSD_WITH_JPEG": "ON",
+        "FFPSD_WITH_IMGUI": "ON"
+      }
+    },
+    {
+      "name": "all-debug",
+      "displayName": "All · Debug",
+      "inherits": ["static-debug", "everything"]
+    },
+    {
+      "name": "all-release",
+      "displayName": "All · Release",
+      "inherits": ["static-release", "everything"]
     }
   ],
 
   "buildPresets": [
     { "name": "static-debug",   "configurePreset": "static-debug" },
-    { "name": "ui-debug",       "configurePreset": "ui-debug" },
     { "name": "static-release", "configurePreset": "static-release" },
     { "name": "shared-debug",   "configurePreset": "shared-debug" },
     { "name": "shared-release", "configurePreset": "shared-release" },
-    { "name": "bench-release",  "configurePreset": "bench-release" }
+    { "name": "bench-release",  "configurePreset": "bench-release" },
+    { "name": "all-debug",      "configurePreset": "all-debug" },
+    { "name": "all-release",    "configurePreset": "all-release" }
   ],
 
   "testPresets": [
     { "name": "static-debug", "configurePreset": "static-debug", "output": { "outputOnFailure": true } },
-    { "name": "shared-debug", "configurePreset": "shared-debug", "output": { "outputOnFailure": true } }
+    { "name": "shared-debug", "configurePreset": "shared-debug", "output": { "outputOnFailure": true } },
+    { "name": "all-debug",    "configurePreset": "all-debug",    "output": { "outputOnFailure": true } },
+    { "name": "all-release",  "configurePreset": "all-release",  "output": { "outputOnFailure": true } }
   ]
 }

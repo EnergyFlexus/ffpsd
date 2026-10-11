@@ -6,10 +6,3 @@ if(FFPSD_WITH_PNG AND FFPSD_WITH_JPEG)
 else()
     message(STATUS "img2ffpsd is skipped: it needs FFPSD_WITH_PNG and FFPSD_WITH_JPEG")
 endif()
-
-# Its UI draws with Dear ImGui.
-if(FFPSD_WITH_PNG AND FFPSD_WITH_JPEG AND FFPSD_WITH_IMGUI)
-    add_subdirectory(img2ffpsd_ui)
-else()
-    message(STATUS "img2ffpsd_ui is skipped: it needs FFPSD_WITH_PNG, FFPSD_WITH_JPEG and FFPSD_WITH_IMGUI")
-endif()

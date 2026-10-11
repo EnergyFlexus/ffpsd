@@ -1,7 +1,9 @@
 #include "detail/image.hpp"
 #include "detail/layer_and_mask/adjustments/adjustment_layer.hpp"
 #include "detail/layer_and_mask/adjustments/levels.hpp"
+#include "detail/layer_and_mask/channel_ids.hpp"
 #include "detail/layer_and_mask/layer_geometry.hpp"
+#include "detail/layer_and_mask/layer_mask.hpp"
 #include "detail/layer_and_mask/layer_pixels.hpp"
 #include "detail/layer_and_mask/layer_record.hpp"
 #include "detail/layer_and_mask/tagged_blocks/section_divider_setting.hpp"
@@ -70,7 +72,7 @@ namespace ffpsd
     bool Layer::IsBackground() const noexcept
     {
         return document_->GetLayerCount() != 0 && document_->GetLayerByIndex(0) == this && GetKind() == LayerKind::kRaster &&
-               detail::HasBackgroundMarks(*record_);
+               record_->HasBackgroundMarks();
     }
     std::uint32_t Layer::GetBlendKey() const noexcept
     {
@@ -79,7 +81,7 @@ namespace ffpsd
 
     void Layer::SetName(const std::string& name)
     {
-        detail::SetLayerName(*record_, name);
+        record_->SetName(name);
     }
     void Layer::SetOpacity(std::uint8_t opacity) noexcept
     {
@@ -233,7 +235,7 @@ namespace ffpsd
     {
         if (IsBackground())
             throw std::logic_error("ffpsd: the background has no mask");
-        if (detail::HasVectorMask(*record_))
+        if (record_->HasVectorMask())
             throw std::logic_error("ffpsd: the mask of a layer with a vector mask is not supported yet");
         if (default_color != 0 && default_color != 255)
             throw std::invalid_argument("ffpsd: a mask's default color is 0 or 255, not " + std::to_string(default_color));
@@ -254,13 +256,13 @@ namespace ffpsd
 
     bool Layer::RemoveMask()
     {
-        if (detail::FindPixelMaskId(*record_) == 0)
+        if (record_->FindPixelMaskId() == 0)
             return false;
-        if (detail::HasVectorMask(*record_))
+        if (record_->HasVectorMask())
             throw std::logic_error("ffpsd: the mask of a layer with a vector mask is not supported yet");
 
-        detail::RemoveChannels(*record_, detail::kLayerMaskId);
-        record_->mask_data.clear();
+        record_->RemoveChannels(detail::kLayerMaskId);
+        record_->mask_data.Clear();
         document_->SetHasRealMergedData(false);
         return true;
     }

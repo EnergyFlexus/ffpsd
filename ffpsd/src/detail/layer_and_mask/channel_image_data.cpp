@@ -1,5 +1,7 @@
 #include "detail/layer_and_mask/channel_image_data.hpp"
 
+#include "detail/samples.hpp"
+
 #include <algorithm>
 #include <cstring>
 #include <stdexcept>
@@ -25,7 +27,7 @@ namespace ffpsd::detail
         return channel;
     }
 
-    ChannelImageData EncodeOpaqueChannel(std::int16_t id, std::size_t width, std::size_t height, std::uint16_t depth, bool is_psb)
+    ChannelImageData ChannelImageData::Opaque(std::int16_t id, std::size_t width, std::size_t height, std::uint16_t depth, bool is_psb)
     {
         const std::size_t sample_size = SampleBytes(depth);
         std::vector<std::uint8_t> samples(width * height * sample_size, 0xFF);
@@ -35,14 +37,14 @@ namespace ffpsd::detail
             for (std::size_t at = 0; at < samples.size(); at += sizeof(full))
                 std::memcpy(samples.data() + at, &full, sizeof(full));
         }
-        return EncodeChannelImageData(id, samples.data(), width, height, depth, is_psb);
+        return Encode(id, samples.data(), width, height, depth, is_psb);
     }
 
-    ChannelImageData EncodeChannelImageData(
+    ChannelImageData ChannelImageData::Encode(
         std::int16_t id, const std::uint8_t* samples, std::size_t width, std::size_t height, std::uint16_t depth, bool is_psb)
     {
         if (width == 0 || height == 0)
-            return EmptyChannel(id);
+            return Empty(id);
 
         const std::size_t sample_size = SampleBytes(depth);
         ChannelImageData channel;
@@ -51,7 +53,7 @@ namespace ffpsd::detail
         return channel;
     }
 
-    ChannelImageData EmptyChannel(std::int16_t id)
+    ChannelImageData ChannelImageData::Empty(std::int16_t id)
     {
         ChannelImageData channel;
         channel.id = id;

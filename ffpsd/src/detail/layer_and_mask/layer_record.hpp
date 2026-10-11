@@ -1,16 +1,16 @@
 #ifndef FFPSD_DETAIL_LAYER_AND_MASK_LAYER_RECORD_HPP_
 #define FFPSD_DETAIL_LAYER_AND_MASK_LAYER_RECORD_HPP_
 
-#include "detail/file_header.hpp"
 #include "detail/io/big_endian_reader.hpp"
 #include "detail/io/big_endian_writer.hpp"
 #include "detail/io/fourcc.hpp"
 #include "detail/layer_and_mask/channel_image_data.hpp"
+#include "detail/layer_and_mask/mask_data.hpp"
 #include "detail/layer_and_mask/tagged_blocks/tagged_block.hpp"
+#include "detail/signatures.hpp"
 
 #include <cstdint>
 #include <ffpsd/types.hpp>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -19,7 +19,7 @@ namespace ffpsd::detail
     // What ffpsd does not interpret stays as bytes.
     struct LayerRecord
     {
-        // Copied only through CopyLayerRecord: a record holds every channel's pixels.
+        // Copied only through Copy: a record holds every channel's pixels.
         LayerRecord() = default;
         LayerRecord(const LayerRecord&) = delete;
         LayerRecord& operator=(const LayerRecord&) = delete;
@@ -38,7 +38,7 @@ namespace ffpsd::detail
         std::uint8_t flags = 0;
 
         // 0, 20, 36 or more bytes; the rectangle inside is the one channel -2 covers.
-        std::vector<std::uint8_t> mask_data;
+        MaskData mask_data;
 
         std::vector<std::uint8_t> blending_ranges;
 
@@ -49,48 +49,33 @@ namespace ffpsd::detail
         std::vector<ChannelImageData> channels;
 
         TaggedBlocks blocks;
+
+        // A deep copy, blocks included; a new field has to be added here too.
+        LayerRecord Copy() const;
+
+        // Null when the record has no channel of that id.
+        const ChannelImageData* FindChannel(std::int16_t id) const noexcept;
+        void RemoveChannels(std::int16_t id);
+
+        // Channel -2 or -3 among the channels.
+        bool HasLayerMask() const noexcept;
+        bool HasVectorMask() const noexcept;
+
+        // The channel of the pixel mask, 0 when there is none; a -2 rendered from a vector mask is not one.
+        std::int16_t FindPixelMaskId() const noexcept;
+
+        // The 'luni' block and the legacy Pascal copy, which is cut to 255 bytes on writing.
+        void SetName(const std::string& new_name);
+
+        // Any one makes Photoshop take a bottom raster layer for the background: locked transparency, an 'lspf' lock, no -1.
+        bool HasBackgroundMarks() const noexcept;
+
+        // Marked: transparency locked, 'lnsr' of 'bgnd' and position locked in 'lspf', as Photoshop marks it.
+        void MarkAsBackground();
+
+        // What Photoshop gives a copy of its background: an ordinary layer again, with opaque transparency when it had none.
+        void UnmarkBackground(std::uint16_t depth, bool is_psb);
     };
-
-    // Any one makes Photoshop take a bottom raster layer for the background: locked transparency, an 'lspf' lock, no -1.
-    bool HasBackgroundMarks(const LayerRecord& record) noexcept;
-
-    // Marked: transparency locked, 'lnsr' of 'bgnd' and position locked in 'lspf', as Photoshop marks it.
-    void MarkAsBackground(LayerRecord& record);
-
-    // What Photoshop gives a copy of its background: an ordinary layer again, with opaque transparency when it had none.
-    void UnmarkBackground(LayerRecord& record, std::uint16_t depth, bool is_psb);
-
-    // Throws when an edge leaves the 32 bit range.
-    Rect MakeRect(std::int64_t top, std::int64_t left, std::int64_t bottom, std::int64_t right);
-
-    // The rectangle mask channel -2 or -3 covers, read from the mask data; none when the data has no such one.
-    std::optional<Rect> FindMaskBounds(const std::vector<std::uint8_t>& mask_data, std::int16_t id);
-
-    // For a mask channel the record has: data without its rectangle is a damaged file.
-    Rect RequireMaskBounds(const std::vector<std::uint8_t>& mask_data, std::int16_t id);
-
-    // Throws when the data has no rectangle for that mask.
-    void SetMaskBounds(std::vector<std::uint8_t>& mask_data, std::int16_t id, const Rect& bounds);
-
-    // The value everywhere outside the rectangle, 0 or 255.
-    std::optional<std::uint8_t> FindMaskDefaultColor(const std::vector<std::uint8_t>& mask_data, std::int16_t id);
-    void SetMaskDefaultColor(std::vector<std::uint8_t>& mask_data, std::int16_t id, std::uint8_t color);
-
-    // Then -2 holds Photoshop's rendering of a vector mask, and the pixel mask is -3.
-    bool IsRenderedMask(const std::vector<std::uint8_t>& mask_data) noexcept;
-
-    // Null when the record has no channel of that id.
-    const ChannelImageData* FindChannel(const LayerRecord& record, std::int16_t id) noexcept;
-    void RemoveChannels(LayerRecord& record, std::int16_t id);
-
-    // Mask data with just a layer mask: its rectangle, default color, flags and padding.
-    std::vector<std::uint8_t> NewMaskData();
-
-    // The 'luni' block and the legacy Pascal copy, which is cut to 255 bytes on writing.
-    void SetLayerName(LayerRecord& record, const std::string& name);
-
-    // A deep copy, blocks included; a new LayerRecord field has to be added here too.
-    LayerRecord CopyLayerRecord(const LayerRecord& source);
 
     // Pass one of the layer info; channel_lengths gets the declared length of each channel.
     LayerRecord ParseLayerRecord(BigEndianReader& reader, bool is_psb, std::vector<std::uint64_t>& channel_lengths);

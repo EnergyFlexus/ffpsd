@@ -14,23 +14,10 @@ namespace ffpsd::detail
     PixelData
     ParseImageData(BigEndianReader& reader, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth);
 
-    // Raw and RLE; no data gives an empty Image.
-    Image DecodeImageData(
-        const PixelData& data, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth,
-        ColorMode color_mode, bool is_psb);
-
-    // The shape DecodeImageData gives, without decoding; the same into out, exactly info's GetSizeBytes.
+    // The composite's shape, for PixelData::Decode; empty when the file has none.
     ImageInfo ImageDataInfo(
         const PixelData& data, std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth,
         ColorMode color_mode);
-    void DecodeImageData(const PixelData& data, const ImageInfo& info, bool is_psb, std::uint8_t* out, std::size_t size);
-
-    // RLE when smaller.
-    PixelData EncodeImageData(const ImageView& image, bool is_psb);
-
-    // Zeros for a file without a composite; in RLE a large document costs a few bytes a row.
-    PixelData EncodeBlankImageData(
-        std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth, bool is_psb, Compression compression);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_IMAGE_DATA_HPP_

@@ -31,7 +31,7 @@ is rejected whole.
 ffpsd/include/ffpsd/   the public API, flat
 ffpsd/src/             the library
 ffpsd/src/detail/      everything not in the public API
-apps/                  the apps, a folder each: img2ffpsd
+apps/                  the apps, a folder each: img2ffpsd, with cli/, ui/ and the common/ they share
 docs/                  PSD.md, the format reference
 vendor/                libpng, zlib-ng, libjpeg-turbo, imgui, SDL, googletest, benchmark: submodules pinned to tags
 tests/cases/           GoogleTest, built with FFPSD_BUILD_TESTS
@@ -248,7 +248,7 @@ Only what is marked `FFPSD_EXPORT` is visible outside the library.
 | Entity | Convention | Example |
 |--------|------------|---------|
 | Cache option | `FFPSD_<NAME>` | `FFPSD_BUILD_APPS` |
-| Target | `snake_case`, as the artifact | `ffpsd`, `img2ffpsd` |
+| Target | `snake_case`; an executable is named with hyphens through `OUTPUT_NAME` | `ffpsd`, `img2ffpsd_cli` as `img2ffpsd-cli` |
 | Alias for consumers | `ffpsd::<target>` | `ffpsd::ffpsd` |
 | Local variable | `ffpsd_<name>`, lowercase | `ffpsd_warnings` |
 | Command, keyword | lowercase / uppercase | `target_sources(... PRIVATE ...)` |

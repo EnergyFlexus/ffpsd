@@ -160,7 +160,7 @@ jobs:
           gh release create "$GITHUB_REF_NAME" archives/* --title "$GITHUB_REF_NAME" --generate-notes --notes \
           "- \`ffpsd-shared-*\`: the shared library, its headers and CMake package.
           - \`ffpsd-static-*\`: the static library, its headers and CMake package.
-          - \`img2ffpsd-*\`: the app, img2ffpsd for the command line and img2ffpsd_ui with a window.
+          - \`img2ffpsd-*\`: the app, img2ffpsd-cli for the command line and img2ffpsd-ui with a window.
 
           macOS builds are for Apple Silicon and unsigned: run \`xattr -d com.apple.quarantine\` on them once.
 
