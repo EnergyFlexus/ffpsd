@@ -11,11 +11,11 @@ namespace img2ffpsd
     // A folder's pictures: the relative path without the extension, which pairs them, to the file itself.
     using Pictures = std::map<std::filesystem::path, std::filesystem::path>;
 
-    // The regular files under the folder, hidden files and whatever hidden folders hold left out.
-    std::vector<std::filesystem::path> VisibleFiles(const std::filesystem::path& folder);
+    // The regular files under the folder, or in it alone unless recursive; hidden files and whatever hidden folders hold left out.
+    std::vector<std::filesystem::path> VisibleFiles(const std::filesystem::path& folder, bool recursive);
 
-    // The PNG and JPEG files under the folder; a name that more than one has, 01.png and 01.jpg, goes into duplicates instead.
-    Pictures FindPictures(const std::filesystem::path& folder, std::vector<std::vector<std::filesystem::path>>& duplicates);
+    // The PNG and JPEG files of VisibleFiles; a name that more than one has, 01.png and 01.jpg, goes into duplicates instead.
+    Pictures FindPictures(const std::filesystem::path& folder, bool recursive, std::vector<std::vector<std::filesystem::path>>& duplicates);
 
     // A PNG of gray or gray with alpha, or a JPEG of one component, by the file's header alone; false for anything else.
     bool IsGrayPicture(const std::filesystem::path& file);

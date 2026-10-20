@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <ffpsd/ffpsd.hpp>
 #include <filesystem>
@@ -40,12 +41,19 @@ namespace
         return static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
     }
 
+    struct Input
+    {
+        std::string folder;
+        bool visible = true; // the layer it makes; only those above Layer 1 can hide
+    };
+
     struct Settings
     {
-        std::vector<std::string> inputs = {"", ""};
+        std::vector<Input> inputs = {Input(), Input()};
         std::string output;
         img2ffpsd::ColorChoice color = img2ffpsd::ColorChoice::kAuto;
         bool bicubic = false;
+        bool recursive = true;
         int jobs = Processors(); // not saved: every start has all the processors
     };
 
@@ -77,7 +85,9 @@ namespace
             const std::string key = line.substr(0, equals);
             const std::string value = line.substr(equals + 1);
             if (key == "input")
-                settings.inputs.push_back(value);
+                settings.inputs.push_back(Input{value, true});
+            else if (key == "visible" && !settings.inputs.empty())
+                settings.inputs.back().visible = value != "false";
             else if (key == "output")
                 settings.output = value;
             else if (key == "color")
@@ -90,6 +100,8 @@ namespace
             }
             else if (key == "resize")
                 settings.bicubic = value == "bicubic";
+            else if (key == "recursive")
+                settings.recursive = value != "false";
         }
         settings.inputs.resize(std::max<std::size_t>(settings.inputs.size(), 2));
         return settings;
@@ -98,11 +110,12 @@ namespace
     void SaveSettings(const Settings& settings)
     {
         std::string text;
-        for (const std::string& input : settings.inputs)
-            text += "input=" + input + "\n";
+        for (const Input& input : settings.inputs)
+            text += "input=" + input.folder + "\nvisible=" + (input.visible ? "true" : "false") + "\n";
         text += "output=" + settings.output + "\n";
         text += std::string("color=") + kColorKeys[static_cast<int>(settings.color)] + "\n";
         text += std::string("resize=") + (settings.bicubic ? "bicubic" : "nearest") + "\n";
+        text += std::string("recursive=") + (settings.recursive ? "true" : "false") + "\n";
         SDL_SaveFile(SettingsPath().c_str(), text.data(), text.size());
     }
 
@@ -127,7 +140,7 @@ namespace
 
     std::string& Folder(Settings& settings, int target)
     {
-        return target == kOutput ? settings.output : settings.inputs[target];
+        return target == kOutput ? settings.output : settings.inputs[target].folder;
     }
 
     void OpenFolderDialog(FolderDialog& dialog, SDL_Window* window, Settings& settings, int target)
@@ -154,10 +167,10 @@ namespace
     using img2ffpsd::Pictures;
 
     // Adds an error for each name that more than one picture of the folder has, 01.png and 01.jpg.
-    Pictures FindPictures(const fs::path& folder, std::vector<std::string>& errors)
+    Pictures FindPictures(const fs::path& folder, bool recursive, std::vector<std::string>& errors)
     {
         std::vector<std::vector<fs::path>> duplicates;
-        Pictures pictures = img2ffpsd::FindPictures(folder, duplicates);
+        Pictures pictures = img2ffpsd::FindPictures(folder, recursive, duplicates);
         for (const std::vector<fs::path>& files : duplicates)
         {
             std::string error = folder.u8string() + ": " + files[0].u8string();
@@ -187,11 +200,13 @@ namespace
         job.jobs = settings.jobs;
         for (std::size_t i = 0; i < settings.inputs.size(); ++i)
         {
-            job.conversion.folders.push_back(fs::u8path(settings.inputs[i]));
-            if (settings.inputs[i].empty())
+            const Input& input = settings.inputs[i];
+            job.conversion.folders.push_back(fs::u8path(input.folder));
+            job.conversion.hidden.push_back(i >= 2 && !input.visible);
+            if (input.folder.empty())
                 job.errors.push_back(img2ffpsd::LayerName(i) + ": no folder chosen");
             else if (!fs::is_directory(job.conversion.folders[i]))
-                job.errors.push_back(img2ffpsd::LayerName(i) + ": " + settings.inputs[i] + " does not exist");
+                job.errors.push_back(img2ffpsd::LayerName(i) + ": " + input.folder + " does not exist");
         }
         job.conversion.output = fs::u8path(settings.output);
         if (settings.output.empty())
@@ -200,7 +215,7 @@ namespace
             return job;
 
         for (const fs::path& folder : job.conversion.folders)
-            job.found.push_back(FindPictures(folder, job.errors));
+            job.found.push_back(FindPictures(folder, settings.recursive, job.errors));
         const Pictures& bottoms = job.found[0];
         const Pictures& tops = job.found[1];
         for (const fs::path& file : img2ffpsd::OnlyIn(bottoms, tops))
@@ -217,7 +232,7 @@ namespace
         }
         for (const std::string& gap : img2ffpsd::FindGaps(bottoms))
             job.warnings.push_back("Possible miss: " + gap);
-        if (fs::is_directory(job.conversion.output) && !img2ffpsd::VisibleFiles(job.conversion.output).empty())
+        if (fs::is_directory(job.conversion.output) && !img2ffpsd::VisibleFiles(job.conversion.output, true).empty())
             job.warnings.push_back(settings.output + " is not empty: files there may be replaced");
 
         for (const auto& [name, file] : bottoms)
@@ -277,6 +292,37 @@ namespace
         return ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2 + ImGui::GetStyle().ItemSpacing.x;
     }
 
+    // An eye, as Photoshop shows a layer; a stroke across it while hidden. True when clicked.
+    bool EyeButton(bool visible)
+    {
+        const float size = ImGui::GetFrameHeight();
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const bool clicked = ImGui::InvisibleButton("##eye", ImVec2(size, size));
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(visible ? "Shown: click to hide the layer" : "Hidden: click to show the layer");
+
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        const ImU32 color = ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_Text : (visible ? ImGuiCol_Text : ImGuiCol_TextDisabled));
+        const ImVec2 center(at.x + size * 0.5f, at.y + size * 0.5f);
+        const float half = size * 0.36f;
+        const float thickness = std::max(1.0f, size * 0.07f);
+
+        // The lids are two arcs through the corners, the pupil a disc between them.
+        const float bulge = half * 0.75f;
+        const float radius = (half * half + bulge * bulge) / (2.0f * bulge);
+        const float angle = std::asin(half / radius);
+        const float pi = 3.14159265f;
+        draw->PathArcTo(ImVec2(center.x, center.y + radius - bulge), radius, -pi / 2 - angle, -pi / 2 + angle);
+        draw->PathStroke(color, ImDrawFlags_None, thickness);
+        draw->PathArcTo(ImVec2(center.x, center.y - radius + bulge), radius, pi / 2 - angle, pi / 2 + angle);
+        draw->PathStroke(color, ImDrawFlags_None, thickness);
+        draw->AddCircleFilled(center, half * 0.32f, color);
+        if (!visible)
+            draw->AddLine(
+                ImVec2(center.x - half, center.y + half * 0.8f), ImVec2(center.x + half, center.y - half * 0.8f), color, thickness);
+        return clicked;
+    }
+
     enum class Pressed
     {
         kNothing,
@@ -284,12 +330,22 @@ namespace
         kRemove
     };
 
-    // Browse ends every row at the right edge; Remove comes before it on the rows that can go.
-    Pressed FolderField(const std::string& label, std::string& folder, bool removable)
+    // An eye before the folder on the rows that can go, room for one on the others; Browse ends every row, Remove before it.
+    Pressed FolderField(const std::string& label, std::string& folder, bool* visible, bool removable)
     {
         ImGui::AlignTextToFramePadding();
         ImGui::TextUnformatted(label.c_str());
         ImGui::SameLine(ImGui::GetFontSize() * 6);
+        if (visible != nullptr)
+        {
+            if (EyeButton(*visible))
+                *visible = !*visible;
+        }
+        else
+        {
+            ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
+        }
+        ImGui::SameLine();
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ButtonWidth("Browse") - (removable ? ButtonWidth("Remove") : 0.0f));
         ImGui::InputText("##folder", &folder);
 
@@ -414,7 +470,9 @@ namespace
         for (int i = 0; i < static_cast<int>(settings.inputs.size()); ++i)
         {
             ImGui::PushID(i);
-            const Pressed pressed = FolderField(img2ffpsd::LayerName(static_cast<std::size_t>(i)), settings.inputs[i], i >= 2);
+            Input& input = settings.inputs[static_cast<std::size_t>(i)];
+            const Pressed pressed =
+                FolderField(img2ffpsd::LayerName(static_cast<std::size_t>(i)), input.folder, i >= 2 ? &input.visible : nullptr, i >= 2);
             if (pressed == Pressed::kBrowse)
                 OpenFolderDialog(dialog, window, settings, i);
             else if (pressed == Pressed::kRemove)
@@ -428,7 +486,7 @@ namespace
 
         ImGui::Separator();
         ImGui::PushID(kOutput);
-        if (FolderField("Output", settings.output, false) == Pressed::kBrowse)
+        if (FolderField("Output", settings.output, nullptr, false) == Pressed::kBrowse)
             OpenFolderDialog(dialog, window, settings, kOutput);
         ImGui::PopID();
 
@@ -440,6 +498,10 @@ namespace
         int color = static_cast<int>(settings.color);
         if (ImGui::Combo("##colors", &color, kColorNames, IM_ARRAYSIZE(kColorNames)))
             settings.color = static_cast<img2ffpsd::ColorChoice>(color);
+        ImGui::SameLine();
+        ImGui::Checkbox("Recursive", &settings.recursive);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("The pictures of the folders inside too");
         ImGui::AlignTextToFramePadding();
         const float right = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
         ImGui::TextUnformatted("Resize");

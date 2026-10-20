@@ -107,6 +107,15 @@ namespace img2ffpsd
             doc.SetBackgroundLayer(0);
         }
 
+        // Every layer is opaque, so the upper one shown covers the rest and is the composite; the background when none is.
+        const auto shown = [&](std::size_t i) { return folders[i] >= conversion.hidden.size() || !conversion.hidden[folders[i]]; };
+        std::size_t composite = 0;
+        for (std::size_t i = 1; i < images.size(); ++i)
+        {
+            if (shown(i))
+                composite = i;
+        }
+
         for (std::size_t i = 1; i < images.size(); ++i)
         {
             // A layer loses its transparency, the plane after the color ones.
@@ -115,12 +124,13 @@ namespace img2ffpsd
             const ffpsd::ImageView colors(image, image.bytes.data(), image.GetSizeBytes());
 
             ffpsd::Layer* layer = doc.AddLayer(LayerName(folders[i]), colors);
+            layer->SetVisible(shown(i));
             const bool resized = image.width != width || image.height != height;
             if (resized)
                 layer->Resize(width, height, conversion.filter);
 
-            // The upper layer covers the rest, so it is the composite; a resized one is read back from its layer.
-            if (i + 1 == images.size())
+            // A resized layer is read back for the composite.
+            if (i == composite)
             {
                 if (resized)
                     doc.SetMergedImage(layer->GetPixels());
@@ -128,6 +138,8 @@ namespace img2ffpsd
                     doc.SetMergedImage(colors); // a ternary would copy the picture
             }
         }
+        if (composite == 0)
+            doc.SetMergedImage(doc.GetLayerByIndex(0)->GetPixels());
 
         fs::path target = conversion.output / name;
         target += ".psd"; // the name has no extension left to replace

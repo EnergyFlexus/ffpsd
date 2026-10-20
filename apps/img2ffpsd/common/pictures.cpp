@@ -94,17 +94,17 @@ namespace img2ffpsd
         }
     } // namespace
 
-    std::vector<fs::path> VisibleFiles(const fs::path& folder)
+    std::vector<fs::path> VisibleFiles(const fs::path& folder, bool recursive)
     {
         std::vector<fs::path> files;
         for (auto entry = fs::recursive_directory_iterator(folder); entry != fs::recursive_directory_iterator(); ++entry)
         {
-            if (IsHidden(entry->path()))
+            if (entry->is_directory())
             {
-                if (entry->is_directory())
+                if (!recursive || IsHidden(entry->path()))
                     entry.disable_recursion_pending();
             }
-            else if (entry->is_regular_file())
+            else if (!IsHidden(entry->path()) && entry->is_regular_file())
             {
                 files.push_back(entry->path());
             }
@@ -112,10 +112,10 @@ namespace img2ffpsd
         return files;
     }
 
-    Pictures FindPictures(const fs::path& folder, std::vector<std::vector<fs::path>>& duplicates)
+    Pictures FindPictures(const fs::path& folder, bool recursive, std::vector<std::vector<fs::path>>& duplicates)
     {
         std::map<fs::path, std::vector<fs::path>> by_name;
-        for (const fs::path& file : VisibleFiles(folder))
+        for (const fs::path& file : VisibleFiles(folder, recursive))
         {
             if (!IsPicture(file))
                 continue;

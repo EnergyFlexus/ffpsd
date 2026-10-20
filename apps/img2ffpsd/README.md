@@ -5,6 +5,7 @@
 
 ```sh
 img2ffpsd-cli <bottom> <top> [<layer>...] <output> [--auto|--color|--gray] [--jobs N] [--resize nearest|bicubic]
+              [--recursive=true|false]
 ```
 
 Pairs the PNG and JPEG files of the bottom and top folders by their path without
@@ -15,6 +16,13 @@ a layer above those, where it has the file. A layer is named by its folder:
 `Layer 1` from the top one, `Layer 2` from the next. Layers lose their
 transparency, and the upper one is the composite. Every picture is resized to the
 top one, by nearest neighbour or with `--resize bicubic`.
+
+The pictures of the folders inside are found too, keeping their path: `raw/ch1/01.png`
+goes with `scaled/ch1/01.png` into `output/ch1/01.psd`. `--recursive=false`, or the
+Recursive box cleared in the window, takes only the pictures right in each folder.
+
+In the window an eye starts each folder above Layer 1: closed, its layer is hidden
+in the PSD, and the composite is the upper layer shown.
 
 With `--auto`, the default, a document takes its colors from the top picture, as it
 takes its size: grayscale when that picture is gray, RGB otherwise, and the others

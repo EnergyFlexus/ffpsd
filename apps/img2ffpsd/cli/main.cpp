@@ -27,6 +27,7 @@ namespace
     struct Options
     {
         img2ffpsd::Conversion conversion;
+        bool recursive = true;
         unsigned jobs = 0; // 0: one per processor
     };
 
@@ -67,7 +68,7 @@ namespace
     {
         std::cout << "img2ffpsd-cli " << ffpsd::Version() << "\n"
                   << "usage: img2ffpsd-cli <bottom> <top> [<layer>...] <output> [--auto|--color|--gray] [--jobs N]\n"
-                  << "                     [--resize nearest|bicubic]\n\n"
+                  << "                     [--resize nearest|bicubic] [--recursive=true|false]\n\n"
                   << "Pairs PNG or JPEG files by their path without the extension in the bottom and\n"
                   << "top folders into PSD files in output: the bottom one as the locked background,\n"
                   << "the top one as the layer above it. Each further folder adds a layer above those\n"
@@ -78,7 +79,9 @@ namespace
                   << "  --gray              grayscale documents\n"
                   << "  --jobs N            files converted at once, one per processor by default\n"
                   << "  --resize nearest    resizing that keeps hard pixels, the default\n"
-                  << "  --resize bicubic    smooth resizing\n";
+                  << "  --resize bicubic    smooth resizing\n"
+                  << "  --recursive=true    the pictures of the folders inside too, the default\n"
+                  << "  --recursive=false   the pictures right in each folder only\n";
     }
 
     bool ParseArguments(const std::vector<std::string>& args, Options& options)
@@ -92,6 +95,10 @@ namespace
                 options.conversion.color = img2ffpsd::ColorChoice::kColor;
             else if (args[i] == "--gray")
                 options.conversion.color = img2ffpsd::ColorChoice::kGray;
+            else if (args[i] == "--recursive=true")
+                options.recursive = true;
+            else if (args[i] == "--recursive=false")
+                options.recursive = false;
             else if (args[i] == "--jobs" && i + 1 < args.size())
                 options.jobs = static_cast<unsigned>(std::max(1, std::atoi(args[++i].c_str())));
             else if (args[i] == "--resize" && i + 1 < args.size())
@@ -119,10 +126,10 @@ namespace
     }
 
     // Prints the names that more than one picture of the folder has, 01.png and 01.jpg; true when there are none.
-    bool FindPictures(const fs::path& folder, Pictures& pictures)
+    bool FindPictures(const fs::path& folder, bool recursive, Pictures& pictures)
     {
         std::vector<std::vector<fs::path>> duplicates;
-        pictures = img2ffpsd::FindPictures(folder, duplicates);
+        pictures = img2ffpsd::FindPictures(folder, recursive, duplicates);
         if (duplicates.empty())
             return true;
 
@@ -165,7 +172,7 @@ namespace
         bool match = true;
         found.resize(options.conversion.folders.size());
         for (std::size_t i = 0; i < options.conversion.folders.size(); ++i)
-            match = FindPictures(options.conversion.folders[i], found[i]) && match;
+            match = FindPictures(options.conversion.folders[i], options.recursive, found[i]) && match;
         const Pictures& bottoms = found[0];
         const Pictures& tops = found[1];
 
@@ -224,7 +231,7 @@ namespace
             std::cout << kGreen << "Good. Number of files: " << bottoms.size() << ". The files match." << kEnd << "\n";
         }
 
-        if (fs::is_directory(options.conversion.output) && !img2ffpsd::VisibleFiles(options.conversion.output).empty())
+        if (fs::is_directory(options.conversion.output) && !img2ffpsd::VisibleFiles(options.conversion.output, true).empty())
         {
             std::cout << kYellow << "warning: " << Utf8(fs::absolute(options.conversion.output))
                       << " is not empty. Are you sure? Data may be lost." << kEnd << "\n";

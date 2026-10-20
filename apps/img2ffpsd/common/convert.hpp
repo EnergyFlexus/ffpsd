@@ -25,6 +25,7 @@ namespace img2ffpsd
     struct Conversion
     {
         std::vector<std::filesystem::path> folders; // the bottom, the top and the optional ones above it
+        std::vector<bool> hidden;                   // per folder, the layer it makes hidden; a shorter one shows the rest
         std::filesystem::path output;
         ColorChoice color = ColorChoice::kAuto;
         ffpsd::ResampleFilter filter = ffpsd::ResampleFilter::kNearest;
