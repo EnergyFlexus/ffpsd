@@ -1,4 +1,4 @@
-// The codecs themselves are checked in png_test.cpp and jpeg_test.cpp; here only what picks them.
+// The codecs themselves are checked in png_test.cpp, jpeg_test.cpp and webp_test.cpp; here only what picks them.
 #include "support/test_support.hpp"
 
 #include <cstdint>
@@ -23,6 +23,11 @@ TEST(FormatsTest, IsFormatSupportedFollowsTheBuild)
 #else
     EXPECT_FALSE(ffpsd::IsFormatSupported(ffpsd::Format::kJpeg));
 #endif
+#if defined(FFPSD_HAS_WEBP)
+    EXPECT_TRUE(ffpsd::IsFormatSupported(ffpsd::Format::kWebp));
+#else
+    EXPECT_FALSE(ffpsd::IsFormatSupported(ffpsd::Format::kWebp));
+#endif
 }
 
 TEST(FormatsTest, LoadPictureGoesByTheSignatureNotTheName)
@@ -39,7 +44,8 @@ TEST(FormatsTest, LoadPictureGoesByTheSignatureNotTheName)
     const Case cases[] = {
         {"generated/rgba_8bit.png", "ffpsd_\xD0\xBA\xD0\xB0\xD1\x80\xD1\x82\xD0\xB8\xD0\xBD\xD0\xBA\xD0\xB0.jpg", ffpsd::Format::kPng, 3, 2,
          4},
-        {"generated/rgb_quadrants.jpg", "ffpsd_picture.png", ffpsd::Format::kJpeg, 32, 16, 3}};
+        {"generated/rgb_quadrants.jpg", "ffpsd_picture.png", ffpsd::Format::kJpeg, 32, 16, 3},
+        {"generated/rgba_lossless.webp", "ffpsd_picture.jpg", ffpsd::Format::kWebp, 3, 2, 4}};
 
     for (const Case& c : cases)
     {
@@ -67,9 +73,11 @@ TEST(FormatsTest, LoadPictureRefusesAnUnsupportedFormat)
 {
     const std::uint8_t psd[] = {'8', 'B', 'P', 'S', 0, 1};
     const std::uint8_t png_start[] = {0x89, 'P', 'N', 'G'};
+    const std::uint8_t wave[] = {'R', 'I', 'F', 'F', 4, 0, 0, 0, 'W', 'A', 'V', 'E'};
 
     EXPECT_THROW(ffpsd::LoadPicture(psd, sizeof(psd), ffpsd::ColorMode::kRgb, 8), std::runtime_error);
     EXPECT_THROW(ffpsd::LoadPicture(png_start, sizeof(png_start), ffpsd::ColorMode::kRgb, 8), std::runtime_error);
+    EXPECT_THROW(ffpsd::LoadPicture(wave, sizeof(wave), ffpsd::ColorMode::kRgb, 8), std::runtime_error);
     EXPECT_THROW(ffpsd::LoadPicture(nullptr, 0, ffpsd::ColorMode::kRgb, 8), std::runtime_error);
     EXPECT_THROW(ffpsd::LoadPicture(DataFile("no_such_file.png"), ffpsd::ColorMode::kRgb, 8), std::filesystem::filesystem_error);
 }

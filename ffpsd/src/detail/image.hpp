@@ -4,14 +4,9 @@
 #include <cstdint>
 #include <ffpsd/image.hpp>
 #include <ffpsd/types.hpp>
-#include <string>
 
 namespace ffpsd::detail
 {
-    // Whole byte samples; a 1 bit bitmap has none.
-    bool IsSampleDepth(std::uint16_t depth) noexcept;
-    std::string UnsupportedDepth(std::uint16_t depth);
-
     // 8, 16 or 32 bit, and the bytes the geometry needs.
     void CheckImage(const ImageView& image);
 

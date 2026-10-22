@@ -1,10 +1,12 @@
 #include "common/convert.hpp"
 #include "common/pictures.hpp"
+#include "common/scan.hpp"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h> // turns main into WinMain for a window app on Windows
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -19,6 +21,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #if defined(__APPLE__)
@@ -166,19 +169,18 @@ namespace
 
     using img2ffpsd::Pictures;
 
-    // Adds an error for each name that more than one picture of the folder has, 01.png and 01.jpg.
-    Pictures FindPictures(const fs::path& folder, bool recursive, std::vector<std::string>& errors)
+    // A line per file an issue names, or the issue alone; capitalized, as the window shows sentences.
+    void AddLines(const std::vector<img2ffpsd::Issue>& issues, std::vector<std::string>& lines)
     {
-        std::vector<std::vector<fs::path>> duplicates;
-        Pictures pictures = img2ffpsd::FindPictures(folder, recursive, duplicates);
-        for (const std::vector<fs::path>& files : duplicates)
+        for (const img2ffpsd::Issue& issue : issues)
         {
-            std::string error = folder.u8string() + ": " + files[0].u8string();
-            for (std::size_t i = 1; i < files.size(); ++i)
-                error += " and " + files[i].u8string();
-            errors.push_back(error + " have one name");
+            std::string text = issue.text;
+            text[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(text[0])));
+            if (issue.items.empty())
+                lines.push_back(text);
+            for (const std::string& item : issue.items)
+                lines.push_back(text + ": " + item);
         }
-        return pictures;
     }
 
     // What one run takes from the settings, and what checking the folders found.
@@ -205,8 +207,6 @@ namespace
             job.conversion.hidden.push_back(i >= 2 && !input.visible);
             if (input.folder.empty())
                 job.errors.push_back(img2ffpsd::LayerName(i) + ": no folder chosen");
-            else if (!fs::is_directory(job.conversion.folders[i]))
-                job.errors.push_back(img2ffpsd::LayerName(i) + ": " + input.folder + " does not exist");
         }
         job.conversion.output = fs::u8path(settings.output);
         if (settings.output.empty())
@@ -214,29 +214,11 @@ namespace
         if (!job.errors.empty())
             return job;
 
-        for (const fs::path& folder : job.conversion.folders)
-            job.found.push_back(FindPictures(folder, settings.recursive, job.errors));
-        const Pictures& bottoms = job.found[0];
-        const Pictures& tops = job.found[1];
-        for (const fs::path& file : img2ffpsd::OnlyIn(bottoms, tops))
-            job.errors.push_back("Missing in Layer 1: " + file.u8string());
-        for (const fs::path& file : img2ffpsd::OnlyIn(tops, bottoms))
-            job.errors.push_back("Missing in Background: " + file.u8string());
-        if (bottoms.empty())
-            job.errors.push_back("No pictures in " + job.conversion.folders[0].u8string());
-
-        for (std::size_t i = 2; i < job.found.size(); ++i)
-        {
-            for (const fs::path& file : img2ffpsd::OnlyIn(job.found[i], bottoms))
-                job.warnings.push_back("Missing in Background, skipped in " + img2ffpsd::LayerName(i) + ": " + file.u8string());
-        }
-        for (const std::string& gap : img2ffpsd::FindGaps(bottoms))
-            job.warnings.push_back("Possible miss: " + gap);
-        if (fs::is_directory(job.conversion.output) && !img2ffpsd::VisibleFiles(job.conversion.output, true).empty())
-            job.warnings.push_back(settings.output + " is not empty: files there may be replaced");
-
-        for (const auto& [name, file] : bottoms)
-            job.names.push_back(name);
+        img2ffpsd::FolderScan scan = img2ffpsd::ScanFolders(job.conversion, settings.recursive);
+        AddLines(scan.errors, job.errors);
+        AddLines(scan.warnings, job.warnings);
+        job.found = std::move(scan.found);
+        job.names = std::move(scan.names);
         return job;
     }
 

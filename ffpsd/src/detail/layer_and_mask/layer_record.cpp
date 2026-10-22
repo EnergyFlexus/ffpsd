@@ -1,12 +1,12 @@
 #include "detail/layer_and_mask/layer_record.hpp"
 
-#include "detail/file_header.hpp"
 #include "detail/io/big_endian_writer.hpp"
 #include "detail/io/strings.hpp"
 #include "detail/layer_and_mask/channel_ids.hpp"
 #include "detail/layer_and_mask/tagged_blocks/layer_name_source_setting.hpp"
 #include "detail/layer_and_mask/tagged_blocks/protected_setting.hpp"
 #include "detail/layer_and_mask/tagged_blocks/unicode_layer_name.hpp"
+#include "detail/limits.hpp"
 #include "detail/rect.hpp"
 
 #include <algorithm>
@@ -57,9 +57,7 @@ namespace ffpsd::detail
         record.bounds = ReadRect(reader);
 
         const std::uint16_t channel_count = reader.ReadU16();
-        if (channel_count > kMaxChannels)
-            throw std::runtime_error(
-                "ffpsd: layer at offset " + std::to_string(record_start) + " claims " + std::to_string(channel_count) + " channels");
+        CheckChannelCount<std::runtime_error>(channel_count, ("the layer at offset " + std::to_string(record_start)).c_str());
 
         record.channels.resize(channel_count);
         channel_lengths.clear();
@@ -81,7 +79,7 @@ namespace ffpsd::detail
         record.flags = reader.ReadU8();
         reader.Skip(1); // filler
 
-        const std::size_t extra_length = reader.CheckLength(reader.ReadU32(), reader.GetSize(), "layer extra data");
+        const std::size_t extra_length = reader.CheckedLength(reader.ReadU32(), reader.GetSize(), "layer extra data");
         const std::size_t extra_end = reader.Tell() + extra_length;
 
         record.mask_data = MaskData(reader.ReadBlob(extra_end, "layer mask data"));

@@ -10,7 +10,6 @@
 #include <cstdint>
 #include <cstdio> // jpeglib.h uses FILE and size_t without including them
 #include <cstdlib>
-#include <cstring>
 #include <ffpsd/bytes.hpp>
 #include <jpeglib.h>
 #include <limits>
@@ -111,17 +110,6 @@ namespace ffpsd::detail
             std::vector<std::uint8_t> row;
             std::vector<std::uint8_t> narrow;
         };
-
-        // Rounded, as libpng narrows 16 bit.
-        void NarrowRow(const std::uint8_t* samples, std::size_t count, std::uint8_t* out) noexcept
-        {
-            for (std::size_t i = 0; i < count; ++i)
-            {
-                std::uint16_t sample = 0;
-                std::memcpy(&sample, samples + i * 2, 2);
-                out[i] = static_cast<std::uint8_t>((sample * 255u + 32767) / 65535);
-            }
-        }
 
 #if defined(_MSC_VER)
 #pragma warning(push)
@@ -229,20 +217,6 @@ namespace ffpsd::detail
             }
             decoded.channels = 3; // the bytes past three a pixel stay unused
         }
-
-        Image WidenTo16(const Image& image)
-        {
-            ImageInfo info = image;
-            info.depth = 16;
-            Image wide(info);
-            for (std::size_t i = 0; i < image.bytes.size(); ++i)
-            {
-                const auto sample = static_cast<std::uint16_t>(image.bytes[i] * 257);
-                std::memcpy(wide.bytes.data() + i * 2, &sample, 2);
-            }
-            return wide;
-        }
-
     } // namespace
 
     Image DecodeJpeg(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth, bool apply_orientation)

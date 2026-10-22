@@ -22,7 +22,7 @@ namespace ffpsd::detail
 
     ParsedLayerAndMaskInfo ParseLayerAndMaskInfo(BigEndianReader& reader, bool is_psb, std::uint16_t depth)
     {
-        const std::size_t length = reader.CheckLength(reader.ReadLength(is_psb), reader.GetSize(), "layer and mask information");
+        const std::size_t length = reader.CheckedLength(reader.ReadLength(is_psb), reader.GetSize(), "layer and mask information");
         const std::size_t end = reader.Tell() + length;
 
         ParsedLayerAndMaskInfo parsed;

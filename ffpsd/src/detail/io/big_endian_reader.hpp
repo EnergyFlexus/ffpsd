@@ -44,7 +44,7 @@ namespace ffpsd::detail
         bool FitsLength(std::uint64_t length, std::size_t end) const noexcept;
 
         // The length, when it fits; what names the field in the error.
-        std::size_t CheckLength(std::uint64_t length, std::size_t end, const char* what) const;
+        std::size_t CheckedLength(std::uint64_t length, std::size_t end, const char* what) const;
 
         // A 4 byte length and that many bytes, which must end by end.
         std::vector<std::uint8_t> ReadBlob(std::size_t end, const char* what);

@@ -1,6 +1,7 @@
-// Folders of PNG or JPEG files into PSD files: the first one as the background, every next one as a layer above it.
+// Folders of PNG, JPEG or WebP files into PSD files: the first one as the background, every next one as a layer above it.
 #include "common/convert.hpp"
 #include "common/pictures.hpp"
+#include "common/scan.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -11,6 +12,7 @@
 #include <iostream>
 #include <mutex>
 #include <string>
+#include <utility>
 #include <vector>
 
 #if defined(_WIN32)
@@ -69,11 +71,11 @@ namespace
         std::cout << "img2ffpsd-cli " << ffpsd::Version() << "\n"
                   << "usage: img2ffpsd-cli <bottom> <top> [<layer>...] <output> [--auto|--color|--gray] [--jobs N]\n"
                   << "                     [--resize nearest|bicubic] [--recursive=true|false]\n\n"
-                  << "Pairs PNG or JPEG files by their path without the extension in the bottom and\n"
-                  << "top folders into PSD files in output: the bottom one as the locked background,\n"
-                  << "the top one as the layer above it. Each further folder adds a layer above those\n"
-                  << "where it has the file. The upper layer is the composite. Every picture is\n"
-                  << "resized to the top one.\n\n"
+                  << "Pairs PNG, JPEG or WebP files by their path without the extension in the bottom\n"
+                  << "and top folders into PSD files in output: the bottom one as the locked\n"
+                  << "background, the top one as the layer above it. Each further folder adds a layer\n"
+                  << "above those where it has the file. The upper layer is the composite. Every\n"
+                  << "picture is resized to the top one.\n\n"
                   << "  --auto              the colors of the top picture, gray or RGB, the default\n"
                   << "  --color             RGB documents\n"
                   << "  --gray              grayscale documents\n"
@@ -125,121 +127,49 @@ namespace
         return true;
     }
 
-    // Prints the names that more than one picture of the folder has, 01.png and 01.jpg; true when there are none.
-    bool FindPictures(const fs::path& folder, bool recursive, Pictures& pictures)
+    // Each one, and the files it names, one a line.
+    void PrintIssues(const std::vector<img2ffpsd::Issue>& issues, const char* color, const char* kind)
     {
-        std::vector<std::vector<fs::path>> duplicates;
-        pictures = img2ffpsd::FindPictures(folder, recursive, duplicates);
-        if (duplicates.empty())
-            return true;
-
-        std::cout << kRed << "error: pictures with the same name in '" << Utf8(fs::absolute(folder)) << "':\n";
-        for (const std::vector<fs::path>& names : duplicates)
+        for (const img2ffpsd::Issue& issue : issues)
         {
-            for (const fs::path& file : names)
-                std::cout << "    - " << Utf8(file) << "\n";
+            std::cout << color << kind << ": " << issue.text;
+            if (issue.items.empty())
+            {
+                std::cout << kEnd << "\n";
+                continue;
+            }
+            std::cout << ":\n";
+            for (const std::string& item : issue.items)
+                std::cout << "    - " << item << "\n";
+            std::cout << kEnd << "\n";
         }
-        std::cout << kEnd << "\n";
-        return false;
     }
 
-    // Prints the files of one folder that the other lacks; true when there are none.
-    bool CheckMissing(const fs::path& other_folder, const Pictures& pictures, const Pictures& other)
-    {
-        const std::vector<fs::path> only = img2ffpsd::OnlyIn(pictures, other);
-        if (only.empty())
-            return true;
-
-        std::cout << kRed << "error: files missing in '" << Utf8(fs::absolute(other_folder)) << "':\n";
-        for (const fs::path& file : only)
-            std::cout << "    - " << Utf8(file) << "\n";
-        std::cout << kEnd << "\n";
-        return false;
-    }
-
-    // The bottom's paths, which the top must match, and every folder's files; false, after printing why, if they cannot be converted.
+    // The bottom's paths and every folder's files; false, after printing why, if they cannot be converted.
     bool FindFiles(const Options& options, std::vector<fs::path>& files, std::vector<Pictures>& found)
     {
-        for (const fs::path& folder : options.conversion.folders)
-        {
-            if (!fs::is_directory(folder))
-            {
-                std::cout << kRed << "error: " << Utf8(fs::absolute(folder)) << " does not exist." << kEnd << "\n";
-                return false;
-            }
-        }
-
-        bool match = true;
-        found.resize(options.conversion.folders.size());
-        for (std::size_t i = 0; i < options.conversion.folders.size(); ++i)
-            match = FindPictures(options.conversion.folders[i], options.recursive, found[i]) && match;
-        const Pictures& bottoms = found[0];
-        const Pictures& tops = found[1];
-
-        if (bottoms.size() != tops.size())
-        {
-            const std::size_t difference = bottoms.size() > tops.size() ? bottoms.size() - tops.size() : tops.size() - bottoms.size();
-            std::cout << kRed << "error: number of files differs: " << bottoms.size() << " vs " << tops.size() << " (" << difference << ")"
-                      << kEnd << "\n";
-            match = false;
-        }
-        match = CheckMissing(options.conversion.folders[1], bottoms, tops) && match;
-        match = CheckMissing(options.conversion.folders[0], tops, bottoms) && match;
-        if (!match)
+        img2ffpsd::FolderScan scan = img2ffpsd::ScanFolders(options.conversion, options.recursive);
+        PrintIssues(scan.errors, kRed, "error");
+        if (!scan.errors.empty())
         {
             std::cout << kRed << "Bad. Check errors. Conversion cancelled." << kEnd << "\n";
             Pause();
             return false;
         }
-        if (bottoms.empty())
-        {
-            std::cout << kYellow << "warning: no pictures in " << Utf8(fs::absolute(options.conversion.folders[0])) << "." << kEnd << "\n";
-            return true;
-        }
 
-        bool warned = false;
-        for (std::size_t i = 2; i < found.size(); ++i)
-        {
-            const std::vector<fs::path> only = img2ffpsd::OnlyIn(found[i], bottoms);
-            if (only.empty())
-                continue;
-            std::cout << kYellow << "warning: files missing in '" << Utf8(fs::absolute(options.conversion.folders[0])) << "', skipped in '"
-                      << Utf8(fs::absolute(options.conversion.folders[i])) << "':\n";
-            for (const fs::path& file : only)
-                std::cout << "    - " << Utf8(file) << "\n";
-            std::cout << kEnd << "\n";
-            warned = true;
-        }
-
-        const std::vector<std::string> gaps = img2ffpsd::FindGaps(bottoms);
-        if (!gaps.empty())
-        {
-            std::cout << kYellow << "warning: possible misses:\n";
-            for (const std::string& gap : gaps)
-                std::cout << "    - " << gap << "\n";
-            std::cout << kEnd << "\n";
-            warned = true;
-        }
-
-        if (warned)
+        PrintIssues(scan.warnings, kYellow, "warning");
+        if (!scan.warnings.empty())
         {
             std::cout << kYellow << "Warnings. But if everything is ok, you can continue." << kEnd << "\n";
             Pause();
         }
         else
         {
-            std::cout << kGreen << "Good. Number of files: " << bottoms.size() << ". The files match." << kEnd << "\n";
+            std::cout << kGreen << "Good. Number of files: " << scan.names.size() << ". The files match." << kEnd << "\n";
         }
 
-        if (fs::is_directory(options.conversion.output) && !img2ffpsd::VisibleFiles(options.conversion.output, true).empty())
-        {
-            std::cout << kYellow << "warning: " << Utf8(fs::absolute(options.conversion.output))
-                      << " is not empty. Are you sure? Data may be lost." << kEnd << "\n";
-            Pause();
-        }
-
-        for (const auto& [name, file] : bottoms)
-            files.push_back(name);
+        files = std::move(scan.names);
+        found = std::move(scan.found);
         return true;
     }
 

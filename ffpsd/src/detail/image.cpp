@@ -1,6 +1,7 @@
 #include "detail/image.hpp"
 
 #include "detail/color.hpp"
+#include "detail/limits.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -10,16 +11,6 @@
 
 namespace ffpsd::detail
 {
-    bool IsSampleDepth(std::uint16_t depth) noexcept
-    {
-        return depth == 8 || depth == 16 || depth == 32;
-    }
-
-    std::string UnsupportedDepth(std::uint16_t depth)
-    {
-        return "ffpsd: " + std::to_string(depth) + " bit samples are not supported";
-    }
-
     void CheckBytesSize(const ImageInfo& info, const std::uint8_t* out, std::size_t size)
     {
         if (size != info.GetSizeBytes())
@@ -31,8 +22,7 @@ namespace ffpsd::detail
 
     void CheckImage(const ImageView& image)
     {
-        if (!IsSampleDepth(image.depth))
-            throw std::invalid_argument(UnsupportedDepth(image.depth));
+        CheckSampleDepth(image.depth);
 
         const std::size_t needed = image.GetSizeBytes();
         if ((image.data == nullptr && needed != 0) || image.size != needed)

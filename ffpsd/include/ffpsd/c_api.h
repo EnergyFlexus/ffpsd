@@ -102,7 +102,8 @@ extern "C"
     typedef enum ffpsd_format_t
     {
         FFPSD_FORMAT_PNG = 0,
-        FFPSD_FORMAT_JPEG = 1
+        FFPSD_FORMAT_JPEG = 1,
+        FFPSD_FORMAT_WEBP = 2
     } ffpsd_format_t;
 
     /* Speed against size of a written PNG; FASTEST can grow flat pictures a few times over. */
@@ -382,7 +383,7 @@ extern "C"
     /* Nonzero when this build reads and writes the format. */
     FFPSD_EXPORT int ffpsd_format_is_supported(ffpsd_format_t format);
 
-    /* PNG or JPEG by the signature, a JPEG turned upright by EXIF; UNSUPPORTED for one this build lacks. */
+    /* PNG, JPEG or WebP by the signature, a JPEG turned upright by EXIF; UNSUPPORTED for one this build lacks. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_picture_load(const char* path, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_image_t** out);
     FFPSD_EXPORT ffpsd_status_t
     ffpsd_picture_load_memory(const uint8_t* data, size_t size, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_image_t** out);
@@ -406,6 +407,15 @@ extern "C"
     /* Gray from 1 or 2 channels, RGB from 3 or 4; alpha is dropped and 16 bit narrowed to 8; quality is 1 to 100. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_jpeg_save(const ffpsd_image_view_t* image, const char* path, int quality);
     FFPSD_EXPORT ffpsd_status_t ffpsd_jpeg_save_memory(const ffpsd_image_view_t* image, int quality, ffpsd_buffer_t** out);
+
+    /* Every WebP call is UNSUPPORTED in a build without WebP; an animated WebP is refused. */
+    FFPSD_EXPORT ffpsd_status_t ffpsd_webp_load(const char* path, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_image_t** out);
+    FFPSD_EXPORT ffpsd_status_t
+    ffpsd_webp_load_memory(const uint8_t* data, size_t size, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_image_t** out);
+
+    /* RGBA when a pixel is not opaque, RGB otherwise; gray to the colors, 16 bit to 8; quality 0 to 100, the effort when lossless. */
+    FFPSD_EXPORT ffpsd_status_t ffpsd_webp_save(const ffpsd_image_view_t* image, const char* path, int quality, int lossless);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_webp_save_memory(const ffpsd_image_view_t* image, int quality, int lossless, ffpsd_buffer_t** out);
 
 #ifdef __cplusplus
 }

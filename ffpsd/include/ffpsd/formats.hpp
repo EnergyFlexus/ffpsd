@@ -14,7 +14,8 @@ namespace ffpsd
     enum class Format : std::uint8_t
     {
         kPng,
-        kJpeg
+        kJpeg,
+        kWebp
     };
 
     // Speed against size of a written PNG; kFastest can grow flat pictures a few times over.
@@ -28,7 +29,7 @@ namespace ffpsd
     // Whether this build reads and writes the format.
     FFPSD_EXPORT bool IsFormatSupported(Format format) noexcept;
 
-    // PNG or JPEG by the file's signature, not its name; a JPEG is turned upright by EXIF, as Photoshop opens it.
+    // PNG, JPEG or WebP by the file's signature, not its name; a JPEG is turned upright by EXIF, as Photoshop opens it.
     FFPSD_EXPORT Image LoadPicture(const std::string& path, ColorMode color_mode, std::uint16_t depth);
     FFPSD_EXPORT Image LoadPicture(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth);
 
@@ -51,6 +52,17 @@ namespace ffpsd
     // Gray from 1 or 2 channels, RGB from 3 or 4, alpha dropped and 16 bit narrowed to 8; quality is 1 to 100.
     FFPSD_EXPORT std::vector<std::uint8_t> EncodeJpeg(const ImageView& image, int quality = 90);
     FFPSD_EXPORT void SaveJpeg(const ImageView& image, const std::string& path, int quality = 90);
+#endif
+
+#if defined(FFPSD_HAS_WEBP)
+    // Gray or RGB at 8 or 16 bit, alpha as the last plane; an animated WebP is refused.
+    FFPSD_EXPORT Image LoadWebp(const std::string& path, ColorMode color_mode, std::uint16_t depth);
+    FFPSD_EXPORT Image LoadWebp(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth);
+
+    // RGBA when a pixel is not opaque, RGB otherwise; gray goes to all three colors, 16 bit narrows to 8; quality is 0 to 100.
+    // Lossless keeps every 8 bit sample, transparent pixels included, and takes quality as the effort spent on size.
+    FFPSD_EXPORT std::vector<std::uint8_t> EncodeWebp(const ImageView& image, int quality = 90, bool lossless = false);
+    FFPSD_EXPORT void SaveWebp(const ImageView& image, const std::string& path, int quality = 90, bool lossless = false);
 #endif
 } // namespace ffpsd
 

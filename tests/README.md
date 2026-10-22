@@ -14,7 +14,7 @@ cases/           what builds into ffpsd_tests
   layer/         layer.hpp: properties, name, kind and blocks, pixels and position,
                  the background, resizing
   adjustments/   adjustments.hpp: Levels
-  formats/       formats.hpp: LoadPicture; png and jpeg only with their options
+  formats/       formats.hpp: LoadPicture; png, jpeg and webp only with their options
   c_api/         c_api.h alone; c_header_check.c compiles it as C
   support/       test_support.hpp: the data files, their layer names, small builders
 data/            photoshop/: written by Photoshop; generated/: written by scripts/
@@ -49,9 +49,12 @@ and branch that is no longer covered. `--html DIR` shows it line by line.
 | `generated/orientation_broken.jpg` | EXIF that ends inside its first entry |
 | `generated/gray.jpg` | 16 x 8 gray: 64 on the left, 192 on the right |
 | `generated/cmyk.jpg` | 16 x 8 Adobe CMYK: cyan on the left, half black on the right |
+| `generated/rgba_lossless.webp` | the pixels of `rgba_8bit.png`, lossless, colors under the clear one kept |
+| `generated/rgb_quadrants.webp` | the quarters of `rgb_quadrants.jpg`, lossy at quality 100 |
+| `generated/animated.webp` | two 4 x 4 frames, red then blue |
 
 `photoshop/` is from Photoshop 2026, in Git LFS, and is never edited: it is what
 the library is checked against. `generated/` is written by
 `scripts/make_png_files.py` with zlib alone, so libpng is checked against
-another encoder, and by `scripts/make_jpeg_files.py` with Pillow
+another encoder, and by `scripts/make_jpeg_files.py` and `scripts/make_webp_files.py` with Pillow
 (`pip install -r scripts/requirements.txt`); run them again after changing them.

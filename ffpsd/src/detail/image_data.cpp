@@ -1,6 +1,6 @@
 #include "detail/image_data.hpp"
 
-#include "detail/image.hpp"
+#include "detail/limits.hpp"
 #include "detail/samples.hpp"
 
 #include <stdexcept>
@@ -25,8 +25,7 @@ namespace ffpsd::detail
     {
         if (data.IsEmpty())
             return ImageInfo();
-        if (!IsSampleDepth(info.depth))
-            throw std::runtime_error(UnsupportedDepth(info.depth));
+        CheckSampleDepth<std::runtime_error>(info.depth);
         return info;
     }
 } // namespace ffpsd::detail

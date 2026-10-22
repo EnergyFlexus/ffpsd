@@ -8,8 +8,8 @@ img2ffpsd-cli <bottom> <top> [<layer>...] <output> [--auto|--color|--gray] [--jo
               [--recursive=true|false]
 ```
 
-Pairs the PNG and JPEG files of the bottom and top folders by their path without
-the extension into PSD files: `raw/01.jpg` goes with `scaled/01.png`. A JPEG is
+Pairs the PNG, JPEG and WebP files of the bottom and top folders by their path
+without the extension into PSD files: `raw/01.jpg` goes with `scaled/01.png`. A JPEG is
 turned upright by its EXIF orientation, as Photoshop opens it. The bottom one is
 the locked background, the top one the layer above it. Each further folder adds
 a layer above those, where it has the file. A layer is named by its folder:
@@ -35,4 +35,4 @@ A file in only the bottom or the top folder stops it, and so do two pictures of
 one name in a folder, `01.png` and `01.jpg`; a file that only a further folder
 has is skipped with a warning. Gaps in numbered names (`1, 2, 4`; `3-4` is two
 pages) and a non-empty output folder wait for a key, Ctrl+C to stop. Needs
-`FFPSD_WITH_PNG` and `FFPSD_WITH_JPEG`.
+`FFPSD_WITH_PNG` and `FFPSD_WITH_JPEG`; WebP files are taken with `FFPSD_WITH_WEBP`.

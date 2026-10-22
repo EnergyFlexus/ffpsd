@@ -21,7 +21,7 @@ namespace ffpsd::detail
 
     ImageResources ParseImageResources(BigEndianReader& reader)
     {
-        const std::size_t section_length = reader.CheckLength(reader.ReadU32(), reader.GetSize(), "image resources section");
+        const std::size_t section_length = reader.CheckedLength(reader.ReadU32(), reader.GetSize(), "image resources section");
 
         const std::size_t section_end = reader.Tell() + section_length;
 

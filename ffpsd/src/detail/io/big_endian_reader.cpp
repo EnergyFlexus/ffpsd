@@ -62,7 +62,7 @@ namespace ffpsd::detail
         return end >= offset_ && length <= end - offset_;
     }
 
-    std::size_t BigEndianReader::CheckLength(std::uint64_t length, std::size_t end, const char* what) const
+    std::size_t BigEndianReader::CheckedLength(std::uint64_t length, std::size_t end, const char* what) const
     {
         if (!FitsLength(length, end))
             throw std::runtime_error(
@@ -73,7 +73,7 @@ namespace ffpsd::detail
 
     std::vector<std::uint8_t> BigEndianReader::ReadBlob(std::size_t end, const char* what)
     {
-        return ReadBytes(CheckLength(ReadU32(), end, what));
+        return ReadBytes(CheckedLength(ReadU32(), end, what));
     }
 
     std::vector<std::uint8_t> BigEndianReader::ReadBytes(std::size_t count)

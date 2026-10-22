@@ -1,11 +1,10 @@
 #include "detail/formats/planes.hpp"
 
-#include "detail/image.hpp"
+#include "detail/limits.hpp"
 
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <stdexcept>
 
 #if defined(_M_X64) || defined(__x86_64__)
 #define FFPSD_SPLIT_SSSE3
@@ -250,8 +249,7 @@ namespace ffpsd::detail
 
     Image MakePlanes(std::uint32_t width, std::uint32_t height, std::uint16_t channel_count, std::uint16_t depth)
     {
-        if (!IsSampleDepth(depth))
-            throw std::invalid_argument(UnsupportedDepth(depth));
+        CheckSampleDepth(depth);
 
         return Image(ImageInfo{width, height, channel_count, depth, channel_count >= 3 ? ColorMode::kRgb : ColorMode::kGrayscale});
     }
@@ -317,5 +315,28 @@ namespace ffpsd::detail
         default:
             return JoinRow<4>(in, image.width, image.channel_count, plane_bytes, out);
         }
+    }
+
+    void NarrowRow(const std::uint8_t* samples, std::size_t count, std::uint8_t* out) noexcept
+    {
+        for (std::size_t i = 0; i < count; ++i)
+        {
+            std::uint16_t sample = 0;
+            std::memcpy(&sample, samples + i * 2, 2);
+            out[i] = static_cast<std::uint8_t>((sample * 255u + 32767) / 65535);
+        }
+    }
+
+    Image WidenTo16(const Image& image)
+    {
+        ImageInfo info = image;
+        info.depth = 16;
+        Image wide(info);
+        for (std::size_t i = 0; i < image.bytes.size(); ++i)
+        {
+            const auto sample = static_cast<std::uint16_t>(image.bytes[i] * 257);
+            std::memcpy(wide.bytes.data() + i * 2, &sample, 2);
+        }
+        return wide;
     }
 } // namespace ffpsd::detail

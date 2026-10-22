@@ -1,4 +1,3 @@
-#include "detail/file_header.hpp"
 #include "detail/image.hpp"
 #include "detail/layer_and_mask/adjustments/adjustment_layer.hpp"
 #include "detail/layer_and_mask/adjustments/levels.hpp"
@@ -9,6 +8,7 @@
 #include "detail/layer_and_mask/layer_record.hpp"
 #include "detail/layer_and_mask/tagged_blocks/section_divider_setting.hpp"
 #include "detail/layer_and_mask/tagged_blocks/unicode_layer_name.hpp"
+#include "detail/limits.hpp"
 
 #include <cstdint>
 #include <ffpsd/document.hpp>

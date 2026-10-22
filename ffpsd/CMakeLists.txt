@@ -20,6 +20,8 @@ target_sources(ffpsd
         src/detail/image_data.hpp
         src/detail/image.cpp
         src/detail/image.hpp
+        src/detail/limits.cpp
+        src/detail/limits.hpp
         src/detail/pixel_data.cpp
         src/detail/pixel_data.hpp
         src/detail/rect.cpp
@@ -129,6 +131,19 @@ if(FFPSD_WITH_JPEG)
     target_compile_definitions(ffpsd PUBLIC FFPSD_HAS_JPEG)
 endif()
 
+if(FFPSD_WITH_WEBP)
+    target_sources(ffpsd PRIVATE src/detail/formats/webp.cpp src/detail/formats/webp.hpp)
+    get_target_property(ffpsd_webp_location ffpsd_webp IMPORTED_LOCATION)
+    get_target_property(ffpsd_sharpyuv_location ffpsd_sharpyuv IMPORTED_LOCATION)
+    get_filename_component(ffpsd_webp_file "${ffpsd_webp_location}" NAME)
+    get_filename_component(ffpsd_sharpyuv_file "${ffpsd_sharpyuv_location}" NAME)
+    target_link_libraries(ffpsd PRIVATE
+        "$<BUILD_INTERFACE:ffpsd_webp>"
+        "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_LIBDIR}/${ffpsd_webp_file}>"
+        "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_LIBDIR}/${ffpsd_sharpyuv_file}>")
+    target_compile_definitions(ffpsd PUBLIC FFPSD_HAS_WEBP)
+endif()
+
 # Keeps the symbols of the vendored libraries inside the .so.
 if(BUILD_SHARED_LIBS AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_options(ffpsd PRIVATE "LINKER:--exclude-libs,ALL")
@@ -163,6 +178,9 @@ if(FFPSD_WITH_PNG AND NOT BUILD_SHARED_LIBS)
 endif()
 if(FFPSD_WITH_JPEG AND NOT BUILD_SHARED_LIBS)
     install(FILES "${ffpsd_jpeg_location}" DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+endif()
+if(FFPSD_WITH_WEBP AND NOT BUILD_SHARED_LIBS)
+    install(FILES "${ffpsd_webp_location}" "${ffpsd_sharpyuv_location}" DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 endif()
 
 install(EXPORT ffpsd-targets

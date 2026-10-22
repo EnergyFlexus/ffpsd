@@ -26,6 +26,7 @@ OUT_DIR = ROOT / "ffpsd-out"
 MIN_CMAKE = (3, 23)
 PNG_VENDORED = ("libpng", "zlib-ng")
 JPEG_VENDORED = ("libjpeg-turbo",)
+WEBP_VENDORED = ("libwebp",)
 UI_VENDORED = ("imgui", "SDL")
 
 IS_WINDOWS = platform.system() == "Windows"
@@ -168,8 +169,8 @@ def smoke_test(directory, env):
     run([tool, "--help"], env)
 
 
-def check_vendor(names=PNG_VENDORED + JPEG_VENDORED):
-    """PNG, JPEG and the window of img2ffpsd-ui build what they need from the submodules under vendor/."""
+def check_vendor(names=PNG_VENDORED + JPEG_VENDORED + WEBP_VENDORED):
+    """PNG, JPEG, WebP and the window of img2ffpsd-ui build what they need from the submodules under vendor/."""
     # Dear ImGui has no CMakeLists.txt of its own, so its header shows the submodule is there.
     missing = [name for name in names if not (ROOT / "vendor" / name / "CMakeLists.txt").is_file()
                and not (ROOT / "vendor" / name / f"{name}.h").is_file()]
@@ -177,7 +178,7 @@ def check_vendor(names=PNG_VENDORED + JPEG_VENDORED):
         return
     if not (ROOT / ".git").exists():
         fail("vendor/ is missing " + ", ".join(missing),
-             "download them, or build without them: --no-png, --no-jpeg")
+             "download them, or build without them: --no-png, --no-jpeg, --no-webp")
     run(["git", "submodule", "update", "--init", "--recursive"])
 
 
@@ -192,6 +193,8 @@ def main():
                         help="build without PNG loading and saving, so without libpng, zlib-ng and img2ffpsd")
     parser.add_argument("--no-jpeg", action="store_true",
                         help="build without JPEG loading and saving, so without libjpeg-turbo and img2ffpsd")
+    parser.add_argument("--no-webp", action="store_true",
+                        help="build without WebP loading and saving, so without libwebp")
     parser.add_argument("--crt", choices=("static", "dynamic"),
                         help="MSVC: the C runtime, /MT or /MD (default: static for "
                              "--static, dynamic for a shared library)")
@@ -211,7 +214,8 @@ def main():
     cmake = check_cmake()
     # img2ffpsd-ui reads PNG and JPEG too; without either there is no window to build.
     ui = not (args.no_apps or args.no_png or args.no_jpeg)
-    check_vendor((() if args.no_png else PNG_VENDORED) + (() if args.no_jpeg else JPEG_VENDORED) + (UI_VENDORED if ui else ()))
+    check_vendor((() if args.no_png else PNG_VENDORED) + (() if args.no_jpeg else JPEG_VENDORED)
+                 + (() if args.no_webp else WEBP_VENDORED) + (UI_VENDORED if ui else ()))
     generator = pick_generator()
     env = build_env()
 
@@ -228,6 +232,7 @@ def main():
          f"-DFFPSD_BUILD_APPS={'OFF' if args.no_apps else 'ON'}",
          f"-DFFPSD_WITH_PNG={'OFF' if args.no_png else 'ON'}",
          f"-DFFPSD_WITH_JPEG={'OFF' if args.no_jpeg else 'ON'}",
+         f"-DFFPSD_WITH_WEBP={'OFF' if args.no_webp else 'ON'}",
          f"-DFFPSD_WITH_IMGUI={'ON' if ui else 'OFF'}",
          f"-DFFPSD_MSVC_STATIC_RUNTIME={'ON' if crt == 'static' else 'OFF'}",
          f"-DCMAKE_INSTALL_PREFIX={out_dir}"], env)

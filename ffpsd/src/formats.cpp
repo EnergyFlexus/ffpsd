@@ -1,6 +1,7 @@
 #include "detail/formats/jpeg.hpp"
 #include "detail/formats/picture.hpp"
 #include "detail/formats/png.hpp"
+#include "detail/formats/webp.hpp"
 #include "detail/io/file.hpp"
 
 #include <cstddef>
@@ -26,11 +27,17 @@ namespace ffpsd
 #else
         constexpr bool kHasJpeg = false;
 #endif
+
+#if defined(FFPSD_HAS_WEBP)
+        constexpr bool kHasWebp = true;
+#else
+        constexpr bool kHasWebp = false;
+#endif
     } // namespace
 
     bool IsFormatSupported(Format format) noexcept
     {
-        return (format == Format::kPng && kHasPng) || (format == Format::kJpeg && kHasJpeg);
+        return (format == Format::kPng && kHasPng) || (format == Format::kJpeg && kHasJpeg) || (format == Format::kWebp && kHasWebp);
     }
 
     // A build without either format has no use for the color mode and the depth.
@@ -52,6 +59,14 @@ namespace ffpsd
             return detail::DecodeJpeg(data, size, color_mode, depth, true);
 #else
             throw std::logic_error("ffpsd: built without JPEG support");
+#endif
+        }
+        if (format == Format::kWebp)
+        {
+#if defined(FFPSD_HAS_WEBP)
+            return detail::DecodeWebp(data, size, color_mode, depth);
+#else
+            throw std::logic_error("ffpsd: built without WebP support");
 #endif
         }
         throw std::runtime_error("ffpsd: unsupported image format");
@@ -106,6 +121,29 @@ namespace ffpsd
     void SaveJpeg(const ImageView& image, const std::string& path, int quality)
     {
         detail::WriteFile(path, detail::EncodeJpeg(image, quality));
+    }
+#endif
+
+#if defined(FFPSD_HAS_WEBP)
+    Image LoadWebp(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth)
+    {
+        return detail::DecodeWebp(data, size, color_mode, depth);
+    }
+
+    Image LoadWebp(const std::string& path, ColorMode color_mode, std::uint16_t depth)
+    {
+        const Bytes file = detail::ReadFile(path);
+        return detail::DecodeWebp(file.data(), file.size(), color_mode, depth);
+    }
+
+    std::vector<std::uint8_t> EncodeWebp(const ImageView& image, int quality, bool lossless)
+    {
+        return detail::EncodeWebp(image, quality, lossless);
+    }
+
+    void SaveWebp(const ImageView& image, const std::string& path, int quality, bool lossless)
+    {
+        detail::WriteFile(path, detail::EncodeWebp(image, quality, lossless));
     }
 #endif
 } // namespace ffpsd

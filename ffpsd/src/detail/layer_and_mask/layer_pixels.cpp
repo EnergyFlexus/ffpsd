@@ -3,6 +3,7 @@
 #include "detail/color.hpp"
 #include "detail/image.hpp"
 #include "detail/layer_and_mask/channel_ids.hpp"
+#include "detail/limits.hpp"
 #include "detail/pixel_data.hpp"
 #include "detail/rect.hpp"
 
@@ -23,8 +24,7 @@ namespace ffpsd::detail
 
         LayerPlanes FindLayerPlanes(const LayerRecord& record, ColorMode color_mode, std::uint16_t depth)
         {
-            if (!IsSampleDepth(depth))
-                throw std::runtime_error(UnsupportedDepth(depth));
+            CheckSampleDepth<std::runtime_error>(depth);
 
             LayerPlanes planes;
             planes.info.depth = depth;

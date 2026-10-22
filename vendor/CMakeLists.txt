@@ -39,9 +39,26 @@ if(FFPSD_WITH_PNG)
         DESTINATION "${CMAKE_INSTALL_DATADIR}/ffpsd/licenses" RENAME zlib-ng.md)
 endif()
 
+if(FFPSD_WITH_JPEG OR FFPSD_WITH_WEBP)
+    # What a library built on its own and installed into the build tree needs to build as the rest does.
+    include(ExternalProject)
+    set(ffpsd_external_args
+        -DCMAKE_INSTALL_LIBDIR=lib
+        -DCMAKE_INSTALL_INCLUDEDIR=include
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+        -DCMAKE_C_VISIBILITY_PRESET=hidden)
+    foreach(ffpsd_variable IN ITEMS CMAKE_BUILD_TYPE CMAKE_C_COMPILER CMAKE_MAKE_PROGRAM CMAKE_TOOLCHAIN_FILE
+                                    CMAKE_OSX_ARCHITECTURES CMAKE_OSX_DEPLOYMENT_TARGET)
+        if(${ffpsd_variable})
+            # Backslashes of a Windows path would be escapes in the script ExternalProject writes.
+            file(TO_CMAKE_PATH "${${ffpsd_variable}}" ffpsd_value)
+            list(APPEND ffpsd_external_args "-D${ffpsd_variable}=${ffpsd_value}")
+        endif()
+    endforeach()
+endif()
+
 if(FFPSD_WITH_JPEG)
     # libjpeg-turbo refuses add_subdirectory, so it is built on its own and installed into the build tree.
-    include(ExternalProject)
     set(ffpsd_jpeg_dir "${CMAKE_CURRENT_BINARY_DIR}/libjpeg-turbo-install")
     if(MSVC)
         set(ffpsd_jpeg_file jpeg-static.lib)
@@ -56,11 +73,8 @@ if(FFPSD_WITH_JPEG)
 
     # Plain C, without SIMD: no assembler to install on any system.
     set(ffpsd_jpeg_args
+        ${ffpsd_external_args}
         -DCMAKE_INSTALL_PREFIX=${ffpsd_jpeg_dir}
-        -DCMAKE_INSTALL_LIBDIR=lib
-        -DCMAKE_INSTALL_INCLUDEDIR=include
-        -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-        -DCMAKE_C_VISIBILITY_PRESET=hidden
         -DENABLE_SHARED=0
         -DENABLE_STATIC=1
         -DWITH_TURBOJPEG=0
@@ -68,14 +82,6 @@ if(FFPSD_WITH_JPEG)
         -DWITH_TESTS=0
         -DWITH_SIMD=0
         -DWITH_CRT_DLL=${ffpsd_jpeg_crt_dll})
-    foreach(ffpsd_variable IN ITEMS CMAKE_BUILD_TYPE CMAKE_C_COMPILER CMAKE_MAKE_PROGRAM CMAKE_TOOLCHAIN_FILE
-                                    CMAKE_OSX_ARCHITECTURES CMAKE_OSX_DEPLOYMENT_TARGET)
-        if(${ffpsd_variable})
-            # Backslashes of a Windows path would be escapes in the script ExternalProject writes.
-            file(TO_CMAKE_PATH "${${ffpsd_variable}}" ffpsd_value)
-            list(APPEND ffpsd_jpeg_args "-D${ffpsd_variable}=${ffpsd_value}")
-        endif()
-    endforeach()
 
     ExternalProject_Add(libjpeg-turbo
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libjpeg-turbo"
@@ -98,6 +104,71 @@ if(FFPSD_WITH_JPEG)
         DESTINATION "${CMAKE_INSTALL_DATADIR}/ffpsd/licenses" RENAME libjpeg-turbo.md)
     install(FILES libjpeg-turbo/README.ijg
         DESTINATION "${CMAKE_INSTALL_DATADIR}/ffpsd/licenses" RENAME libjpeg-turbo-ijg.txt)
+endif()
+
+if(FFPSD_WITH_WEBP)
+    # libwebp installs its headers and CMake package whatever it is told, so it is built on its own too.
+    set(ffpsd_webp_dir "${CMAKE_CURRENT_BINARY_DIR}/libwebp-install")
+    if(MSVC)
+        set(ffpsd_webp_file libwebp.lib)
+        set(ffpsd_sharpyuv_file libsharpyuv.lib)
+    else()
+        set(ffpsd_webp_file libwebp.a)
+        set(ffpsd_sharpyuv_file libsharpyuv.a)
+    endif()
+
+    # The generators are single-config, so the build type decides the debug CRT.
+    set(ffpsd_webp_crt MultiThreaded)
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        string(APPEND ffpsd_webp_crt Debug)
+    endif()
+    if(NOT FFPSD_MSVC_STATIC_RUNTIME)
+        string(APPEND ffpsd_webp_crt DLL)
+    endif()
+
+    # SIMD through intrinsics, so no assembler; no threads, as ffpsd has none.
+    set(ffpsd_webp_args
+        ${ffpsd_external_args}
+        -DCMAKE_INSTALL_PREFIX=${ffpsd_webp_dir}
+        -DCMAKE_MSVC_RUNTIME_LIBRARY=${ffpsd_webp_crt}
+        -DBUILD_SHARED_LIBS=OFF
+        -DWEBP_USE_THREAD=OFF
+        -DWEBP_BUILD_ANIM_UTILS=OFF
+        -DWEBP_BUILD_CWEBP=OFF
+        -DWEBP_BUILD_DWEBP=OFF
+        -DWEBP_BUILD_GIF2WEBP=OFF
+        -DWEBP_BUILD_IMG2WEBP=OFF
+        -DWEBP_BUILD_VWEBP=OFF
+        -DWEBP_BUILD_WEBPINFO=OFF
+        -DWEBP_BUILD_LIBWEBPMUX=OFF
+        -DWEBP_BUILD_WEBPMUX=OFF
+        -DWEBP_BUILD_EXTRAS=OFF)
+
+    ExternalProject_Add(libwebp
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libwebp"
+        CMAKE_ARGS ${ffpsd_webp_args}
+        BUILD_BYPRODUCTS "${ffpsd_webp_dir}/lib/${ffpsd_webp_file}" "${ffpsd_webp_dir}/lib/${ffpsd_sharpyuv_file}"
+        LOG_CONFIGURE ON
+        LOG_BUILD ON
+        LOG_INSTALL ON
+        LOG_OUTPUT_ON_FAILURE ON)
+
+    # libwebp converts colors with libsharpyuv, so the one links the other.
+    file(MAKE_DIRECTORY "${ffpsd_webp_dir}/include")
+    add_library(ffpsd_sharpyuv STATIC IMPORTED GLOBAL)
+    set_target_properties(ffpsd_sharpyuv PROPERTIES IMPORTED_LOCATION "${ffpsd_webp_dir}/lib/${ffpsd_sharpyuv_file}")
+    add_dependencies(ffpsd_sharpyuv libwebp)
+    add_library(ffpsd_webp STATIC IMPORTED GLOBAL)
+    set_target_properties(ffpsd_webp PROPERTIES
+        IMPORTED_LOCATION "${ffpsd_webp_dir}/lib/${ffpsd_webp_file}"
+        INTERFACE_INCLUDE_DIRECTORIES "${ffpsd_webp_dir}/include"
+        INTERFACE_LINK_LIBRARIES ffpsd_sharpyuv)
+    add_dependencies(ffpsd_webp libwebp)
+
+    install(FILES libwebp/COPYING
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/ffpsd/licenses" RENAME libwebp.txt)
+    install(FILES libwebp/PATENTS
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/ffpsd/licenses" RENAME libwebp-patents.txt)
 endif()
 
 if(FFPSD_WITH_IMGUI)

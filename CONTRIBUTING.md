@@ -33,7 +33,7 @@ ffpsd/src/             the library
 ffpsd/src/detail/      everything not in the public API
 apps/                  the apps, a folder each: img2ffpsd, with cli/, ui/ and the common/ they share
 docs/                  PSD.md, the format reference
-vendor/                libpng, zlib-ng, libjpeg-turbo, imgui, SDL, googletest, benchmark: submodules pinned to tags
+vendor/                libpng, zlib-ng, libjpeg-turbo, libwebp, imgui, SDL, googletest, benchmark: submodules pinned to tags
 tests/cases/           GoogleTest, built with FFPSD_BUILD_TESTS
 tests/data/            the files they read; tests/scripts/ writes generated/
 benchmarks/            Google Benchmark, built with FFPSD_BUILD_BENCHMARKS
@@ -103,7 +103,7 @@ section needs more than one file:
 detail/io/                 byte order, readers, writers, files, fourcc, fixed, strings, compression
 detail/color.*             RGB to gray and back
 detail/composite.*         the white canvas, normal blending
-detail/formats/            PNG and JPEG behind formats.cpp; planes, EXIF, signatures and checks
+detail/formats/            PNG, JPEG and WebP behind formats.cpp; planes, EXIF, signatures and checks
 detail/file_header.*       section 1
 detail/color_mode_data.*   section 2
 detail/image_resources/    section 3
@@ -232,7 +232,7 @@ Shouty case, always `FFPSD_`: a macro ignores namespaces. `FFPSD_BUILDING`,
 * A layer name goes into the caller's buffer, cut to fit, with its full length.
 * `int` stands for `bool`; an enum is a C enum in a parameter, a fixed-width
   integer in a struct.
-* The declarations do not depend on build options: without PNG or JPEG, their
+* The declarations do not depend on build options: without PNG, JPEG or WebP, their
   calls return `FFPSD_STATUS_UNSUPPORTED`.
 
 Exceptions map to statuses: `invalid_argument` and `length_error` to
@@ -270,8 +270,9 @@ so review and `git add` again. Without committing:
 
 `vendor/` is theirs: not formatted, not renamed, skipped by the hooks.
 `vendor/CMakeLists.txt` is ours and builds everything static with our CRT.
-libjpeg-turbo refuses `add_subdirectory`, so it is an `ExternalProject` installed
-into the build tree and imported as `ffpsd_jpeg`. To update one:
+libjpeg-turbo refuses `add_subdirectory`, and libwebp installs its own headers and
+package whatever it is told, so each is an `ExternalProject` installed into the
+build tree and imported as `ffpsd_jpeg`, or `ffpsd_webp` with `ffpsd_sharpyuv`. To update one:
 
 ```sh
 git -C vendor/libpng fetch --tags
@@ -301,7 +302,7 @@ Tests, `tests/README.md` has the folders:
 
 * The public headers: `document.hpp`, `image_resources.hpp`, `adjustments.hpp`,
   `tagged_block.hpp`, `types.hpp`, `image.hpp`, `layer.hpp`, `formats.hpp` (PNG
-  with `FFPSD_WITH_PNG`, JPEG with `FFPSD_WITH_JPEG`), `c_api.h`, `export.h`,
+  with `FFPSD_WITH_PNG`, JPEG with `FFPSD_WITH_JPEG`, WebP with `FFPSD_WITH_WEBP`), `c_api.h`, `export.h`,
   and the `ffpsd.hpp` umbrella, which includes everything.
 * A new one goes into `ffpsd/include/ffpsd/` and `FILE_SET HEADERS`, or it is not
   installed.

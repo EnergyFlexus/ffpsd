@@ -5,6 +5,7 @@
 #include "detail/formats/planes.hpp"
 #include "detail/image.hpp"
 #include "detail/io/byte_order.hpp"
+#include "detail/limits.hpp"
 
 #include <cstdint>
 #include <cstdio>
@@ -22,8 +23,8 @@ namespace ffpsd::detail
 {
     namespace
     {
-        // Refused before the rows are allocated, read or written.
-        constexpr std::uint32_t kMaxSide = 300000;
+        // A side no PSB holds is refused before the rows are allocated, read or written.
+        constexpr std::uint32_t kMaxSide = kMaxSidePsb;
 
         constexpr std::size_t kErrorSize = 256;
 
@@ -126,7 +127,7 @@ namespace ffpsd::detail
             out.height = png_get_image_height(png, info);
             out.channels = png_get_channels(png, info);
             if (out.width > kMaxSide || out.height > kMaxSide)
-                png_error(png, "a PNG side is at most 300000 pixels");
+                png_error(png, "a PNG side is longer than a PSB holds");
 
             const std::size_t row_bytes = png_get_rowbytes(png, info);
             if (png_get_interlace_type(png, info) == PNG_INTERLACE_NONE)

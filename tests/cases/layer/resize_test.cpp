@@ -6,7 +6,6 @@
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <utility>
-#include <vector>
 
 using namespace ffpsd_test;
 

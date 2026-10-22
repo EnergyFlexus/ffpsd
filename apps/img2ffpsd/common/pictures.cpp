@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <ffpsd/formats.hpp>
 #include <fstream>
 #include <set>
 
@@ -23,6 +24,8 @@ namespace img2ffpsd
         bool IsPicture(const fs::path& path)
         {
             const std::string extension = Extension(path);
+            if (extension == ".webp")
+                return ffpsd::IsFormatSupported(ffpsd::Format::kWebp);
             return extension == ".png" || extension == ".jpg" || extension == ".jpeg";
         }
 

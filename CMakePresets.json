@@ -82,6 +82,7 @@
         "FFPSD_BUILD_APPS": "ON",
         "FFPSD_WITH_PNG": "ON",
         "FFPSD_WITH_JPEG": "ON",
+        "FFPSD_WITH_WEBP": "ON",
         "FFPSD_WITH_IMGUI": "ON"
       }
     },

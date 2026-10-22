@@ -2,6 +2,7 @@
 
 #include "detail/color.hpp"
 #include "detail/image.hpp"
+#include "detail/limits.hpp"
 #include "detail/samples.hpp"
 
 #include <algorithm>
@@ -92,8 +93,7 @@ namespace ffpsd::detail
 
     Image MakeWhiteImage(std::uint32_t width, std::uint32_t height, ColorMode color_mode, std::uint16_t depth)
     {
-        if (!IsSampleDepth(depth))
-            throw std::invalid_argument(UnsupportedDepth(depth));
+        CheckSampleDepth(depth);
 
         Image image(ImageInfo{width, height, ColorChannelCount(color_mode), depth, color_mode});
         switch (depth)

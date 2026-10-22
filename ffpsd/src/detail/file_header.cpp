@@ -1,6 +1,7 @@
 #include "detail/file_header.hpp"
 
 #include "detail/io/fourcc.hpp"
+#include "detail/limits.hpp"
 
 #include <stdexcept>
 #include <string>
@@ -34,9 +35,10 @@ namespace ffpsd::detail
         info.color_mode = static_cast<ColorMode>(reader.ReadU16());
 
         CheckCanvasSides<std::runtime_error>(info.width, info.height, header.version == kVersionPsb);
-        if (info.channel_count < 1 || info.channel_count > kMaxChannels)
-            throw std::runtime_error("ffpsd: channel count out of range: " + std::to_string(info.channel_count));
-        CheckDepthAndMode<std::runtime_error>(info.depth, info.color_mode);
+        if (info.channel_count == 0)
+            throw std::runtime_error("ffpsd: the file has no channels");
+        CheckChannelCount<std::runtime_error>(info.channel_count, "the file");
+        CheckModeAndDepth<std::runtime_error>(info.color_mode, info.depth);
         return header;
     }
 
@@ -52,12 +54,4 @@ namespace ffpsd::detail
         writer.WriteU16(static_cast<std::uint16_t>(header.info.color_mode));
     }
 
-    void CheckLayerSides(std::uint32_t width, std::uint32_t height, bool is_psb)
-    {
-        const std::uint32_t max_side = MaxSide(is_psb);
-        if (width > max_side || height > max_side)
-            throw std::invalid_argument(
-                "ffpsd: a " + std::to_string(width) + " x " + std::to_string(height) + " layer exceeds " + std::to_string(max_side) +
-                " pixels a side");
-    }
 } // namespace ffpsd::detail

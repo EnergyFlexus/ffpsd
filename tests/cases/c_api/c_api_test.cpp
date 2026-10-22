@@ -440,7 +440,7 @@ TEST(CApiTest, EveryFailureIsAStatusWithAMessage)
     EXPECT_STREQ(ffpsd_last_error(), "");
 }
 
-TEST(CApiTest, PngAndJpegThroughC)
+TEST(CApiTest, PictureFormatsThroughC)
 {
     OpenDocument file(kRgbPsd);
     const ffpsd_layer_t* layer = Layer(file.doc, 1);
@@ -486,6 +486,31 @@ TEST(CApiTest, PngAndJpegThroughC)
     EXPECT_EQ(jpeg_status, FFPSD_STATUS_UNSUPPORTED);
     EXPECT_EQ(jpeg, nullptr);
 #endif
+
+    ffpsd_buffer_t* webp = nullptr;
+    const ffpsd_status_t webp_status = ffpsd_webp_save_memory(&pixels_view, 50, 1, &webp);
+
+#if defined(FFPSD_HAS_WEBP)
+    ASSERT_EQ(webp_status, FFPSD_STATUS_OK) << ffpsd_last_error();
+    ffpsd_image_t* lossless = nullptr;
+    ASSERT_EQ(
+        ffpsd_webp_load_memory(ffpsd_buffer_get_data(webp), ffpsd_buffer_get_size(webp), FFPSD_COLOR_MODE_RGB, 8, &lossless),
+        FFPSD_STATUS_OK)
+        << ffpsd_last_error();
+    // The layer is opaque, and WebP leaves out an alpha that is.
+    const ffpsd::Bytes layer_pixels = Pixels(layer);
+    const std::size_t colors = layer_pixels.size() / 4 * 3;
+    ASSERT_TRUE(std::all_of(layer_pixels.begin() + static_cast<std::ptrdiff_t>(colors), layer_pixels.end(), [](std::uint8_t alpha) {
+        return alpha == 0xFF;
+    }));
+    EXPECT_EQ(Bytes(lossless), ffpsd::Bytes(layer_pixels.data(), colors));
+    ffpsd_image_destroy(lossless);
+    ffpsd_buffer_destroy(webp);
+    EXPECT_EQ(ffpsd_webp_save_memory(&pixels_view, 101, 0, &webp), FFPSD_STATUS_INVALID_ARGUMENT);
+#else
+    EXPECT_EQ(webp_status, FFPSD_STATUS_UNSUPPORTED);
+    EXPECT_EQ(webp, nullptr);
+#endif
     ffpsd_image_destroy(pixels);
 }
 
@@ -522,6 +547,23 @@ TEST(CApiTest, APictureGoesByItsSignatureThroughC)
 #else
     EXPECT_EQ(ffpsd_format_is_supported(FFPSD_FORMAT_JPEG), 0);
     EXPECT_EQ(jpeg_status, FFPSD_STATUS_UNSUPPORTED);
+    EXPECT_EQ(image, nullptr);
+#endif
+
+    const ffpsd_status_t webp_status =
+        ffpsd_picture_load(DataFile("generated/rgb_quadrants.webp").c_str(), FFPSD_COLOR_MODE_GRAYSCALE, 16, &image);
+
+#if defined(FFPSD_HAS_WEBP)
+    EXPECT_EQ(ffpsd_format_is_supported(FFPSD_FORMAT_WEBP), 1);
+    ASSERT_EQ(webp_status, FFPSD_STATUS_OK) << ffpsd_last_error();
+    ASSERT_EQ(ffpsd_image_get_view(image, &view), FFPSD_STATUS_OK);
+    EXPECT_EQ(view.width, 32u);
+    EXPECT_EQ(view.channel_count, 1u);
+    EXPECT_EQ(view.depth, 16u);
+    ffpsd_image_destroy(image);
+#else
+    EXPECT_EQ(ffpsd_format_is_supported(FFPSD_FORMAT_WEBP), 0);
+    EXPECT_EQ(webp_status, FFPSD_STATUS_UNSUPPORTED);
     EXPECT_EQ(image, nullptr);
 #endif
 

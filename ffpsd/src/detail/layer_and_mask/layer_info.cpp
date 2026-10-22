@@ -16,7 +16,7 @@ namespace ffpsd::detail
 
     LayerInfo ParseLayerInfo(BigEndianReader& reader, bool is_psb, std::uint16_t depth)
     {
-        const std::size_t length = reader.CheckLength(reader.ReadLength(is_psb), reader.GetSize(), "layer info");
+        const std::size_t length = reader.CheckedLength(reader.ReadLength(is_psb), reader.GetSize(), "layer info");
 
         // The length counts the padding, which is 4 in practice and 2 by the specification.
         return ParseLayerInfoBody(reader, reader.Tell() + length, is_psb, depth);

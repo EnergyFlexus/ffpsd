@@ -13,11 +13,11 @@ namespace ffpsd::detail
     // The format the bytes start with, supported by this build or not.
     std::optional<Format> FindFormat(const std::uint8_t* data, std::size_t size) noexcept;
 
-    // What PNG and JPEG hold, gray or RGB at 8 or 16 bit; format names the one in the message.
-    void CheckPictureMode(ColorMode color_mode, std::uint16_t depth, const char* format);
+    // What the picture formats take, gray or RGB at 8 or 16 bit; what names the format in the message.
+    void CheckPictureMode(ColorMode color_mode, std::uint16_t depth, const char* what);
 
     // Not empty, in a mode and depth CheckPictureMode takes, transparency at most, and the bytes for it.
-    void CheckPicture(const ImageView& image, const char* format);
+    void CheckPicture(const ImageView& image, const char* what);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_FORMATS_PICTURE_HPP_

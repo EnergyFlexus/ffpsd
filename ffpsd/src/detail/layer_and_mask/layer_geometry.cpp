@@ -1,12 +1,12 @@
 #include "detail/layer_and_mask/layer_geometry.hpp"
 
 #include "detail/composite.hpp"
-#include "detail/file_header.hpp"
 #include "detail/image.hpp"
 #include "detail/io/fourcc.hpp"
 #include "detail/layer_and_mask/channel_ids.hpp"
 #include "detail/layer_and_mask/layer_mask.hpp"
 #include "detail/layer_and_mask/layer_pixels.hpp"
+#include "detail/limits.hpp"
 #include "detail/resample.hpp"
 
 #include <stdexcept>

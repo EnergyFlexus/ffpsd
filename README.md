@@ -8,7 +8,7 @@ Read and write Photoshop PSD and PSB files, with two APIs from one build:
 Code style: [CONTRIBUTING.md](CONTRIBUTING.md). Programs in C++, C and Rust:
 [examples/](examples/README.md).
 
-libpng, zlib-ng, libjpeg-turbo, Dear ImGui, SDL3, GoogleTest and Google Benchmark are git submodules under
+libpng, zlib-ng, libjpeg-turbo, libwebp, Dear ImGui, SDL3, GoogleTest and Google Benchmark are git submodules under
 `vendor/`; the test PSD files are in Git LFS (`git lfs install` before cloning).
 
 ```sh
@@ -28,25 +28,26 @@ python build.py --static   # static library
 
 It checks for CMake >= 3.23, Ninja and a compiler, sets up MSVC on Windows by
 itself and fetches missing submodules. Flags: `--clean`, `--jobs N`,
-`--no-apps`, `--no-png`, `--no-jpeg`, `--crt static|dynamic`, `--out DIR`.
+`--no-apps`, `--no-png`, `--no-jpeg`, `--no-webp`, `--crt static|dynamic`, `--out DIR`.
 
 ```
 ffpsd-out/bin/        ffpsd.dll, img2ffpsd-cli, img2ffpsd-ui
 ffpsd-out/lib/        ffpsd.lib / libffpsd.a, cmake/ffpsd/
-                      static only: libpng16_static.lib, zlibstatic.lib, jpeg-static.lib
+                      static only: libpng16_static.lib, zlibstatic.lib, jpeg-static.lib,
+                      libwebp.lib, libsharpyuv.lib
 ffpsd-out/include/    ffpsd/*.hpp, ffpsd/c_api.h, ffpsd/export.h
 ffpsd-out/share/      ffpsd/licenses/
 ```
 
-A DLL has libpng, zlib-ng and libjpeg-turbo inside and exports none of their
+A DLL has libpng, zlib-ng, libjpeg-turbo and libwebp inside and exports none of their
 symbols; a static library ships them next to it, and the CMake package links them.
-libjpeg-turbo is plain C, without SIMD, so no assembler is needed.
+libjpeg-turbo is plain C, without SIMD, and libwebp's SIMD is C intrinsics, so no assembler is needed.
 
 ## Apps
 
 Built with `FFPSD_BUILD_APPS` and installed into `bin/`:
 
-* [img2ffpsd](apps/img2ffpsd/README.md) - folders of PNG and JPEG pictures into layered PSD files:
+* [img2ffpsd](apps/img2ffpsd/README.md) - folders of PNG, JPEG and WebP pictures into layered PSD files:
   `img2ffpsd-cli` on the command line, `img2ffpsd-ui` in a window with `FFPSD_WITH_IMGUI`; `build.py` builds both
 
 ## Build with CMake
@@ -113,6 +114,7 @@ Benchmark's `compare.py`, which needs
 | `FFPSD_BUILD_APPS`  | `ON`    | `apps/`                            |
 | `FFPSD_WITH_PNG`    | `ON`    | PNG in `ffpsd/formats.hpp`, with libpng and zlib-ng |
 | `FFPSD_WITH_JPEG`   | `ON`    | JPEG in `ffpsd/formats.hpp`, with libjpeg-turbo |
+| `FFPSD_WITH_WEBP`   | `ON`    | WebP in `ffpsd/formats.hpp`, with libwebp |
 | `FFPSD_WITH_IMGUI`  | `OFF`   | the apps with a window, with Dear ImGui and SDL3 |
 | `FFPSD_BUILD_TESTS` | `OFF`, `ON` in the debug presets | `tests/` |
 | `FFPSD_BUILD_BENCHMARKS` | `OFF`, `ON` in `bench-release` and the debug presets | `benchmarks/` |

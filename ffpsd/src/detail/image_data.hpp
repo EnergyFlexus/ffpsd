@@ -6,7 +6,6 @@
 #include "detail/pixel_data.hpp"
 
 #include <ffpsd/image.hpp>
-#include <ffpsd/types.hpp>
 
 namespace ffpsd::detail
 {

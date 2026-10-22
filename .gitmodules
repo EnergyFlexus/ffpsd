@@ -19,3 +19,6 @@
 [submodule "vendor/SDL"]
 	path = vendor/SDL
 	url = https://github.com/libsdl-org/SDL
+[submodule "vendor/libwebp"]
+	path = vendor/libwebp
+	url = https://github.com/webmproject/libwebp

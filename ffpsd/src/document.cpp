@@ -20,6 +20,7 @@
 #include "detail/layer_and_mask/layer_pixels.hpp"
 #include "detail/layer_and_mask/layer_record.hpp"
 #include "detail/layer_and_mask/tagged_blocks/layer_id.hpp"
+#include "detail/limits.hpp"
 #include "detail/pixel_data.hpp"
 #include "detail/rect.hpp"
 #include "detail/resample.hpp"
@@ -118,9 +119,9 @@ namespace ffpsd
     Document::Document(std::uint32_t width, std::uint32_t height, ColorMode color_mode, std::uint16_t depth)
         : Document(std::make_unique<Impl>())
     {
-        detail::CheckDepthAndMode<std::invalid_argument>(depth, color_mode);
+        detail::CheckModeAndDepth(color_mode, depth);
         impl_->version = std::max(width, height) > detail::MaxSide(false) ? kVersionPsb : kVersionPsd;
-        detail::CheckCanvasSides<std::invalid_argument>(width, height, IsPsb());
+        detail::CheckCanvasSides(width, height, IsPsb());
 
         impl_->image_data_info = ImageInfo{width, height, detail::ColorChannelCount(color_mode), depth, color_mode};
     }
@@ -201,7 +202,7 @@ namespace ffpsd
 
     void Document::ResizeCanvas(std::uint32_t width, std::uint32_t height, Anchor anchor)
     {
-        detail::CheckCanvasSides<std::invalid_argument>(width, height, IsPsb());
+        detail::CheckCanvasSides(width, height, IsPsb());
         if (width == impl_->image_data_info.width && height == impl_->image_data_info.height)
             return;
 
@@ -213,7 +214,7 @@ namespace ffpsd
 
     void Document::Resize(std::uint32_t width, std::uint32_t height, ResampleFilter filter)
     {
-        detail::CheckCanvasSides<std::invalid_argument>(width, height, IsPsb());
+        detail::CheckCanvasSides(width, height, IsPsb());
         if (width == impl_->image_data_info.width && height == impl_->image_data_info.height)
             return;
 
@@ -320,8 +321,8 @@ namespace ffpsd
             throw std::invalid_argument(
                 "ffpsd: converting color mode " + std::to_string(static_cast<int>(from)) + " to " +
                 std::to_string(static_cast<int>(color_mode)) + " is not supported");
-        if (!to_gray && impl_->image_data_info.channel_count + 2 > kMaxChannels)
-            throw std::invalid_argument("ffpsd: in RGB the document would have more than 56 channels");
+        if (!to_gray)
+            detail::CheckChannelCount(impl_->image_data_info.channel_count + 2u, "the document in RGB");
 
         Image (*const convert)(const ImageView&) = to_gray ? detail::RgbToGray : detail::GrayToRgb;
         const Layers& layers = impl_->layers;

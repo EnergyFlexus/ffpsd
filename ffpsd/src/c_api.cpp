@@ -308,7 +308,37 @@ namespace
     }
 #endif
 
-    // UNSUPPORTED for a format this build lacks, as every PNG and JPEG call reports it.
+    void RequireWebp()
+    {
+#if !defined(FFPSD_HAS_WEBP)
+        throw Unsupported("ffpsd: built without WebP support");
+#endif
+    }
+
+#if defined(FFPSD_HAS_WEBP)
+    using ffpsd::EncodeWebp;
+    using ffpsd::LoadWebp;
+    using ffpsd::SaveWebp;
+#else
+    // Never reached: RequireWebp throws first. They keep the WebP entry points below compiling.
+    ffpsd::Image LoadWebp(const std::string&, ffpsd::ColorMode, std::uint16_t)
+    {
+        return ffpsd::Image();
+    }
+    ffpsd::Image LoadWebp(const std::uint8_t*, std::size_t, ffpsd::ColorMode, std::uint16_t)
+    {
+        return ffpsd::Image();
+    }
+    std::vector<std::uint8_t> EncodeWebp(const ffpsd::ImageView&, int, bool)
+    {
+        return {};
+    }
+    void SaveWebp(const ffpsd::ImageView&, const std::string&, int, bool)
+    {
+    }
+#endif
+
+    // UNSUPPORTED for a format this build lacks, as every PNG, JPEG and WebP call reports it.
     ffpsd::Image LoadPicture(const std::uint8_t* data, std::size_t size, ffpsd_color_mode_t color_mode, std::uint16_t depth)
     {
         const std::optional<ffpsd::Format> format = ffpsd::detail::FindFormat(data, size);
@@ -316,6 +346,8 @@ namespace
             RequirePng();
         if (format == ffpsd::Format::kJpeg)
             RequireJpeg();
+        if (format == ffpsd::Format::kWebp)
+            RequireWebp();
         return ffpsd::LoadPicture(data, size, static_cast<ffpsd::ColorMode>(color_mode), depth);
     }
 
@@ -1037,6 +1069,40 @@ extern "C"
             ffpsd_buffer_t*& target = NeedOut(out);
             RequireJpeg();
             target = new ffpsd_buffer_t{EncodeJpeg(ToView(Need(image, "image")), quality)};
+        });
+    }
+
+    ffpsd_status_t ffpsd_webp_load(const char* path, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_image_t** out)
+    {
+        return Guard([&] {
+            ffpsd_image_t*& target = NeedOut(out);
+            RequireWebp();
+            const std::string file(&Need(path, "path"));
+            target = NewImage(LoadWebp(file, static_cast<ffpsd::ColorMode>(color_mode), depth));
+        });
+    }
+    ffpsd_status_t
+    ffpsd_webp_load_memory(const uint8_t* data, size_t size, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_image_t** out)
+    {
+        return Guard([&] {
+            ffpsd_image_t*& target = NeedOut(out);
+            RequireWebp();
+            target = NewImage(LoadWebp(NeedBytes(data, size), size, static_cast<ffpsd::ColorMode>(color_mode), depth));
+        });
+    }
+    ffpsd_status_t ffpsd_webp_save(const ffpsd_image_view_t* image, const char* path, int quality, int lossless)
+    {
+        return Guard([&] {
+            RequireWebp();
+            SaveWebp(ToView(Need(image, "image")), std::string(&Need(path, "path")), quality, lossless != 0);
+        });
+    }
+    ffpsd_status_t ffpsd_webp_save_memory(const ffpsd_image_view_t* image, int quality, int lossless, ffpsd_buffer_t** out)
+    {
+        return Guard([&] {
+            ffpsd_buffer_t*& target = NeedOut(out);
+            RequireWebp();
+            target = new ffpsd_buffer_t{EncodeWebp(ToView(Need(image, "image")), quality, lossless != 0)};
         });
     }
 } // extern "C"

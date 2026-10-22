@@ -6,7 +6,6 @@
 #include "detail/transform.hpp"
 
 #include <cstdint>
-#include <ffpsd/image.hpp>
 #include <ffpsd/layer.hpp>
 #include <ffpsd/types.hpp>
 #include <optional>

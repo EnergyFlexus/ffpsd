@@ -3,6 +3,7 @@
 
 #include "detail/formats/exif.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <ffpsd/image.hpp>
 
@@ -21,6 +22,12 @@ namespace ffpsd::detail
 
     // Row y of every plane as interleaved pixels, as codecs take them.
     void InterleaveRow(const ImageView& image, std::uint32_t y, std::uint8_t* out) noexcept;
+
+    // 16 bit samples to 8 for a codec of 8 bit only, rounded as libpng narrows them.
+    void NarrowRow(const std::uint8_t* samples, std::size_t count, std::uint8_t* out) noexcept;
+
+    // 8 bit planes to 16 from a codec of 8 bit only, each sample times 257.
+    Image WidenTo16(const Image& image);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_FORMATS_PLANES_HPP_
