@@ -1,9 +1,12 @@
 #include "support/test_support.hpp"
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <ffpsd/ffpsd.hpp>
 #include <gtest/gtest.h>
 #include <stdexcept>
+#include <vector>
 
 using namespace ffpsd_test;
 
@@ -86,7 +89,7 @@ TEST(DocumentStackTest, AStackChangeThatBreaksAGroupIsRolledBack)
 
     EXPECT_THROW(doc.MoveLayer(2, 0), std::invalid_argument);
     EXPECT_THROW(doc.RemoveLayer(0), std::invalid_argument);
-    EXPECT_THROW(doc.AddLayerCopy(*header), std::invalid_argument);
+    EXPECT_THROW(doc.AddLayerCopy(*end), std::invalid_argument);
 
     ASSERT_EQ(doc.GetLayerCount(), 3u);
     EXPECT_EQ(doc.GetLayerByIndex(0), end);
@@ -108,6 +111,7 @@ TEST(DocumentStackTest, EditsSurviveSaving)
     ffpsd::Layer* copy = doc.GetLayerByIndex(2);
     copy->SetOpacity(100);
     copy->SetVisible(false);
+    copy->SetClipped(true);
     copy->SetBlendKey(Fourcc("mul "));
 
     const ffpsd::Document back = ffpsd::Document::Parse(doc.Save());
@@ -118,6 +122,7 @@ TEST(DocumentStackTest, EditsSurviveSaving)
     EXPECT_EQ(copy_back->GetName(), kBackgroundCopyName);
     EXPECT_EQ(copy_back->GetOpacity(), 100u);
     EXPECT_FALSE(copy_back->IsVisible());
+    EXPECT_TRUE(copy_back->IsClipped());
     EXPECT_EQ(copy_back->GetBlendKey(), Fourcc("mul "));
 
     const ffpsd::Layer* added = back.GetLayerByIndex(1);
@@ -126,4 +131,116 @@ TEST(DocumentStackTest, EditsSurviveSaving)
     EXPECT_EQ(added->GetBounds().left, 2);
     EXPECT_EQ(added->GetPixels().bytes, Pattern(2, 2, 4).bytes);
     EXPECT_FALSE(back.HasRealMergedData());
+}
+
+TEST(DocumentStackTest, ACopyOfAGroupHeaderBringsTheWholeGroup)
+{
+    // Bottom to top: a layer below, the group with a nested one inside, a layer above.
+    ffpsd::Document doc = NewDocument();
+    const char* const names[] = {"below", "end", "inner end", "inner layer", "inner", "inside", "group", "above"};
+    const std::uint32_t dividers[] = {0, 3, 3, 0, 2, 0, 1, 0};
+    std::vector<ffpsd::Layer*> layers;
+    for (std::size_t i = 0; i < 8; ++i)
+    {
+        layers.push_back(doc.AddLayer(names[i]));
+        if (dividers[i] != 0)
+            SetSectionDivider(*layers.back(), dividers[i]);
+    }
+    std::vector<std::uint32_t> ids;
+    for (const ffpsd::Layer* layer : layers)
+        ids.push_back(LayerId(*layer));
+
+    // Into the same document and into another one: the six records from the end marker to the header, each with a new id.
+    ffpsd::Document other = NewDocument();
+    for (ffpsd::Document* target : {&doc, &other})
+    {
+        const std::size_t before = target->GetLayerCount();
+        std::uint32_t last_id = 0;
+        for (std::size_t i = 0; i < before; ++i)
+            last_id = std::max(last_id, LayerId(*target->GetLayerByIndex(i)));
+
+        const ffpsd::Layer* copy = target->AddLayerCopy(*layers[6]);
+
+        ASSERT_EQ(target->GetLayerCount(), before + 6);
+        EXPECT_EQ(copy, target->GetLayerByIndex(before + 5));
+        for (std::size_t i = 0; i < 6; ++i)
+        {
+            const ffpsd::Layer* copied = target->GetLayerByIndex(before + i);
+            EXPECT_EQ(copied->GetName(), names[i + 1]);
+            EXPECT_EQ(copied->GetKind(), layers[i + 1]->GetKind());
+            EXPECT_EQ(LayerId(*copied), last_id + 1 + i);
+        }
+    }
+    for (std::size_t i = 0; i < layers.size(); ++i)
+    {
+        EXPECT_EQ(doc.GetLayerByIndex(i), layers[i]);
+        EXPECT_EQ(LayerId(*layers[i]), ids[i]);
+    }
+
+    // A nested group alone, and the end marker, which goes only with its header.
+    EXPECT_EQ(other.AddLayerCopy(*layers[4])->GetName(), "inner");
+    EXPECT_EQ(other.GetLayerCount(), 9u);
+    EXPECT_THROW(other.AddLayerCopy(*layers[1]), std::invalid_argument);
+    EXPECT_EQ(other.GetLayerCount(), 9u);
+}
+
+TEST(DocumentStackTest, AGroupWithoutItsEndMarkerIsNotCopied)
+{
+    ffpsd::Document doc = NewDocument();
+    doc.AddLayer("inside");
+    ffpsd::Layer* header = doc.AddLayer("group");
+    SetSectionDivider(*header, 1);
+
+    ffpsd::Document target = NewDocument();
+    EXPECT_THROW(target.AddLayerCopy(*header), std::invalid_argument);
+    EXPECT_EQ(target.GetLayerCount(), 0u);
+}
+
+TEST(DocumentStackTest, AGroupStartsEmptyOnTopAndTakesLayersThroughMoveLayer)
+{
+    ffpsd::Document doc = NewDocument();
+    doc.AddLayer("below");
+    ffpsd::Layer* group = doc.AddGroup("group");
+
+    ASSERT_EQ(doc.GetLayerCount(), 3u);
+    const ffpsd::Layer* end = doc.GetLayerByIndex(1);
+    EXPECT_EQ(end->GetKind(), ffpsd::LayerKind::kGroupEnd);
+    EXPECT_EQ(doc.GetLayerByIndex(2), group);
+    EXPECT_EQ(group->GetKind(), ffpsd::LayerKind::kGroupOpen);
+    EXPECT_EQ(group->GetName(), "group");
+    EXPECT_EQ(group->GetBlendKey(), Fourcc("pass"));
+    EXPECT_NE(LayerId(*group), LayerId(*end));
+
+    // A layer from above, moved to the header's index, goes in right below the header.
+    const ffpsd::Layer* inside = doc.AddLayer("inside", Pattern(2, 2, 4), 1, 1);
+    doc.MoveLayer(3, 2);
+    EXPECT_EQ(doc.GetLayerByIndex(2), inside);
+    EXPECT_EQ(doc.GetLayerByIndex(3), group);
+
+    // As Photoshop writes a new group: the end marker without opacity, the header passing through, an ordinary group.
+    const ffpsd::Document back = ffpsd::Document::Parse(doc.Save());
+    ASSERT_EQ(back.GetLayerCount(), 4u);
+    EXPECT_EQ(back.GetLayerByIndex(1)->GetKind(), ffpsd::LayerKind::kGroupEnd);
+    EXPECT_EQ(back.GetLayerByIndex(1)->GetOpacity(), 0u);
+    EXPECT_EQ(back.GetLayerByIndex(2)->GetPixels().bytes, Pattern(2, 2, 4).bytes);
+    EXPECT_EQ(back.GetLayerByIndex(3)->GetName(), "group");
+    EXPECT_EQ(
+        back.GetLayerByIndex(3)->GetTaggedBlockByKey(Fourcc("lsct"))->data,
+        (std::vector<std::uint8_t>{0, 0, 0, 1, '8', 'B', 'I', 'M', 'p', 'a', 's', 's', 0, 0, 0, 0}));
+}
+
+TEST(DocumentStackTest, ALayerIsFoundWhereItIsNow)
+{
+    ffpsd::Document doc = NewDocument();
+    const ffpsd::Layer* a = doc.AddLayer("a");
+    const ffpsd::Layer* b = doc.AddLayer("b");
+    EXPECT_EQ(doc.FindLayerIndex(*a).value_or(9), 0u);
+    EXPECT_EQ(doc.FindLayerIndex(*b).value_or(9), 1u);
+
+    doc.MoveLayer(1, 0);
+    EXPECT_EQ(doc.FindLayerIndex(*b).value_or(9), 0u);
+    EXPECT_EQ(doc.FindLayerIndex(*a).value_or(9), 1u);
+
+    ffpsd::Document other = NewDocument();
+    EXPECT_FALSE(doc.FindLayerIndex(*other.AddLayer("elsewhere")).has_value());
 }

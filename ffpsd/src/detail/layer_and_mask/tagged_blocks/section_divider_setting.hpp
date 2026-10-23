@@ -19,10 +19,14 @@ namespace ffpsd::detail
         static constexpr std::uint32_t kClosedFolder = 2;
         static constexpr std::uint32_t kBoundingSectionDivider = 3;
         std::uint32_t type = kAnyOtherLayer;
+
+        // A folder's blend mode, after an 8BIM signature; an end marker has none.
+        std::optional<std::uint32_t> blend_key;
     };
 
-    // Read only: writing the type alone would lose the blend mode and sub type after it.
+    // Written with sub type 0, an ordinary group, so a scene group's sub type does not survive a rewrite.
     template <> std::optional<SectionDividerSetting> DecodeTaggedBlock<SectionDividerSetting>(const std::vector<std::uint8_t>& data);
+    template <> std::vector<std::uint8_t> EncodeTaggedBlock<SectionDividerSetting>(const SectionDividerSetting& value);
 } // namespace ffpsd::detail
 
 #endif // FFPSD_DETAIL_LAYER_AND_MASK_TAGGED_BLOCKS_SECTION_DIVIDER_SETTING_HPP_

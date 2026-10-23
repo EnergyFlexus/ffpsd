@@ -73,6 +73,42 @@ namespace ffpsd
             return open == 0 ? nullptr : "breaks the group nesting";
         }
 
+        bool IsGroupHeader(const Layer& layer) noexcept
+        {
+            return layer.GetKind() == LayerKind::kGroupOpen || layer.GetKind() == LayerKind::kGroupClosed;
+        }
+
+        // The layer alone, or a group header with everything down to its end marker; bottom to top.
+        std::vector<const Layer*> LayersToCopy(const Layers& layers, const Layer& source)
+        {
+            if (!IsGroupHeader(source))
+                return {&source};
+
+            const auto header = std::find_if(
+                layers.begin(), layers.end(), [&source](const std::unique_ptr<Layer>& layer) { return layer.get() == &source; });
+            std::size_t open = 0;
+            for (auto at = header; at != layers.begin();)
+            {
+                --at;
+                if (IsGroupHeader(**at))
+                {
+                    ++open;
+                }
+                else if ((*at)->GetKind() == LayerKind::kGroupEnd)
+                {
+                    if (open == 0)
+                    {
+                        std::vector<const Layer*> group;
+                        for (auto in = at; in != header + 1; ++in)
+                            group.push_back(in->get());
+                        return group;
+                    }
+                    --open;
+                }
+            }
+            throw std::invalid_argument("ffpsd: group '" + source.GetName() + "' has no end marker");
+        }
+
         // Photoshop keeps no layers in these modes.
         void CheckKeepsLayers(ColorMode color_mode)
         {
@@ -448,6 +484,16 @@ namespace ffpsd
         return impl_->layers[index].get();
     }
 
+    std::optional<std::size_t> Document::FindLayerIndex(const Layer& layer) const noexcept
+    {
+        for (std::size_t i = 0; i < impl_->layers.size(); ++i)
+        {
+            if (impl_->layers[i].get() == &layer)
+                return i;
+        }
+        return std::nullopt;
+    }
+
     Layer* Document::AddLayer(const std::string& name, const ImageView& image, std::int32_t top, std::int32_t left)
     {
         CheckKeepsLayers(impl_->image_data_info.color_mode);
@@ -460,6 +506,25 @@ namespace ffpsd
         impl_->layers.push_back(std::unique_ptr<Layer>(new Layer(std::move(record), this)));
         MarkStackChanged();
         return impl_->layers.back().get();
+    }
+
+    Layer* Document::AddGroup(const std::string& name)
+    {
+        CheckKeepsLayers(impl_->image_data_info.color_mode);
+
+        const auto add = [this](detail::LayerRecord made) {
+            auto record = std::make_unique<detail::LayerRecord>(std::move(made));
+            detail::ReplaceLayerPixels(*record, ImageView(), impl_->image_data_info.color_mode, false, IsPsb());
+            AssignLayerId(*record);
+            impl_->layers.push_back(std::unique_ptr<Layer>(new Layer(std::move(record), this)));
+            return impl_->layers.back().get();
+        };
+
+        // Bottom to top, the end marker first; a whole group keeps the stack as valid as it was.
+        add(detail::LayerRecord::GroupEnd());
+        Layer* header = add(detail::LayerRecord::GroupHeader(name));
+        MarkStackChanged();
+        return header;
     }
 
     Layer* Document::AddBackgroundLayer(const std::string& name, const ImageView& image)
@@ -560,20 +625,21 @@ namespace ffpsd
         if (from.image_data_info.depth != impl_->image_data_info.depth ||
             from.image_data_info.color_mode != impl_->image_data_info.color_mode || from.version != impl_->version)
             throw std::invalid_argument("ffpsd: the source layer comes from a document of another format");
+        if (source.GetKind() == LayerKind::kGroupEnd)
+            throw std::invalid_argument("ffpsd: a group's end marker is copied with the group, through its header");
 
-        auto record = std::make_unique<detail::LayerRecord>(source.record_->Copy());
+        // All copied before any is added, as the source may be in this document.
+        std::vector<std::unique_ptr<detail::LayerRecord>> records;
+        for (const Layer* layer : LayersToCopy(from.layers, source))
+            records.push_back(std::make_unique<detail::LayerRecord>(layer->record_->Copy()));
         if (source.IsBackground())
-            record->UnmarkBackground(impl_->image_data_info.depth, IsPsb());
+            records.back()->UnmarkBackground(impl_->image_data_info.depth, IsPsb());
 
-        // The source's id stays with the source.
-        AssignLayerId(*record);
-
-        const bool was_valid = FindStackProblem(impl_->layers) == nullptr;
-        impl_->layers.push_back(std::unique_ptr<Layer>(new Layer(std::move(record), this)));
-        if (const char* problem = was_valid ? FindStackProblem(impl_->layers) : nullptr)
+        // A whole group nests as it did, so the stack stays as valid as it was; the sources' ids stay with them.
+        for (std::unique_ptr<detail::LayerRecord>& record : records)
         {
-            impl_->layers.pop_back();
-            throw std::invalid_argument(std::string("ffpsd: the copy ") + problem);
+            AssignLayerId(*record);
+            impl_->layers.push_back(std::unique_ptr<Layer>(new Layer(std::move(record), this)));
         }
 
         MarkStackChanged();

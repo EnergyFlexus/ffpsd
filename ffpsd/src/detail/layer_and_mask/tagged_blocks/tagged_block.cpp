@@ -19,7 +19,7 @@ namespace ffpsd::detail
 
         constexpr std::size_t kAlignment = 4;
 
-        // In a PSB these keys have an 8 byte length; nothing but this list says so.
+        // In a PSB these keys have an 8 byte length even when signed 8BIM; any block signed 8B64 has one too.
         constexpr std::uint32_t kLongLengthKeys[] = {Fourcc('L', 'M', 's', 'k'), Fourcc('L', 'r', '1', '6'), Fourcc('L', 'r', '3', '2'),
                                                      Fourcc('L', 'a', 'y', 'r'), Fourcc('M', 't', '1', '6'), Fourcc('M', 't', '3', '2'),
                                                      Fourcc('M', 't', 'r', 'n'), Fourcc('A', 'l', 'p', 'h'), Fourcc('F', 'M', 's', 'k'),
@@ -34,10 +34,10 @@ namespace ffpsd::detail
             return signature == kBlockSignature || signature == kSignature64;
         }
 
-        bool UsesLongLength(std::uint32_t key) noexcept
+        bool UsesLongLength(std::uint32_t signature, std::uint32_t key, bool is_psb) noexcept
         {
             const auto* at = std::find(std::begin(kLongLengthKeys), std::end(kLongLengthKeys), key);
-            return at != std::end(kLongLengthKeys);
+            return is_psb && (signature == kSignature64 || at != std::end(kLongLengthKeys));
         }
 
         void WriteBlock(BigEndianWriter& writer, const TaggedBlock& block, bool is_psb, bool pad_in_length)
@@ -45,7 +45,7 @@ namespace ffpsd::detail
             writer.WriteU32(block.signature);
             writer.WriteU32(block.key);
 
-            const bool wide = is_psb && UsesLongLength(block.key);
+            const bool wide = UsesLongLength(block.signature, block.key, is_psb);
             const std::size_t length = writer.ReserveLength(wide);
             const std::size_t data_start = writer.Tell();
             writer.WriteBytes(block.data);
@@ -84,7 +84,7 @@ namespace ffpsd::detail
 
             block->key = reader.ReadU32();
 
-            const std::uint64_t length = reader.ReadLength(is_psb && UsesLongLength(block->key));
+            const std::uint64_t length = reader.ReadLength(UsesLongLength(block->signature, block->key, is_psb));
             if (!reader.FitsLength(length, end))
                 throw std::runtime_error(
                     "ffpsd: tagged block '" + FourccString(block->key) + "' at offset " + std::to_string(block_start) + " claims " +

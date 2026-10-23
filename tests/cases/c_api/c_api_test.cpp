@@ -2,6 +2,7 @@
 #include "support/test_support.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -274,12 +275,14 @@ TEST(CApiTest, StackAndLayerEditsThroughC)
     EXPECT_EQ(ffpsd_layer_set_name(copy, nullptr), FFPSD_STATUS_INVALID_ARGUMENT);
     ASSERT_EQ(ffpsd_layer_set_opacity(copy, 10), FFPSD_STATUS_OK);
     ASSERT_EQ(ffpsd_layer_set_visible(copy, 0), FFPSD_STATUS_OK);
+    ASSERT_EQ(ffpsd_layer_set_clipped(copy, 1), FFPSD_STATUS_OK);
     ASSERT_EQ(ffpsd_document_remove_layer(file.doc, 2), FFPSD_STATUS_OK);
 
     ASSERT_EQ(ffpsd_document_get_layer_count(file.doc), 2u);
     EXPECT_EQ(Name(copy), "copy");
     EXPECT_EQ(ffpsd_layer_get_opacity(copy), 10u);
     EXPECT_EQ(ffpsd_layer_is_visible(copy), 0);
+    EXPECT_EQ(ffpsd_layer_is_clipped(copy), 1);
     EXPECT_EQ(ffpsd_document_get_has_real_merged_data(file.doc), 0);
 
     ffpsd_document_t* doc = NewRgbDocument();
@@ -296,6 +299,24 @@ TEST(CApiTest, StackAndLayerEditsThroughC)
     EXPECT_EQ(bounds.left, 6);
     EXPECT_EQ(bounds.right - bounds.left, 6);
     EXPECT_EQ(ffpsd_layer_resize(layer, 0, 4, FFPSD_RESAMPLE_FILTER_NEAREST), FFPSD_STATUS_INVALID_ARGUMENT);
+
+    // A group goes on top; the layer from below lands inside, between the end marker and the header.
+    ffpsd_layer_t* group = nullptr;
+    ASSERT_EQ(ffpsd_document_add_group(doc, "group", &group), FFPSD_STATUS_OK);
+    EXPECT_EQ(ffpsd_layer_get_kind(group), FFPSD_LAYER_KIND_GROUP_OPEN);
+    EXPECT_EQ(ffpsd_layer_get_kind(Layer(doc, 1)), FFPSD_LAYER_KIND_GROUP_END);
+    ASSERT_EQ(ffpsd_document_move_layer(doc, 0, 1), FFPSD_STATUS_OK);
+    EXPECT_EQ(Layer(doc, 1), layer);
+    EXPECT_EQ(Layer(doc, 2), group);
+
+    std::size_t index = 0;
+    ASSERT_EQ(ffpsd_document_find_layer_index(doc, group, &index), FFPSD_STATUS_OK);
+    EXPECT_EQ(index, 2u);
+    EXPECT_EQ(ffpsd_document_find_layer_index(doc, copy, &index), FFPSD_STATUS_NOT_FOUND);
+    ASSERT_EQ(ffpsd_layer_set_group_open(group, 0), FFPSD_STATUS_OK);
+    EXPECT_EQ(ffpsd_layer_get_kind(group), FFPSD_LAYER_KIND_GROUP_CLOSED);
+    EXPECT_EQ(ffpsd_layer_set_group_open(layer, 1), FFPSD_STATUS_INVALID_OPERATION);
+    EXPECT_EQ(ffpsd_document_add_group(doc, nullptr, &group), FFPSD_STATUS_INVALID_ARGUMENT);
     ffpsd_document_destroy(doc);
 }
 

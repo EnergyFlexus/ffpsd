@@ -8,13 +8,14 @@
 
 using namespace ffpsd_test;
 
-TEST(LayerTest, ANewLayerIsVisibleOpaqueAndNormalUntilSet)
+TEST(LayerTest, ANewLayerIsVisibleOpaqueNormalAndUnclippedUntilSet)
 {
     ffpsd::Document doc = NewDocument();
     ffpsd::Layer* layer = doc.AddLayer("new");
 
     EXPECT_EQ(layer->GetKind(), ffpsd::LayerKind::kRaster);
     EXPECT_TRUE(layer->IsVisible());
+    EXPECT_FALSE(layer->IsClipped());
     EXPECT_EQ(layer->GetOpacity(), 255u);
     EXPECT_EQ(layer->GetBlendKey(), Fourcc("norm"));
     EXPECT_EQ(layer->GetAdjustmentKey(), 0u);
@@ -32,6 +33,11 @@ TEST(LayerTest, ANewLayerIsVisibleOpaqueAndNormalUntilSet)
     EXPECT_FALSE(layer->IsVisible());
     layer->SetVisible(true);
     EXPECT_TRUE(layer->IsVisible());
+
+    layer->SetClipped(true);
+    EXPECT_TRUE(layer->IsClipped());
+    layer->SetClipped(false);
+    EXPECT_FALSE(layer->IsClipped());
 }
 
 TEST(LayerTest, TheNameIsUnicodeWithALegacyCopy)
@@ -99,4 +105,28 @@ TEST(LayerTest, TaggedBlocksAreARawDoor)
     EXPECT_FALSE(layer->RemoveTaggedBlock(Fourcc("abcd")));
     EXPECT_EQ(layer->GetTaggedBlockByKey(Fourcc("abcd")), nullptr);
     EXPECT_THROW(layer->GetTaggedBlockByIndex(count), std::out_of_range);
+}
+
+TEST(LayerTest, AGroupHeaderOpensAndClosesKeepingItsBlendMode)
+{
+    ffpsd::Document doc = NewDocument();
+    ffpsd::Layer* group = doc.AddGroup("group");
+    const std::vector<std::uint8_t> open = group->GetTaggedBlockByKey(Fourcc("lsct"))->data;
+    std::vector<std::uint8_t> closed = open;
+    closed[3] = 2;
+
+    group->SetGroupOpen(false);
+    EXPECT_EQ(group->GetKind(), ffpsd::LayerKind::kGroupClosed);
+    EXPECT_EQ(group->GetTaggedBlockByKey(Fourcc("lsct"))->data, closed);
+    group->SetGroupOpen(true);
+    EXPECT_EQ(group->GetKind(), ffpsd::LayerKind::kGroupOpen);
+    EXPECT_EQ(group->GetTaggedBlockByKey(Fourcc("lsct"))->data, open);
+
+    // Neither the end marker nor a raster layer opens, and both stay as they were.
+    ffpsd::Layer* end = doc.GetLayerByIndex(0);
+    ffpsd::Layer* raster = doc.AddLayer("raster");
+    EXPECT_THROW(end->SetGroupOpen(true), std::logic_error);
+    EXPECT_THROW(raster->SetGroupOpen(false), std::logic_error);
+    EXPECT_EQ(end->GetKind(), ffpsd::LayerKind::kGroupEnd);
+    EXPECT_EQ(raster->GetKind(), ffpsd::LayerKind::kRaster);
 }

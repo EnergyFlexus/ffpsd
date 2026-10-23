@@ -96,6 +96,9 @@ namespace ffpsd
         FFPSD_EXPORT Layer* GetLayerByIndex(std::size_t index);
         FFPSD_EXPORT const Layer* GetLayerByIndex(std::size_t index) const;
 
+        // Where the layer is now, for MoveLayer and RemoveLayer; empty for a layer of another document.
+        FFPSD_EXPORT std::optional<std::size_t> FindLayerIndex(const Layer& layer) const noexcept;
+
         // Adds a raster layer on top. One image plane beyond the color channels is transparency.
         FFPSD_EXPORT Layer*
         AddLayer(const std::string& name, const ImageView& image = ImageView(), std::int32_t top = 0, std::int32_t left = 0);
@@ -109,10 +112,15 @@ namespace ffpsd
         // Makes the background an ordinary layer where it is, unlocked; false when there is none.
         FFPSD_EXPORT bool UnsetBackgroundLayer();
 
+        // An empty group on top, open and passing through as Photoshop makes one; returns its header. MoveLayer puts a layer
+        // in: one that ends up between the end marker and the header is inside.
+        FFPSD_EXPORT Layer* AddGroup(const std::string& name);
+
         // An adjustment layer on top; T is a struct from adjustments.hpp.
         template <class T> FFPSD_EXPORT Layer* AddAdjustmentLayer(const std::string& name, const T& value = T());
 
         // A copy on top, from a document of the same format; a copy of the background is an ordinary layer.
+        // A group's header brings the whole group, nested ones too, and the header is returned; its end marker throws.
         FFPSD_EXPORT Layer* AddLayerCopy(const Layer& source);
 
         // Destroys the layer, so pointers to it dangle.

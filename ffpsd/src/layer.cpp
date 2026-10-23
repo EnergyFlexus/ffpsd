@@ -70,6 +70,10 @@ namespace ffpsd
     {
         return (record_->flags & kHiddenFlag) == 0;
     }
+    bool Layer::IsClipped() const noexcept
+    {
+        return record_->clipping != 0;
+    }
     bool Layer::IsBackground() const noexcept
     {
         return document_->GetLayerCount() != 0 && document_->GetLayerByIndex(0) == this && GetKind() == LayerKind::kRaster &&
@@ -92,6 +96,24 @@ namespace ffpsd
     {
         std::uint8_t& flags = record_->flags;
         flags = visible ? static_cast<std::uint8_t>(flags & ~kHiddenFlag) : static_cast<std::uint8_t>(flags | kHiddenFlag);
+    }
+    void Layer::SetClipped(bool clipped) noexcept
+    {
+        record_->clipping = clipped ? 1 : 0;
+    }
+    void Layer::SetGroupOpen(bool open)
+    {
+        using detail::SectionDividerSetting;
+        const LayerKind kind = GetKind();
+        if (kind != LayerKind::kGroupOpen && kind != LayerKind::kGroupClosed)
+            throw std::logic_error("ffpsd: only a group's header opens and closes, not '" + GetName() + "'");
+
+        // The type alone changes; the blend mode and sub type after it stay as they are.
+        TaggedBlock block = *GetTaggedBlockByKey(SectionDividerSetting::kKey);
+        const std::uint32_t type = open ? SectionDividerSetting::kOpenFolder : SectionDividerSetting::kClosedFolder;
+        for (std::size_t i = 0; i < 4; ++i)
+            block.data[i] = static_cast<std::uint8_t>(type >> (24 - 8 * i));
+        SetTaggedBlock(block);
     }
     void Layer::SetBlendKey(std::uint32_t blend_key) noexcept
     {

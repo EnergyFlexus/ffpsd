@@ -667,6 +667,16 @@ extern "C"
             target = ToHandle(Need(doc, "doc").value.GetLayerByIndex(index));
         });
     }
+    ffpsd_status_t ffpsd_document_find_layer_index(const ffpsd_document_t* doc, const ffpsd_layer_t* layer, size_t* out)
+    {
+        return Guard([&] {
+            size_t& target = Need(out, "out");
+            const std::optional<std::size_t> index = Need(doc, "doc").value.FindLayerIndex(ToLayer(layer));
+            if (!index.has_value())
+                throw NotFound("ffpsd: the layer is not in this document");
+            target = *index;
+        });
+    }
     ffpsd_status_t ffpsd_document_add_layer(
         ffpsd_document_t* doc, const char* name, const ffpsd_image_view_t* image, int32_t top, int32_t left, ffpsd_layer_t** out)
     {
@@ -696,6 +706,13 @@ extern "C"
         return Guard([&] {
             if (!Need(doc, "doc").value.UnsetBackgroundLayer())
                 throw NotFound("ffpsd: the document has no background");
+        });
+    }
+    ffpsd_status_t ffpsd_document_add_group(ffpsd_document_t* doc, const char* name, ffpsd_layer_t** out)
+    {
+        return Guard([&] {
+            ffpsd_layer_t*& target = NeedOut(out);
+            target = ToHandle(Need(doc, "doc").value.AddGroup(std::string(&Need(name, "name"))));
         });
     }
     ffpsd_status_t
@@ -822,6 +839,10 @@ extern "C"
     {
         return layer != nullptr && reinterpret_cast<const ffpsd::Layer*>(layer)->IsVisible() ? 1 : 0;
     }
+    int ffpsd_layer_is_clipped(const ffpsd_layer_t* layer)
+    {
+        return layer != nullptr && reinterpret_cast<const ffpsd::Layer*>(layer)->IsClipped() ? 1 : 0;
+    }
     int ffpsd_layer_is_background(const ffpsd_layer_t* layer)
     {
         return layer != nullptr && reinterpret_cast<const ffpsd::Layer*>(layer)->IsBackground() ? 1 : 0;
@@ -841,6 +862,14 @@ extern "C"
     ffpsd_status_t ffpsd_layer_set_visible(ffpsd_layer_t* layer, int visible)
     {
         return Guard([&] { ToLayer(layer).SetVisible(visible != 0); });
+    }
+    ffpsd_status_t ffpsd_layer_set_clipped(ffpsd_layer_t* layer, int clipped)
+    {
+        return Guard([&] { ToLayer(layer).SetClipped(clipped != 0); });
+    }
+    ffpsd_status_t ffpsd_layer_set_group_open(ffpsd_layer_t* layer, int open)
+    {
+        return Guard([&] { ToLayer(layer).SetGroupOpen(open != 0); });
     }
     ffpsd_status_t ffpsd_layer_set_blend_key(ffpsd_layer_t* layer, uint32_t blend_key)
     {

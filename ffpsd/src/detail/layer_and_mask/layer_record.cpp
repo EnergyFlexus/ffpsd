@@ -5,6 +5,7 @@
 #include "detail/layer_and_mask/channel_ids.hpp"
 #include "detail/layer_and_mask/tagged_blocks/layer_name_source_setting.hpp"
 #include "detail/layer_and_mask/tagged_blocks/protected_setting.hpp"
+#include "detail/layer_and_mask/tagged_blocks/section_divider_setting.hpp"
 #include "detail/layer_and_mask/tagged_blocks/unicode_layer_name.hpp"
 #include "detail/limits.hpp"
 #include "detail/rect.hpp"
@@ -32,6 +33,11 @@ namespace ffpsd::detail
 
         // Bit 3, written by Photoshop 5.0 and later: Photoshop sets it on every layer.
         constexpr std::uint8_t kFlagsPhotoshop5 = 0x08;
+
+        // Bit 4, valid with bit 3: the pixels do not count, as on both records of a group.
+        constexpr std::uint8_t kPixelsIrrelevant = 0x10;
+
+        constexpr std::uint32_t kPassThrough = Fourcc('p', 'a', 's', 's');
 
         // Black low, black high, white low, white high, twice: source, then destination.
         constexpr std::uint8_t kPassEverything[] = {0, 0, 255, 255, 0, 0, 255, 255};
@@ -126,6 +132,30 @@ namespace ffpsd::detail
         record.flags = kFlagsPhotoshop5;
         record.blending_ranges = DefaultBlendingRanges();
         record.SetName(name);
+        return record;
+    }
+
+    LayerRecord LayerRecord::GroupHeader(const std::string& name)
+    {
+        LayerRecord record = Empty(name, 0, 0);
+        record.flags = kFlagsPhotoshop5 | kPixelsIrrelevant;
+        record.blend_key = kPassThrough;
+        SectionDividerSetting divider;
+        divider.type = SectionDividerSetting::kOpenFolder;
+        divider.blend_key = kPassThrough;
+        SetTaggedBlock(record.blocks, divider);
+        return record;
+    }
+
+    // Photoshop gives the end marker no opacity.
+    LayerRecord LayerRecord::GroupEnd()
+    {
+        LayerRecord record = Empty("</Layer group>", 0, 0);
+        record.flags = kFlagsPhotoshop5 | kPixelsIrrelevant;
+        record.opacity = 0;
+        SectionDividerSetting divider;
+        divider.type = SectionDividerSetting::kBoundingSectionDivider;
+        SetTaggedBlock(record.blocks, divider);
         return record;
     }
 

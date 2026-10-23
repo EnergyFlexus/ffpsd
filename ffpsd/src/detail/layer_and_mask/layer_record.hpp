@@ -54,6 +54,10 @@ namespace ffpsd::detail
         // No channels, at top and left, with the flags and blending ranges Photoshop gives a new layer.
         static LayerRecord Empty(const std::string& name, std::int32_t top, std::int32_t left);
 
+        // The two records of a new group as Photoshop writes them, no channels: the open header passing through, the end marker.
+        static LayerRecord GroupHeader(const std::string& name);
+        static LayerRecord GroupEnd();
+
         // A deep copy, blocks included; a new field has to be added here too.
         LayerRecord Copy() const;
 

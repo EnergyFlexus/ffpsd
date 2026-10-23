@@ -69,6 +69,9 @@ namespace ffpsd
         FFPSD_EXPORT std::uint8_t GetOpacity() const noexcept;
         FFPSD_EXPORT bool IsVisible() const noexcept;
 
+        // Shown only where the layer below is, Photoshop's clipping mask; the lowest of a run is its base.
+        FFPSD_EXPORT bool IsClipped() const noexcept;
+
         // The bottom raster layer with locked transparency, a lock or no transparency at all, as Photoshop takes it.
         FFPSD_EXPORT bool IsBackground() const noexcept;
 
@@ -79,6 +82,10 @@ namespace ffpsd
         FFPSD_EXPORT void SetName(const std::string& name);
         FFPSD_EXPORT void SetOpacity(std::uint8_t opacity) noexcept;
         FFPSD_EXPORT void SetVisible(bool visible) noexcept;
+        FFPSD_EXPORT void SetClipped(bool clipped) noexcept;
+
+        // A group's header only, as kGroupOpen or kGroupClosed: whether Photoshop's panel shows its layers; the picture stays.
+        FFPSD_EXPORT void SetGroupOpen(bool open);
         FFPSD_EXPORT void SetBlendKey(std::uint32_t blend_key) noexcept;
 
         // The block of an adjustment layer, such as 'levl', or 0; raw, so unknown ones are seen too.

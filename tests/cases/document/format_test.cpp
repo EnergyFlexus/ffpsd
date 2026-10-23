@@ -1,5 +1,7 @@
 #include "support/test_support.hpp"
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <ffpsd/ffpsd.hpp>
 #include <gtest/gtest.h>
@@ -17,6 +19,31 @@ TEST(DocumentFormatTest, APsbKeepsEveryPixel)
     EXPECT_TRUE(made_back.IsPsb());
     EXPECT_EQ(made_back.GetLayerByIndex(0)->GetPixels().bytes, Pattern(3, 2, 4).bytes);
     EXPECT_EQ(made_back.GetMergedImage().bytes.size(), 4u * 3 * 3);
+}
+
+TEST(DocumentFormatTest, APsbBlockSigned8B64HasAnEightByteLength)
+{
+    // 'cinf' is not on the list of long keys, but Photoshop signs it 8B64 in a PSB and gives it 8 bytes of length.
+    ffpsd::TaggedBlock block;
+    block.signature = Fourcc("8B64");
+    block.key = Fourcc("cinf");
+    block.data = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    ffpsd::Document doc = NewDocument();
+    doc.SetPsb(true);
+    doc.AddLayer("one", Pattern(3, 2, 4))->SetTaggedBlock(block);
+    doc.SetTaggedBlock(block);
+    const std::vector<std::uint8_t> file = doc.Save();
+
+    const std::vector<std::uint8_t> written = {'8', 'B', '6', '4', 'c', 'i', 'n', 'f', 0, 0, 0, 0, 0, 0, 0, 8, 1, 2, 3, 4, 5, 6, 7, 8};
+    std::size_t found = 0;
+    for (auto at = file.begin(); (at = std::search(at, file.end(), written.begin(), written.end())) != file.end(); ++at)
+        ++found;
+    EXPECT_EQ(found, 2u);
+
+    const ffpsd::Document back = ffpsd::Document::Parse(file);
+    EXPECT_EQ(back.GetLayerByIndex(0)->GetTaggedBlockByKey(Fourcc("cinf"))->data, block.data);
+    EXPECT_EQ(back.GetTaggedBlockByKey(Fourcc("cinf"))->data, block.data);
 }
 
 TEST(DocumentFormatTest, SwitchingTheFormatAndBackGivesTheSameFile)

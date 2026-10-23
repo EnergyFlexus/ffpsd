@@ -281,6 +281,9 @@ extern "C"
     FFPSD_EXPORT size_t ffpsd_document_get_layer_count(const ffpsd_document_t* doc);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_get_layer(ffpsd_document_t* doc, size_t index, ffpsd_layer_t** out);
 
+    /* Where the layer is now; NOT_FOUND for a layer of another document. */
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_find_layer_index(const ffpsd_document_t* doc, const ffpsd_layer_t* layer, size_t* out);
+
     /* A raster layer on top; a NULL image is an empty layer. The name is UTF-8. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_add_layer(
         ffpsd_document_t* doc, const char* name, const ffpsd_image_view_t* image, int32_t top, int32_t left, ffpsd_layer_t** out);
@@ -295,11 +298,14 @@ extern "C"
     /* The background becomes an ordinary layer where it is; NOT_FOUND when there is none. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_unset_background_layer(ffpsd_document_t* doc);
 
+    /* An empty group on top, out is its header; a layer moved between its end marker and its header is inside. */
+    FFPSD_EXPORT ffpsd_status_t ffpsd_document_add_group(ffpsd_document_t* doc, const char* name, ffpsd_layer_t** out);
+
     /* NULL levels change nothing. */
     FFPSD_EXPORT ffpsd_status_t
     ffpsd_document_add_levels_layer(ffpsd_document_t* doc, const char* name, const ffpsd_levels_t* levels, ffpsd_layer_t** out);
 
-    /* From this document or one of the same depth, color mode and format. */
+    /* From this document or one of the same depth, color mode and format; a group's header brings the whole group. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_add_layer_copy(ffpsd_document_t* doc, const ffpsd_layer_t* source, ffpsd_layer_t** out);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_remove_layer(ffpsd_document_t* doc, size_t index);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_move_layer(ffpsd_document_t* doc, size_t from, size_t to);
@@ -332,11 +338,16 @@ extern "C"
 
     FFPSD_EXPORT uint8_t ffpsd_layer_get_opacity(const ffpsd_layer_t* layer);
     FFPSD_EXPORT int ffpsd_layer_is_visible(const ffpsd_layer_t* layer);
+    FFPSD_EXPORT int ffpsd_layer_is_clipped(const ffpsd_layer_t* layer);
     FFPSD_EXPORT int ffpsd_layer_is_background(const ffpsd_layer_t* layer);
     FFPSD_EXPORT uint32_t ffpsd_layer_get_blend_key(const ffpsd_layer_t* layer);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_name(ffpsd_layer_t* layer, const char* name);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_opacity(ffpsd_layer_t* layer, uint8_t opacity);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_visible(ffpsd_layer_t* layer, int visible);
+    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_clipped(ffpsd_layer_t* layer, int clipped);
+
+    /* A group's header only, else INVALID_OPERATION: whether Photoshop's panel shows its layers. */
+    FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_group_open(ffpsd_layer_t* layer, int open);
     FFPSD_EXPORT ffpsd_status_t ffpsd_layer_set_blend_key(ffpsd_layer_t* layer, uint32_t blend_key);
 
     /* The block of an adjustment layer, such as 'levl', or 0. */
