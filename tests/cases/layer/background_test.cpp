@@ -16,19 +16,21 @@ namespace
     // The flags of each record, which the API hides: they follow "8BIMnorm", opacity and clipping.
     std::vector<std::uint8_t> NormalLayerFlags(const std::vector<std::uint8_t>& psd)
     {
-        const std::uint8_t marker[] = {'8', 'B', 'I', 'M', 'n', 'o', 'r', 'm'};
         std::vector<std::uint8_t> flags;
-        auto at = psd.begin();
-        while ((at = std::search(at, psd.end(), std::begin(marker), std::end(marker))) != psd.end())
-        {
-            flags.push_back(*(at + sizeof(marker) + 2));
-            at += sizeof(marker);
-        }
+        for (const std::size_t at : Find(psd, Ascii("8BIMnorm")))
+            flags.push_back(psd.at(at + 10));
         return flags;
+    }
+
+    // The 'lnsr' and 'lspf' blocks of one layer are the other's.
+    void ExpectMarkedAs(const ffpsd::Layer& layer, const ffpsd::Layer& like)
+    {
+        EXPECT_EQ(BlockData(layer, "lnsr"), BlockData(like, "lnsr"));
+        EXPECT_EQ(BlockData(layer, "lspf"), BlockData(like, "lspf"));
     }
 } // namespace
 
-TEST(LayerBackgroundTest, ItIsMarkedAsPhotoshopMarksIt)
+TEST(LayerBackgroundTest, ItIsMarkedAndFoundAsPhotoshopDoesIt)
 {
     // In the gray file with Levels the copy took its name from the background, so its 'lnsr' says 'bgnd' too.
     for (const std::string& path : {kRgbPsd, kGrayscalePsd, kRgbLevelsPsd, kGrayscaleLevelsPsd})
@@ -43,9 +45,7 @@ TEST(LayerBackgroundTest, ItIsMarkedAsPhotoshopMarksIt)
     const std::vector<std::uint8_t> photoshop_file = ReadFile(kRgbPsd);
     const ffpsd::Document photoshop = ffpsd::Document::Parse(photoshop_file);
     ffpsd::Document doc = NewDocument();
-    const ffpsd::Layer* background = doc.AddBackgroundLayer("Background", Pattern(4, 3, 3));
-    EXPECT_EQ(BlockData(*background, "lnsr"), BlockData(*photoshop.GetLayerByIndex(0), "lnsr"));
-    EXPECT_EQ(BlockData(*background, "lspf"), BlockData(*photoshop.GetLayerByIndex(0), "lspf"));
+    ExpectMarkedAs(*doc.AddBackgroundLayer("Background", Pattern(4, 3, 3)), *photoshop.GetLayerByIndex(0));
     EXPECT_EQ(NormalLayerFlags(doc.Save()).at(0), NormalLayerFlags(photoshop_file).at(0));
 
     // A copy of it, and the background once unset, are marked as Photoshop's copy is.
@@ -54,8 +54,7 @@ TEST(LayerBackgroundTest, ItIsMarkedAsPhotoshopMarksIt)
     const ffpsd::Layer* copy = rgb.AddLayerCopy(*rgb.GetLayerByIndex(0));
     EXPECT_FALSE(copy->IsBackground());
     EXPECT_TRUE(rgb.GetLayerByIndex(0)->IsBackground());
-    EXPECT_EQ(BlockData(*copy, "lnsr"), BlockData(*photoshops_copy, "lnsr"));
-    EXPECT_EQ(BlockData(*copy, "lspf"), BlockData(*photoshops_copy, "lspf"));
+    ExpectMarkedAs(*copy, *photoshops_copy);
     std::vector<std::uint8_t> flags = NormalLayerFlags(rgb.Save());
     ASSERT_EQ(flags.size(), 3u);
     EXPECT_EQ(flags[2], flags[1]);
@@ -66,21 +65,17 @@ TEST(LayerBackgroundTest, ItIsMarkedAsPhotoshopMarksIt)
     EXPECT_FALSE(rgb.UnsetBackgroundLayer());
     EXPECT_EQ(rgb.GetLayerByIndex(0), former);
     EXPECT_FALSE(former->IsBackground());
-    EXPECT_EQ(BlockData(*former, "lnsr"), BlockData(*photoshops_copy, "lnsr"));
-    EXPECT_EQ(BlockData(*former, "lspf"), BlockData(*photoshops_copy, "lspf"));
+    ExpectMarkedAs(*former, *photoshops_copy);
     EXPECT_EQ(former->GetPixels().bytes, WithOpaqueAlpha(pixels).bytes);
     flags = NormalLayerFlags(rgb.Save());
     EXPECT_EQ(flags.at(0), flags.at(1));
-}
 
-TEST(LayerBackgroundTest, ItIsTheBottomRasterLayerWithAnyOfItsMarks)
-{
     // An ordinary layer gets transparency even from an image without one, so at the bottom it stays ordinary.
-    ffpsd::Document doc = NewDocument();
-    ffpsd::Layer* bottom = doc.AddLayer("bottom", Pattern(4, 3, 3));
-    ffpsd::Layer* top = doc.AddLayer("top", Pattern(4, 3, 3));
+    ffpsd::Document marks = NewDocument();
+    ffpsd::Layer* bottom = marks.AddLayer("bottom", Pattern(4, 3, 3));
+    ffpsd::Layer* top = marks.AddLayer("top", Pattern(4, 3, 3));
     EXPECT_FALSE(bottom->IsBackground());
-    EXPECT_FALSE(ffpsd::Document::Parse(doc.Save()).GetLayerByIndex(0)->IsBackground());
+    EXPECT_FALSE(RoundTrip(marks).GetLayerByIndex(0)->IsBackground());
 
     // A lock in 'lspf' is a mark, but only at the bottom.
     const ffpsd::TaggedBlock position_lock = Block("lspf", {0, 0, 0, 4});
@@ -88,7 +83,59 @@ TEST(LayerBackgroundTest, ItIsTheBottomRasterLayerWithAnyOfItsMarks)
     EXPECT_FALSE(top->IsBackground());
     bottom->SetTaggedBlock(position_lock);
     EXPECT_TRUE(bottom->IsBackground());
-    EXPECT_TRUE(ffpsd::Document::Parse(doc.Save()).GetLayerByIndex(0)->IsBackground());
+    EXPECT_TRUE(RoundTrip(marks).GetLayerByIndex(0)->IsBackground());
+}
+
+TEST(LayerBackgroundTest, AddBackgroundLayerFlattensOneImageOfTheCanvasSizeOntoWhite)
+{
+    ffpsd::Document doc = NewDocument();
+    EXPECT_THROW(doc.AddBackgroundLayer("five", Pattern(4, 3, 5)), std::invalid_argument);
+    EXPECT_THROW(doc.AddBackgroundLayer("small", Pattern(3, 3, 3)), std::invalid_argument);
+    EXPECT_THROW(doc.AddBackgroundLayer("deep", Pattern(4, 3, 3, 16)), std::invalid_argument);
+    EXPECT_THROW(doc.AddBackgroundLayer("lab", Pattern(4, 3, 3, 8, ffpsd::ColorMode::kLab)), std::invalid_argument);
+    EXPECT_THROW(doc.AddBackgroundLayer("empty", ffpsd::Image()), std::invalid_argument);
+    EXPECT_EQ(doc.GetLayerCount(), 0u);
+
+    doc.AddBackgroundLayer("Background", Pattern(4, 3, 3));
+    EXPECT_THROW(doc.AddBackgroundLayer("second", Pattern(4, 3, 3)), std::logic_error);
+    EXPECT_EQ(doc.GetLayerCount(), 1u);
+
+    ffpsd::Document gray = NewDocument(ffpsd::ColorMode::kGrayscale);
+    const ffpsd::Layer* opaque = gray.AddBackgroundLayer("Background", Pattern(4, 3, 1));
+    ExpectRect(opaque->GetBounds(), 0, 0, 3, 4);
+    EXPECT_EQ(opaque->GetPixels().channel_count, 1u);
+    EXPECT_EQ(opaque->GetPixels().bytes, Pattern(4, 3, 1).bytes);
+
+    // Opaque stays, clear is white, 0 at half alpha is 127, 200 at a quarter is 241.
+    ffpsd::Document eight = NewDocument(ffpsd::ColorMode::kGrayscale);
+    ffpsd::Bytes samples(24, 0);
+    samples[3] = 200;
+    std::fill(samples.begin() + 12, samples.end(), std::uint8_t{255});
+    samples[13] = 0;
+    samples[14] = 128;
+    samples[15] = 64;
+    const ffpsd::Image flattened = eight.AddBackgroundLayer("Background", Planes(4, 3, 2, samples))->GetPixels();
+    ASSERT_EQ(flattened.channel_count, 1u);
+    EXPECT_EQ(flattened.bytes, (ffpsd::Bytes{0, 255, 127, 241, 0, 0, 0, 0, 0, 0, 0, 0}));
+
+    // 16 bit white is full.
+    ffpsd::Document sixteen = NewDocument(ffpsd::ColorMode::kGrayscale, 16);
+    ffpsd::Image deep = Pattern(4, 3, 2, 16);
+    std::vector<std::uint16_t> deep_samples(24, 0x1234);
+    std::fill(deep_samples.begin() + 12, deep_samples.end(), std::uint16_t{0xFFFF});
+    deep_samples[12] = 0;
+    std::memcpy(deep.bytes.data(), deep_samples.data(), deep.bytes.size());
+    const std::vector<std::uint16_t> read = Samples16(sixteen.AddBackgroundLayer("Background", deep)->GetPixels());
+    EXPECT_EQ(read[0], 0xFFFFu);
+    EXPECT_EQ(read[1], 0x1234u);
+
+    // Lab white has neutral a and b.
+    ffpsd::Document lab = NewDocument(ffpsd::ColorMode::kLab);
+    ffpsd::Image clear = Pattern(4, 3, 4, 8, ffpsd::ColorMode::kLab);
+    std::fill(clear.bytes.begin() + 3 * 12, clear.bytes.end(), std::uint8_t{0});
+    ffpsd::Bytes white(36, 128);
+    std::fill(white.begin(), white.begin() + 12, std::uint8_t{255});
+    EXPECT_EQ(lab.AddBackgroundLayer("Background", clear)->GetPixels().bytes, white);
 }
 
 TEST(LayerBackgroundTest, SetPixelsKeepsItOpaqueAndOfTheCanvasSize)
@@ -107,63 +154,6 @@ TEST(LayerBackgroundTest, SetPixelsKeepsItOpaqueAndOfTheCanvasSize)
     background->SetPixels(other);
     EXPECT_TRUE(background->IsBackground());
     EXPECT_EQ(background->GetPixels().bytes, other.bytes);
-}
-
-TEST(LayerBackgroundTest, AddBackgroundLayerFlattensOntoWhite)
-{
-    ffpsd::Document gray = NewDocument(ffpsd::ColorMode::kGrayscale);
-    const ffpsd::Layer* opaque = gray.AddBackgroundLayer("Background", Pattern(4, 3, 1));
-    ExpectRect(opaque->GetBounds(), 0, 0, 3, 4);
-    EXPECT_EQ(opaque->GetPixels().channel_count, 1u);
-    EXPECT_EQ(opaque->GetPixels().bytes, Pattern(4, 3, 1).bytes);
-
-    // Opaque stays, clear is white, 0 at half alpha is 127, 200 at a quarter is 241.
-    ffpsd::Document eight = NewDocument(ffpsd::ColorMode::kGrayscale);
-    ffpsd::Image image = Pattern(4, 3, 2);
-    std::fill(image.bytes.begin(), image.bytes.end(), std::uint8_t{0});
-    image.bytes[3] = 200;
-    std::fill(image.bytes.begin() + 12, image.bytes.end(), std::uint8_t{255});
-    image.bytes[13] = 0;
-    image.bytes[14] = 128;
-    image.bytes[15] = 64;
-    const ffpsd::Image flattened = eight.AddBackgroundLayer("Background", image)->GetPixels();
-    ASSERT_EQ(flattened.channel_count, 1u);
-    EXPECT_EQ(flattened.bytes, (ffpsd::Bytes{0, 255, 127, 241, 0, 0, 0, 0, 0, 0, 0, 0}));
-
-    // 16 bit white is full.
-    ffpsd::Document sixteen = NewDocument(ffpsd::ColorMode::kGrayscale, 16);
-    ffpsd::Image deep = Pattern(4, 3, 2, 16);
-    std::vector<std::uint16_t> samples(24, 0x1234);
-    std::fill(samples.begin() + 12, samples.end(), std::uint16_t{0xFFFF});
-    samples[12] = 0;
-    std::memcpy(deep.bytes.data(), samples.data(), deep.bytes.size());
-    const std::vector<std::uint16_t> read = Samples16(sixteen.AddBackgroundLayer("Background", deep)->GetPixels());
-    EXPECT_EQ(read[0], 0xFFFFu);
-    EXPECT_EQ(read[1], 0x1234u);
-
-    // Lab white has neutral a and b.
-    ffpsd::Document lab = NewDocument(ffpsd::ColorMode::kLab);
-    ffpsd::Image clear = Pattern(4, 3, 4, 8, ffpsd::ColorMode::kLab);
-    std::fill(clear.bytes.begin() + 3 * 12, clear.bytes.end(), std::uint8_t{0});
-    ffpsd::Bytes white(36, 128);
-    std::fill(white.begin(), white.begin() + 12, std::uint8_t{255});
-    EXPECT_EQ(lab.AddBackgroundLayer("Background", clear)->GetPixels().bytes, white);
-}
-
-TEST(LayerBackgroundTest, AddBackgroundLayerTakesOneImageOfTheCanvasSize)
-{
-    ffpsd::Document doc = NewDocument();
-
-    EXPECT_THROW(doc.AddBackgroundLayer("five", Pattern(4, 3, 5)), std::invalid_argument);
-    EXPECT_THROW(doc.AddBackgroundLayer("small", Pattern(3, 3, 3)), std::invalid_argument);
-    EXPECT_THROW(doc.AddBackgroundLayer("deep", Pattern(4, 3, 3, 16)), std::invalid_argument);
-    EXPECT_THROW(doc.AddBackgroundLayer("lab", Pattern(4, 3, 3, 8, ffpsd::ColorMode::kLab)), std::invalid_argument);
-    EXPECT_THROW(doc.AddBackgroundLayer("empty", ffpsd::Image()), std::invalid_argument);
-    EXPECT_EQ(doc.GetLayerCount(), 0u);
-
-    doc.AddBackgroundLayer("Background", Pattern(4, 3, 3));
-    EXPECT_THROW(doc.AddBackgroundLayer("second", Pattern(4, 3, 3)), std::logic_error);
-    EXPECT_EQ(doc.GetLayerCount(), 1u);
 }
 
 TEST(LayerBackgroundTest, ItStaysAtTheBottomThroughSaving)
@@ -185,11 +175,11 @@ TEST(LayerBackgroundTest, ItStaysAtTheBottomThroughSaving)
     EXPECT_EQ(doc.GetLayerByIndex(0), background);
     EXPECT_EQ(doc.GetLayerByIndex(2), b);
 
-    const ffpsd::Document back = ffpsd::Document::Parse(doc.Save());
+    const ffpsd::Document back = RoundTrip(doc);
     ASSERT_EQ(back.GetLayerCount(), 3u);
     EXPECT_TRUE(back.GetLayerByIndex(0)->IsBackground());
     EXPECT_FALSE(back.GetLayerByIndex(1)->IsBackground());
-    EXPECT_EQ(back.GetLayerByIndex(0)->GetPixels().bytes, Pattern(4, 3, 3).bytes);
+    EXPECT_EQ(Pixels(back, 0), Pattern(4, 3, 3).bytes);
 
     // Above it, layers move freely; without it, anything can be at the bottom.
     doc.MoveLayer(2, 1);
@@ -204,10 +194,10 @@ TEST(LayerBackgroundTest, ItStaysAtTheBottomThroughSaving)
     rgb.UnsetBackgroundLayer();
     rgb.MoveLayer(0, 1);
     EXPECT_EQ(rgb.GetLayerByIndex(1), former);
-    EXPECT_FALSE(ffpsd::Document::Parse(rgb.Save()).GetLayerByIndex(1)->IsBackground());
+    EXPECT_FALSE(RoundTrip(rgb).GetLayerByIndex(1)->IsBackground());
 }
 
-TEST(LayerBackgroundTest, SetBackgroundLayerFlattensItOntoAWhiteCanvas)
+TEST(LayerBackgroundTest, SetBackgroundLayerFlattensARasterLayerOntoAWhiteCanvas)
 {
     ffpsd::Document doc = NewDocument();
     doc.AddLayer("a");
@@ -228,9 +218,7 @@ TEST(LayerBackgroundTest, SetBackgroundLayerFlattensItOntoAWhiteCanvas)
 
     // Black at 20% over white is 255 * 204 / 255; the opacity and the blend mode are folded in.
     ffpsd::Document faded = NewDocument();
-    ffpsd::Image black = Pattern(4, 3, 3);
-    std::fill(black.bytes.begin(), black.bytes.end(), std::uint8_t{0});
-    ffpsd::Layer* layer = faded.AddLayer("black", black);
+    ffpsd::Layer* layer = faded.AddLayer("black", Flat(4, 3, 3, 0));
     layer->SetOpacity(51);
     layer->SetBlendKey(Fourcc("mul "));
     faded.SetBackgroundLayer(0);
@@ -251,19 +239,17 @@ TEST(LayerBackgroundTest, SetBackgroundLayerFlattensItOntoAWhiteCanvas)
     copy.bytes = ffpsd::Bytes(copy.bytes.data(), copy.bytes.size() / 4 * 3);
     rgb.UnsetBackgroundLayer();
     rgb.SetBackgroundLayer(0);
-    EXPECT_EQ(rgb.GetLayerByIndex(0)->GetPixels().bytes, background.bytes);
+    EXPECT_EQ(Pixels(rgb, 0), background.bytes);
     rgb.UnsetBackgroundLayer();
     rgb.SetBackgroundLayer(1);
     EXPECT_EQ(rgb.GetLayerByIndex(0)->GetName(), kBackgroundCopyName);
-    EXPECT_EQ(rgb.GetLayerByIndex(0)->GetPixels().bytes, copy.bytes);
-}
+    EXPECT_EQ(Pixels(rgb, 0), copy.bytes);
 
-TEST(LayerBackgroundTest, SetBackgroundLayerRefusesWhatCannotBeOne)
-{
-    ffpsd::Document rgb = ffpsd::Document::Open(kRgbPsd);
-    EXPECT_THROW(rgb.SetBackgroundLayer(1), std::logic_error);
-    EXPECT_THROW(rgb.SetBackgroundLayer(2), std::out_of_range);
-    rgb.SetBackgroundLayer(0); // already it
+    // Not over another background, out of the stack, or from an adjustment or a group marker.
+    ffpsd::Document photoshop = ffpsd::Document::Open(kRgbPsd);
+    EXPECT_THROW(photoshop.SetBackgroundLayer(1), std::logic_error);
+    EXPECT_THROW(photoshop.SetBackgroundLayer(2), std::out_of_range);
+    photoshop.SetBackgroundLayer(0); // already it
 
     ffpsd::Document levels = ffpsd::Document::Open(kRgbLevelsPsd);
     levels.UnsetBackgroundLayer();

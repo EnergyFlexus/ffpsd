@@ -74,17 +74,18 @@ namespace ffpsd::detail
 
         const std::size_t plane_samples = std::size_t{image.width} * image.height;
         const std::size_t sample_size = image.GetBytesPerSample();
-        const auto plane = [&](std::size_t index) { return image.data + index * plane_samples * sample_size; };
+        const auto encode = [&](std::int16_t id, std::size_t plane) {
+            const std::uint8_t* samples = image.data + plane * plane_samples * sample_size;
+            return ChannelImageData::Encode(id, samples, image.width, image.height, image.depth, is_psb);
+        };
 
         // Transparency is declared first, as Photoshop writes it; without it the bottom layer would become the background.
         if (HasTransparency(image))
-            channels.push_back(
-                ChannelImageData::Encode(kTransparencyId, plane(color_count), image.width, image.height, image.depth, is_psb));
+            channels.push_back(encode(kTransparencyId, color_count));
         else if (!is_background)
             channels.push_back(ChannelImageData::Opaque(kTransparencyId, image.width, image.height, image.depth, is_psb));
         for (std::size_t i = 0; i < color_count; ++i)
-            channels.push_back(
-                ChannelImageData::Encode(static_cast<std::int16_t>(i), plane(i), image.width, image.height, image.depth, is_psb));
+            channels.push_back(encode(static_cast<std::int16_t>(i), i));
         return channels;
     }
 

@@ -8,9 +8,8 @@ namespace ffpsd::detail
 {
     constexpr std::uint32_t Fourcc(char a, char b, char c, char d) noexcept
     {
-        return (static_cast<std::uint32_t>(static_cast<unsigned char>(a)) << 24) |
-               (static_cast<std::uint32_t>(static_cast<unsigned char>(b)) << 16) |
-               (static_cast<std::uint32_t>(static_cast<unsigned char>(c)) << 8) | static_cast<std::uint32_t>(static_cast<unsigned char>(d));
+        const auto byte = [](char value) { return static_cast<std::uint32_t>(static_cast<unsigned char>(value)); };
+        return (byte(a) << 24) | (byte(b) << 16) | (byte(c) << 8) | byte(d);
     }
 
     // Unprintable bytes become '?': a code from a malformed file is arbitrary.

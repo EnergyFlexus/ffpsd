@@ -87,13 +87,13 @@
       }
     },
     {
-      "name": "all-debug",
-      "displayName": "All · Debug",
+      "name": "all-static-debug",
+      "displayName": "All · Static · Debug",
       "inherits": ["static-debug", "everything"]
     },
     {
-      "name": "all-release",
-      "displayName": "All · Release",
+      "name": "all-static-release",
+      "displayName": "All · Static · Release",
       "inherits": ["static-release", "everything"]
     }
   ],
@@ -104,14 +104,14 @@
     { "name": "shared-debug",   "configurePreset": "shared-debug" },
     { "name": "shared-release", "configurePreset": "shared-release" },
     { "name": "bench-release",  "configurePreset": "bench-release" },
-    { "name": "all-debug",      "configurePreset": "all-debug" },
-    { "name": "all-release",    "configurePreset": "all-release" }
+    { "name": "all-static-debug",   "configurePreset": "all-static-debug" },
+    { "name": "all-static-release", "configurePreset": "all-static-release" }
   ],
 
   "testPresets": [
     { "name": "static-debug", "configurePreset": "static-debug", "output": { "outputOnFailure": true } },
     { "name": "shared-debug", "configurePreset": "shared-debug", "output": { "outputOnFailure": true } },
-    { "name": "all-debug",    "configurePreset": "all-debug",    "output": { "outputOnFailure": true } },
-    { "name": "all-release",  "configurePreset": "all-release",  "output": { "outputOnFailure": true } }
+    { "name": "all-static-debug",   "configurePreset": "all-static-debug",   "output": { "outputOnFailure": true } },
+    { "name": "all-static-release", "configurePreset": "all-static-release", "output": { "outputOnFailure": true } }
   ]
 }

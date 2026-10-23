@@ -212,7 +212,7 @@ namespace ffpsd::detail
                 }
             }
         }
-        // SplitRow backwards: a sample size known at compile time makes each copy a plain move instead of a call.
+        // A sample size known at compile time makes each copy a plain move instead of a call.
         template <std::size_t kSample, std::uint16_t kChannels>
         void JoinRow(const std::uint8_t* in, std::uint32_t width, std::size_t plane_bytes, std::uint8_t* out) noexcept
         {

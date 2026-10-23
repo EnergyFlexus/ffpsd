@@ -15,6 +15,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ffpsd::detail
@@ -235,8 +236,8 @@ namespace ffpsd::detail
             CmykToRgb(decoded);
 
         const Orientation orientation = apply_orientation ? decoded.orientation : Orientation::kNormal;
-        Image image = ConvertColorMode(
-            Deinterleave(decoded.bytes.data(), decoded.width, decoded.height, decoded.channels, 8, orientation), color_mode);
+        Image planes = Deinterleave(decoded.bytes.data(), decoded.width, decoded.height, decoded.channels, 8, orientation);
+        Image image = ConvertColorMode(std::move(planes), color_mode);
         if (depth == 16)
             return WidenTo16(image);
         return image;

@@ -13,7 +13,7 @@ namespace ffpsd::detail
     PixelData ParseImageData(BigEndianReader& reader, const ImageInfo& info);
     void WriteImageData(BigEndianWriter& writer, const PixelData& data);
 
-    // The composite's shape, for PixelData::Decode; empty when the file has none.
+    // The composite's shape; empty when the file has none.
     ImageInfo ImageDataInfo(const PixelData& data, const ImageInfo& info);
 } // namespace ffpsd::detail
 

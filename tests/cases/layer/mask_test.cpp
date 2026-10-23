@@ -29,7 +29,7 @@ TEST(LayerMaskTest, PhotoshopsPixelMasksAreRead)
     EXPECT_EQ(real->image.width, 703u);
 }
 
-TEST(LayerMaskTest, ASetMaskIsSavedReplacedAndRemoved)
+TEST(LayerMaskTest, AMaskIsSetReplacedAndRemovedWhereItCanGo)
 {
     ffpsd::Document doc = NewDocument();
     ffpsd::Layer* layer = doc.AddLayer("layer", Pattern(4, 3, 4));
@@ -37,29 +37,43 @@ TEST(LayerMaskTest, ASetMaskIsSavedReplacedAndRemoved)
     layer->SetMask(mask, 1, 2, 0);
     EXPECT_FALSE(doc.HasRealMergedData());
 
-    const ffpsd::Document back = ffpsd::Document::Parse(doc.Save());
+    const ffpsd::Document back = RoundTrip(doc);
     const std::optional<ffpsd::LayerMask> read = back.GetLayerByIndex(0)->GetMask();
     ASSERT_TRUE(read.has_value());
     ExpectRect(read->bounds, 1, 2, 3, 4);
     EXPECT_EQ(read->default_color, 0);
     EXPECT_EQ(read->image.bytes, mask.bytes);
-    EXPECT_EQ(back.GetLayerByIndex(0)->GetPixels().bytes, Pattern(4, 3, 4).bytes);
+    EXPECT_EQ(Pixels(back, 0), Pattern(4, 3, 4).bytes);
 
     // An empty image is a mask of its default color alone.
     layer->SetMask(ffpsd::ImageView(), 0, 0, 255);
-    const std::optional<ffpsd::LayerMask> blank = ffpsd::Document::Parse(doc.Save()).GetLayerByIndex(0)->GetMask();
+    const std::optional<ffpsd::LayerMask> blank = RoundTrip(doc).GetLayerByIndex(0)->GetMask();
     ASSERT_TRUE(blank.has_value());
     EXPECT_TRUE(blank->image.IsEmpty());
     EXPECT_EQ(blank->default_color, 255);
 
     EXPECT_TRUE(layer->RemoveMask());
     EXPECT_FALSE(layer->RemoveMask());
-    EXPECT_FALSE(ffpsd::Document::Parse(doc.Save()).GetLayerByIndex(0)->GetMask().has_value());
+    EXPECT_FALSE(RoundTrip(doc).GetLayerByIndex(0)->GetMask().has_value());
 
     ffpsd::Document deep = NewDocument(ffpsd::ColorMode::kRgb, 16);
-    ffpsd::Layer* deep_layer = deep.AddLayer("layer", Pattern(4, 3, 3, 16));
-    deep_layer->SetMask(Pattern(3, 3, 1, 16), 0, 0);
-    EXPECT_EQ(ffpsd::Document::Parse(deep.Save()).GetLayerByIndex(0)->GetMask()->image.bytes, Pattern(3, 3, 1, 16).bytes);
+    deep.AddLayer("layer", Pattern(4, 3, 3, 16))->SetMask(Pattern(3, 3, 1, 16), 0, 0);
+    EXPECT_EQ(RoundTrip(deep).GetLayerByIndex(0)->GetMask()->image.bytes, Pattern(3, 3, 1, 16).bytes);
+
+    // Not on the background or beside a vector mask, and only a gray plane at the document's depth with 0 or 255 around it.
+    ffpsd::Document photoshop = ffpsd::Document::Open(kRgbMasksPsd);
+    EXPECT_THROW(photoshop.GetLayerByIndex(0)->SetMask(Pattern(2, 2, 1), 0, 0), std::logic_error);
+    ffpsd::Layer* vector = photoshop.GetLayerByIndex(3);
+    EXPECT_THROW(vector->SetMask(Pattern(2, 2, 1), 0, 0), std::logic_error);
+    EXPECT_THROW(vector->RemoveMask(), std::logic_error);
+    EXPECT_THROW(vector->SetPosition(1, 1), std::logic_error);
+    EXPECT_THROW(vector->Resize(10, 10), std::logic_error);
+
+    ffpsd::Layer* unmasked = photoshop.GetLayerByIndex(1);
+    EXPECT_THROW(unmasked->SetMask(Pattern(2, 2, 3), 0, 0), std::invalid_argument);
+    EXPECT_THROW(unmasked->SetMask(Pattern(2, 2, 1, 16), 0, 0), std::invalid_argument);
+    EXPECT_THROW(unmasked->SetMask(Pattern(2, 2, 1), 0, 0, 7), std::invalid_argument);
+    EXPECT_FALSE(unmasked->GetMask().has_value());
 }
 
 TEST(LayerMaskTest, AMaskMovesAndScalesWithItsLayer)
@@ -75,32 +89,15 @@ TEST(LayerMaskTest, AMaskMovesAndScalesWithItsLayer)
     ExpectRect(layer->GetBounds(), 3, 2, 7, 6);
     const ffpsd::LayerMask mask = *layer->GetMask();
     ExpectRect(mask.bounds, 5, 4, 9, 8);
-    const std::uint8_t a = Pattern(2, 2, 1).bytes[0];
-    const std::uint8_t b = Pattern(2, 2, 1).bytes[1];
-    const std::uint8_t c = Pattern(2, 2, 1).bytes[2];
-    const std::uint8_t d = Pattern(2, 2, 1).bytes[3];
+    const ffpsd::Image set = Pattern(2, 2, 1);
+    const std::uint8_t a = set.bytes[0];
+    const std::uint8_t b = set.bytes[1];
+    const std::uint8_t c = set.bytes[2];
+    const std::uint8_t d = set.bytes[3];
     EXPECT_EQ(mask.image.bytes, (ffpsd::Bytes{a, a, b, b, a, a, b, b, c, c, d, d, c, c, d, d}));
 
     // Photoshop's masked layer moves now, its mask along.
     ffpsd::Document photoshop = ffpsd::Document::Open(kRgbMasksPsd);
     photoshop.GetLayerByIndex(2)->SetPosition(10, 20);
-    ExpectRect(ffpsd::Document::Parse(photoshop.Save()).GetLayerByIndex(2)->GetMask()->bounds, 10, 955, 1427, 1910);
-}
-
-TEST(LayerMaskTest, WhatAMaskCannotGoOnIsRefused)
-{
-    ffpsd::Document doc = ffpsd::Document::Open(kRgbMasksPsd);
-    EXPECT_THROW(doc.GetLayerByIndex(0)->SetMask(Pattern(2, 2, 1), 0, 0), std::logic_error);
-
-    ffpsd::Layer* vector = doc.GetLayerByIndex(3);
-    EXPECT_THROW(vector->SetMask(Pattern(2, 2, 1), 0, 0), std::logic_error);
-    EXPECT_THROW(vector->RemoveMask(), std::logic_error);
-    EXPECT_THROW(vector->SetPosition(1, 1), std::logic_error);
-    EXPECT_THROW(vector->Resize(10, 10), std::logic_error);
-
-    ffpsd::Layer* layer = doc.GetLayerByIndex(1);
-    EXPECT_THROW(layer->SetMask(Pattern(2, 2, 3), 0, 0), std::invalid_argument);
-    EXPECT_THROW(layer->SetMask(Pattern(2, 2, 1, 16), 0, 0), std::invalid_argument);
-    EXPECT_THROW(layer->SetMask(Pattern(2, 2, 1), 0, 0, 7), std::invalid_argument);
-    EXPECT_FALSE(layer->GetMask().has_value());
+    ExpectRect(RoundTrip(photoshop).GetLayerByIndex(2)->GetMask()->bounds, 10, 955, 1427, 1910);
 }

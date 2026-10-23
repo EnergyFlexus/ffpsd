@@ -27,7 +27,6 @@ namespace ffpsd
 
         Bytes() = default;
 
-        // Left as memory comes: every byte is the caller's to write.
         FFPSD_EXPORT explicit Bytes(std::size_t size);
         FFPSD_EXPORT Bytes(std::size_t size, std::uint8_t value);
         FFPSD_EXPORT Bytes(const std::uint8_t* data, std::size_t size);

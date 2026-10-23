@@ -79,8 +79,9 @@ namespace ffpsd::detail
             const Image moved = TransformPixels(std::move(pixels), transform, width, height, filter, false);
             if (canvas != nullptr)
             {
-                Image white = MakeWhiteImage(
-                    static_cast<std::uint32_t>(canvas->GetWidth()), static_cast<std::uint32_t>(canvas->GetHeight()), color_mode, depth);
+                const auto canvas_width = static_cast<std::uint32_t>(canvas->GetWidth());
+                const auto canvas_height = static_cast<std::uint32_t>(canvas->GetHeight());
+                Image white = MakeWhiteImage(canvas_width, canvas_height, color_mode, depth);
                 PlaceImage(white, moved, std::int64_t{result.bounds.top} - canvas->top, std::int64_t{result.bounds.left} - canvas->left);
                 result.bounds = *canvas;
                 channels = EncodeLayerPixels(white, color_mode, true, is_psb);

@@ -16,7 +16,7 @@ namespace ffpsd::detail
     // What the picture formats take, gray or RGB at 8 or 16 bit; what names the format in the message.
     void CheckPictureMode(ColorMode color_mode, std::uint16_t depth, const char* what);
 
-    // Not empty, in a mode and depth CheckPictureMode takes, transparency at most, and the bytes for it.
+    // Not empty, gray or RGB at 8 or 16 bit, transparency at most, and the bytes for it.
     void CheckPicture(const ImageView& image, const char* what);
 } // namespace ffpsd::detail
 

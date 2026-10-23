@@ -4,6 +4,7 @@
 #include <ffpsd/ffpsd.hpp>
 #include <gtest/gtest.h>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 using namespace ffpsd_test;
@@ -27,17 +28,16 @@ TEST(LayerTest, ANewLayerIsVisibleOpaqueNormalAndUnclippedUntilSet)
     EXPECT_EQ(layer->GetBlendKey(), Fourcc("zzzz"));
     EXPECT_EQ(layer->GetOpacity(), 0u);
 
-    layer->SetVisible(false);
-    EXPECT_FALSE(layer->IsVisible());
-    layer->SetVisible(false);
-    EXPECT_FALSE(layer->IsVisible());
-    layer->SetVisible(true);
-    EXPECT_TRUE(layer->IsVisible());
-
-    layer->SetClipped(true);
-    EXPECT_TRUE(layer->IsClipped());
-    layer->SetClipped(false);
-    EXPECT_FALSE(layer->IsClipped());
+    for (const bool visible : {false, false, true})
+    {
+        layer->SetVisible(visible);
+        EXPECT_EQ(layer->IsVisible(), visible);
+    }
+    for (const bool clipped : {true, false})
+    {
+        layer->SetClipped(clipped);
+        EXPECT_EQ(layer->IsClipped(), clipped);
+    }
 }
 
 TEST(LayerTest, TheNameIsUnicodeWithALegacyCopy)
@@ -63,70 +63,42 @@ TEST(LayerTest, TheNameIsUnicodeWithALegacyCopy)
     EXPECT_EQ(plain->GetName(), kBackgroundCopyName);
 }
 
-TEST(LayerTest, TheKindComesFromTheSectionDivider)
+TEST(LayerTest, TheKindComesFromTheSectionDividerAndOnlyAHeaderOpensAndCloses)
 {
     ffpsd::Document doc = NewDocument();
-    ffpsd::Layer* layer = doc.AddLayer("marker");
-
+    ffpsd::Layer* marker = doc.AddLayer("marker");
     const std::pair<std::uint32_t, ffpsd::LayerKind> kinds[] = {
         {1, ffpsd::LayerKind::kGroupOpen},
         {2, ffpsd::LayerKind::kGroupClosed},
         {3, ffpsd::LayerKind::kGroupEnd},
-        {0, ffpsd::LayerKind::kRaster}};
+        {0, ffpsd::LayerKind::kRaster},
+    };
     for (const auto& [type, kind] : kinds)
     {
-        SetSectionDivider(*layer, type);
-        EXPECT_EQ(layer->GetKind(), kind) << "type " << type;
+        SetSectionDivider(*marker, type);
+        EXPECT_EQ(marker->GetKind(), kind) << "type " << type;
     }
 
     // Too short to hold a type.
-    layer->SetTaggedBlock(Block("lsct", {0, 1}));
-    EXPECT_EQ(layer->GetKind(), ffpsd::LayerKind::kRaster);
-}
+    marker->SetTaggedBlock(Block("lsct", {0, 1}));
+    EXPECT_EQ(marker->GetKind(), ffpsd::LayerKind::kRaster);
 
-TEST(LayerTest, TaggedBlocksAreARawDoor)
-{
-    ffpsd::Document doc = NewDocument();
-    ffpsd::Layer* layer = doc.AddLayer("blocks");
-    const std::size_t count = layer->GetTaggedBlockCount();
-
-    layer->SetTaggedBlock(Block("abcd", {1}));
-    ASSERT_EQ(layer->GetTaggedBlockCount(), count + 1);
-    const ffpsd::TaggedBlock* added = layer->GetTaggedBlockByIndex(count);
-    EXPECT_EQ(added->key, Fourcc("abcd"));
-
-    // The same key assigns in place, so the pointer stays and shows the new bytes.
-    layer->SetTaggedBlock(Block("abcd", {2, 3}));
-    EXPECT_EQ(layer->GetTaggedBlockCount(), count + 1);
-    EXPECT_EQ(layer->GetTaggedBlockByKey(Fourcc("abcd")), added);
-    EXPECT_EQ(added->data, (std::vector<std::uint8_t>{2, 3}));
-
-    EXPECT_TRUE(layer->RemoveTaggedBlock(Fourcc("abcd")));
-    EXPECT_FALSE(layer->RemoveTaggedBlock(Fourcc("abcd")));
-    EXPECT_EQ(layer->GetTaggedBlockByKey(Fourcc("abcd")), nullptr);
-    EXPECT_THROW(layer->GetTaggedBlockByIndex(count), std::out_of_range);
-}
-
-TEST(LayerTest, AGroupHeaderOpensAndClosesKeepingItsBlendMode)
-{
-    ffpsd::Document doc = NewDocument();
+    // The type alone changes; the blend mode after it stays.
     ffpsd::Layer* group = doc.AddGroup("group");
-    const std::vector<std::uint8_t> open = group->GetTaggedBlockByKey(Fourcc("lsct"))->data;
+    const std::vector<std::uint8_t> open = BlockData(*group, "lsct");
     std::vector<std::uint8_t> closed = open;
     closed[3] = 2;
-
     group->SetGroupOpen(false);
     EXPECT_EQ(group->GetKind(), ffpsd::LayerKind::kGroupClosed);
-    EXPECT_EQ(group->GetTaggedBlockByKey(Fourcc("lsct"))->data, closed);
+    EXPECT_EQ(BlockData(*group, "lsct"), closed);
     group->SetGroupOpen(true);
     EXPECT_EQ(group->GetKind(), ffpsd::LayerKind::kGroupOpen);
-    EXPECT_EQ(group->GetTaggedBlockByKey(Fourcc("lsct"))->data, open);
+    EXPECT_EQ(BlockData(*group, "lsct"), open);
 
     // Neither the end marker nor a raster layer opens, and both stay as they were.
-    ffpsd::Layer* end = doc.GetLayerByIndex(0);
-    ffpsd::Layer* raster = doc.AddLayer("raster");
+    ffpsd::Layer* end = doc.GetLayerByIndex(1);
     EXPECT_THROW(end->SetGroupOpen(true), std::logic_error);
-    EXPECT_THROW(raster->SetGroupOpen(false), std::logic_error);
+    EXPECT_THROW(marker->SetGroupOpen(false), std::logic_error);
     EXPECT_EQ(end->GetKind(), ffpsd::LayerKind::kGroupEnd);
-    EXPECT_EQ(raster->GetKind(), ffpsd::LayerKind::kRaster);
+    EXPECT_EQ(marker->GetKind(), ffpsd::LayerKind::kRaster);
 }

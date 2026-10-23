@@ -24,10 +24,9 @@ int main(int argc, char** argv)
     // Every failure is an exception with a readable message.
     try
     {
-        // Open the document.
         ffpsd::Document doc = ffpsd::Document::Open(argv[1]);
 
-        // Read what it holds; layers go from the bottom up.
+        // Layers go from the bottom up.
         std::cout << doc.GetWidth() << " x " << doc.GetHeight() << ", " << doc.GetDepth() << " bit, " << doc.GetLayerCount() << " layers\n";
         for (std::size_t i = 0; i < doc.GetLayerCount(); ++i)
         {
@@ -36,7 +35,7 @@ int main(int argc, char** argv)
             std::cout << "  " << i << ": " << layer->GetName() << ", " << bounds.GetWidth() << " x " << bounds.GetHeight() << "\n";
         }
 
-        // Put a copy of the top layer on top; a group marker alone cannot be copied.
+        // A copy of the top layer on top; a group's end marker would throw.
         const ffpsd::Layer* top = doc.GetLayerByIndex(doc.GetLayerCount() - 1);
         doc.AddLayerCopy(*top);
 

@@ -133,8 +133,9 @@ namespace ffpsd::detail
 
     std::optional<std::string> TryReadUnicodeString(BigEndianReader& reader)
     {
-        if (reader.GetRemaining() < sizeof(std::uint32_t) ||
-            reader.PeekU32() > (reader.GetRemaining() - sizeof(std::uint32_t)) / sizeof(std::uint16_t))
+        if (reader.GetRemaining() < sizeof(std::uint32_t))
+            return std::nullopt;
+        if (reader.PeekU32() > (reader.GetRemaining() - sizeof(std::uint32_t)) / sizeof(std::uint16_t))
             return std::nullopt;
         return ReadUnicodeString(reader);
     }
@@ -159,9 +160,9 @@ namespace ffpsd::detail
         for (std::size_t i = 0; i < units.size(); ++i)
         {
             std::uint32_t code = units[i];
-            const bool has_pair = code >= kLeadSurrogateFirst && code <= kLeadSurrogateLast && i + 1 < units.size() &&
-                                  units[i + 1] >= kTrailSurrogateFirst && units[i + 1] <= kTrailSurrogateLast;
-            if (has_pair)
+            const bool is_lead = code >= kLeadSurrogateFirst && code <= kLeadSurrogateLast;
+            const bool trail_follows = i + 1 < units.size() && units[i + 1] >= kTrailSurrogateFirst && units[i + 1] <= kTrailSurrogateLast;
+            if (is_lead && trail_follows)
             {
                 code = kSupplementaryFirst + ((code - kLeadSurrogateFirst) << 10) + (units[i + 1] - kTrailSurrogateFirst);
                 ++i;

@@ -114,7 +114,7 @@ namespace
                     return false;
             }
             else if (args[i].rfind("--", 0) == 0)
-                return false; // an unknown option
+                return false;
             else
                 folders.push_back(args[i]);
         }
@@ -127,7 +127,6 @@ namespace
         return true;
     }
 
-    // Each one, and the files it names, one a line.
     void PrintIssues(const std::vector<img2ffpsd::Issue>& issues, const char* color, const char* kind)
     {
         for (const img2ffpsd::Issue& issue : issues)
@@ -145,7 +144,7 @@ namespace
         }
     }
 
-    // The bottom's paths and every folder's files; false, after printing why, if they cannot be converted.
+    // False, after printing why, when the folders cannot be converted.
     bool FindFiles(const Options& options, std::vector<fs::path>& files, std::vector<Pictures>& found)
     {
         img2ffpsd::FolderScan scan = img2ffpsd::ScanFolders(options.conversion, options.recursive);
@@ -230,7 +229,7 @@ namespace
         std::size_t failed_ = 0;
     };
 
-    // Converts every file; returns the failures.
+    // Returns the number of files that failed.
     std::size_t ConvertAll(const Options& options, const std::vector<Pictures>& found, const std::vector<fs::path>& files)
     {
         Progress progress(files.size());

@@ -4,6 +4,7 @@
 #include <cstring>
 #include <ffpsd/ffpsd.hpp>
 #include <gtest/gtest.h>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 
@@ -37,12 +38,53 @@ namespace
                 image.bytes[y * width + x] = static_cast<std::uint8_t>(4 * x);
         return image;
     }
+
+    // Every sample the same: 77 at 8 bit, 0x4D4D at 16 and 0.3 at 32.
+    ffpsd::Image FlatAt(std::uint32_t width, std::uint32_t height, std::uint16_t depth)
+    {
+        ffpsd::Image image = Pattern(width, height, 1, depth);
+        const std::size_t sample = image.GetBytesPerSample();
+        const std::uint8_t eight = 77;
+        const std::uint16_t sixteen = 0x4D4D;
+        const float thirty_two = 0.3f;
+        const void* value = depth == 8 ? static_cast<const void*>(&eight) : depth == 16 ? static_cast<const void*>(&sixteen) : &thirty_two;
+        for (std::size_t i = 0; i < image.bytes.size(); i += sample)
+            std::memcpy(image.bytes.data() + i, value, sample);
+        return image;
+    }
+
+    // A 10 x 10 document with a 4 x 2 layer at 3, 1 and a 2 x 2 mask over its right half.
+    struct Masked
+    {
+        ffpsd::Document doc = NewDocument(ffpsd::ColorMode::kRgb, 8, 10, 10);
+        ffpsd::Image pixels = Pattern(4, 2, 4);
+        ffpsd::Image mask = Pattern(2, 2, 1);
+        ffpsd::Layer* layer = nullptr;
+
+        Masked()
+        {
+            layer = doc.AddLayer("layer", pixels, 3, 1);
+            layer->SetMask(mask, 3, 3, 0);
+        }
+    };
 } // namespace
 
-TEST(LayerResizeTest, ResizeKeepsTheTopLeftCornerThroughSaving)
+TEST(LayerTransformTest, SetPositionAndResizeKeepThePixelsFromTheTopLeftCorner)
 {
     ffpsd::Document doc = NewDocument();
-    ffpsd::Layer* layer = doc.AddLayer("resized", Pattern(3, 2, 4), 2, 5);
+    ffpsd::Layer* layer = doc.AddLayer("moved", Pattern(3, 2, 4), 1, 1);
+    doc.SetHasRealMergedData(true);
+
+    layer->SetPosition(-4, 7);
+    ExpectRect(layer->GetBounds(), -4, 7, -2, 10);
+    EXPECT_EQ(layer->GetPixels().bytes, Pattern(3, 2, 4).bytes);
+    EXPECT_FALSE(doc.HasRealMergedData());
+
+    // Bounds past 32 bits are refused, and the layer stays; the same top with a new left is still a move.
+    EXPECT_THROW(layer->SetPosition(-4, std::numeric_limits<std::int32_t>::max() - 1), std::invalid_argument);
+    EXPECT_EQ(layer->GetBounds().left, 7);
+
+    layer->SetPosition(2, 5);
     layer->Resize(7, 5);
     ExpectRect(layer->GetBounds(), 2, 5, 7, 12);
     EXPECT_EQ(layer->GetPixels().channel_count, 4u);
@@ -51,12 +93,63 @@ TEST(LayerResizeTest, ResizeKeepsTheTopLeftCornerThroughSaving)
     ffpsd::Layer* deep_layer = deep.AddLayer("deep", Pattern(4, 3, 4, 16));
     deep_layer->Resize(9, 2);
     const ffpsd::Image expected = deep_layer->GetPixels();
-    const ffpsd::Document back = ffpsd::Document::Parse(deep.Save());
+    const ffpsd::Document back = RoundTrip(deep);
     EXPECT_EQ(back.GetLayerByIndex(0)->GetBounds().GetWidth(), 9);
-    EXPECT_EQ(back.GetLayerByIndex(0)->GetPixels().bytes, expected.bytes);
+    EXPECT_EQ(Pixels(back, 0), expected.bytes);
 }
 
-TEST(LayerResizeTest, WhatCannotMoveOrResizeIsRefused)
+TEST(LayerTransformTest, ATurnKeepsTheCenterAndAFlipMirrorsInPlaceMaskIncluded)
+{
+    Masked turned;
+    turned.layer->Rotate(ffpsd::Rotation::k90);
+    ExpectRect(turned.layer->GetBounds(), 2, 2, 6, 4);
+    EXPECT_EQ(turned.layer->GetPixels().bytes, Clockwise(turned.pixels).bytes);
+
+    // The right half of the mask turns into the bottom half.
+    ExpectRect(turned.layer->GetMask()->bounds, 4, 2, 6, 4);
+    EXPECT_EQ(turned.layer->GetMask()->image.bytes, Clockwise(turned.mask).bytes);
+    EXPECT_FALSE(turned.doc.HasRealMergedData());
+
+    turned.layer->Rotate(ffpsd::Rotation::k180);
+    turned.layer->Rotate(ffpsd::Rotation::k90);
+    ExpectRect(turned.layer->GetBounds(), 3, 1, 5, 5);
+    EXPECT_EQ(turned.layer->GetPixels().bytes, turned.pixels.bytes);
+    EXPECT_EQ(turned.layer->GetMask()->image.bytes, turned.mask.bytes);
+
+    Masked flipped;
+    flipped.layer->Flip(ffpsd::FlipDirection::kHorizontal);
+    ExpectRect(flipped.layer->GetBounds(), 3, 1, 5, 5);
+    EXPECT_EQ(flipped.layer->GetPixels().bytes, Mirrored(flipped.pixels).bytes);
+    ExpectRect(flipped.layer->GetMask()->bounds, 3, 1, 5, 3);
+    EXPECT_EQ(Pixels(RoundTrip(flipped.doc), 0), Mirrored(flipped.pixels).bytes);
+
+    flipped.layer->Flip(ffpsd::FlipDirection::kVertical);
+    flipped.layer->Rotate(ffpsd::Rotation::k180);
+    EXPECT_EQ(flipped.layer->GetPixels().bytes, flipped.pixels.bytes);
+
+    // An odd side difference: the center is 1.5, 1; turned, the corner would be 0.5, -0.5, so it lands half a pixel up and left.
+    ffpsd::Document doc = NewDocument();
+    ffpsd::Layer* odd = doc.AddLayer("layer", Pattern(3, 2, 4));
+    odd->Rotate(ffpsd::Rotation::k90);
+    ExpectRect(odd->GetBounds(), -1, 0, 2, 2);
+}
+
+TEST(LayerTransformTest, FarFromTheCanvasTheEdgesStayExact)
+{
+    ffpsd::Document doc = NewDocument();
+    ffpsd::Layer* layer = doc.AddLayer("far", Pattern(3, 2, 4), 2000000001, -2000000001);
+
+    layer->Resize(7, 5);
+    ExpectRect(layer->GetBounds(), 2000000001, -2000000001, 2000000006, -1999999994);
+
+    layer->Rotate(ffpsd::Rotation::k90);
+    ExpectRect(layer->GetBounds(), 2000000000, -2000000000, 2000000007, -1999999995);
+
+    layer->SetPosition(-2000000003, 2000000004);
+    ExpectRect(layer->GetBounds(), -2000000003, 2000000004, -1999999996, 2000000009);
+}
+
+TEST(LayerTransformTest, WhatCannotMoveResizeOrTurnIsRefused)
 {
     ffpsd::Document rgb = ffpsd::Document::Open(kRgbPsd);
     ffpsd::Layer* background = rgb.GetLayerByIndex(0);
@@ -68,6 +161,10 @@ TEST(LayerResizeTest, WhatCannotMoveOrResizeIsRefused)
     EXPECT_THROW(levels.GetLayerByIndex(1)->Resize(10, 10), std::logic_error);
     EXPECT_THROW(levels.GetLayerByIndex(1)->SetPosition(3, 3), std::logic_error);
 
+    ffpsd::Document masks = ffpsd::Document::Open(kRgbMasksPsd);
+    EXPECT_THROW(masks.GetLayerByIndex(0)->Rotate(ffpsd::Rotation::k90), std::logic_error);
+    EXPECT_THROW(masks.GetLayerByIndex(3)->Flip(ffpsd::FlipDirection::kHorizontal), std::logic_error);
+
     ffpsd::Document doc = NewDocument();
     ffpsd::Layer* empty = doc.AddLayer("empty");
     ffpsd::Layer* layer = doc.AddLayer("layer", Pattern(3, 2, 4));
@@ -76,13 +173,18 @@ TEST(LayerResizeTest, WhatCannotMoveOrResizeIsRefused)
     EXPECT_THROW(layer->Resize(30001, 4), std::invalid_argument);
     EXPECT_EQ(layer->GetBounds().GetWidth(), 3);
 
+    ffpsd::Layer* text = doc.AddLayer("text", Pattern(2, 2, 3));
+    text->SetTaggedBlock(Block("TySh", {0}));
+    EXPECT_THROW(text->Rotate(ffpsd::Rotation::k180), std::logic_error);
+    EXPECT_THROW(text->SetPosition(1, 1), std::logic_error);
+
     SetSectionDivider(*layer, 3);
     EXPECT_THROW(layer->Resize(4, 4), std::logic_error);
 }
 
 // The pixels Resize computes; expected values are worked out by hand from the filter definitions.
 
-TEST(LayerResizeTest, EveryFilterAndDepthKeepsFlatImagesFlat)
+TEST(LayerTransformTest, EveryFilterAndDepthKeepsFlatImagesFlat)
 {
     for (const ffpsd::ResampleFilter filter : {ffpsd::ResampleFilter::kNearest, ffpsd::ResampleFilter::kBicubic})
     {
@@ -91,26 +193,8 @@ TEST(LayerResizeTest, EveryFilterAndDepthKeepsFlatImagesFlat)
             const ffpsd::Image image = Pattern(5, 3, 4, depth);
             EXPECT_EQ(Resized(image, 5, 3, filter).bytes, image.bytes) << depth << " bit, the same size";
 
-            ffpsd::Image flat = Pattern(6, 4, 1, depth);
+            const ffpsd::Image flat = FlatAt(6, 4, depth);
             const std::size_t sample = flat.GetBytesPerSample();
-            for (std::size_t i = 0; i < flat.bytes.size(); i += sample)
-            {
-                if (depth == 8)
-                {
-                    flat.bytes[i] = 77;
-                }
-                else if (depth == 16)
-                {
-                    const std::uint16_t value = 0x4D4D;
-                    std::memcpy(flat.bytes.data() + i, &value, 2);
-                }
-                else
-                {
-                    const float value = 0.3f;
-                    std::memcpy(flat.bytes.data() + i, &value, 4);
-                }
-            }
-
             for (const auto& [width, height] : {std::make_pair(13u, 9u), std::make_pair(2u, 1u), std::make_pair(6u, 11u)})
             {
                 const ffpsd::Image resized = Resized(flat, width, height, filter);
@@ -135,7 +219,7 @@ TEST(LayerResizeTest, EveryFilterAndDepthKeepsFlatImagesFlat)
     }
 }
 
-TEST(LayerResizeTest, NearestTakesThePixelUnderEachCenter)
+TEST(LayerTransformTest, NearestTakesThePixelUnderEachCenterAndBicubicAverages)
 {
     const ffpsd::Image doubled = Resized(Pattern(2, 2, 1), 4, 4, ffpsd::ResampleFilter::kNearest); // 3, 10 / 17, 24
     EXPECT_EQ(doubled.bytes, (ffpsd::Bytes{3, 3, 10, 10, 3, 3, 10, 10, 17, 17, 24, 24, 17, 17, 24, 24}));
@@ -147,10 +231,7 @@ TEST(LayerResizeTest, NearestTakesThePixelUnderEachCenter)
     EXPECT_EQ(
         Resized(square, 2, 2, ffpsd::ResampleFilter::kNearest).bytes,
         (ffpsd::Bytes{square.bytes[1 * 4 + 1], square.bytes[1 * 4 + 3], square.bytes[3 * 4 + 1], square.bytes[3 * 4 + 3]}));
-}
 
-TEST(LayerResizeTest, BicubicAveragesAndKeepsLinesStraight)
-{
     // Catmull-Rom keeps a line straight: away from the edges, 8 -> 16 turns the ramp 4i into 2x - 1.
     const ffpsd::Image resized = Resized(Ramp(8, 3), 16, 3);
     for (std::size_t y = 0; y < 3; ++y)
@@ -158,12 +239,8 @@ TEST(LayerResizeTest, BicubicAveragesAndKeepsLinesStraight)
             EXPECT_EQ(resized.bytes[y * 16 + x], 2 * x - 1) << "x " << x;
 
     // A 2 x 1 image into 1 x 1: both pixels are equally near the center, so each weighs half.
-    ffpsd::Image pair = Pattern(2, 1, 1);
-    pair.bytes = {100, 200};
-    EXPECT_EQ(Resized(pair, 1, 1).bytes, (ffpsd::Bytes{150}));
+    EXPECT_EQ(Resized(Planes(2, 1, 1, {100, 200}), 1, 1).bytes, (ffpsd::Bytes{150}));
 
     // Opaque red next to clear black: half coverage, and the color stays pure red.
-    ffpsd::Image image = Pattern(2, 1, 4);
-    image.bytes = {255, 0, 0, 0, 0, 0, 255, 0}; // R, G, B, A planes
-    EXPECT_EQ(Resized(image, 1, 1).bytes, (ffpsd::Bytes{255, 0, 0, 128}));
+    EXPECT_EQ(Resized(Planes(2, 1, 4, {255, 0, 0, 0, 0, 0, 255, 0}), 1, 1).bytes, (ffpsd::Bytes{255, 0, 0, 128}));
 }

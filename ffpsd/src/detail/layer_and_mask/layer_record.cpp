@@ -188,9 +188,8 @@ namespace ffpsd::detail
 
     void LayerRecord::RemoveChannels(std::int16_t id)
     {
-        channels.erase(
-            std::remove_if(channels.begin(), channels.end(), [id](const ChannelImageData& channel) { return channel.id == id; }),
-            channels.end());
+        const auto has_id = [id](const ChannelImageData& channel) { return channel.id == id; };
+        channels.erase(std::remove_if(channels.begin(), channels.end(), has_id), channels.end());
     }
 
     bool LayerRecord::HasLayerMask() const noexcept

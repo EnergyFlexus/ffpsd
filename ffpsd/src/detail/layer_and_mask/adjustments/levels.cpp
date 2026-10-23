@@ -37,11 +37,17 @@ namespace ffpsd::detail
 
         void CheckRecord(const LevelsInfo::Channel& channel, std::size_t index)
         {
-            const bool valid = channel.input_floor <= 253 && channel.input_ceiling >= 2 && channel.input_ceiling <= 255 &&
-                               channel.input_floor < channel.input_ceiling && channel.output_floor <= 255 &&
-                               channel.output_ceiling <= 255 && channel.gamma >= 0.1 && channel.gamma <= 9.99;
-            if (!valid)
-                throw std::invalid_argument("ffpsd: Levels record " + std::to_string(index) + " is out of range");
+            const std::string record = "ffpsd: Levels record " + std::to_string(index);
+            if (channel.input_floor > 253 || channel.input_ceiling < 2 || channel.input_ceiling > 255)
+                throw std::invalid_argument(record + " has input levels out of range");
+            if (channel.input_floor >= channel.input_ceiling)
+                throw std::invalid_argument(record + " has an input floor not below its ceiling");
+            if (channel.output_floor > 255 || channel.output_ceiling > 255)
+                throw std::invalid_argument(record + " has output levels out of range");
+
+            // Written so that NaN fails too.
+            if (!(channel.gamma >= 0.1 && channel.gamma <= 9.99))
+                throw std::invalid_argument(record + " has gamma out of range");
         }
 
         // A record that changes nothing, as LevelsInfo::Channel starts.

@@ -260,7 +260,7 @@ namespace
     using ffpsd::LoadPng;
     using ffpsd::SavePng;
 #else
-    // Never reached: RequirePng throws first. They keep the PNG entry points below compiling.
+    // Stubs that keep the PNG entry points compiling; never reached.
     ffpsd::Image LoadPng(const std::string&, ffpsd::ColorMode, std::uint16_t)
     {
         return ffpsd::Image();
@@ -290,7 +290,7 @@ namespace
     using ffpsd::LoadJpeg;
     using ffpsd::SaveJpeg;
 #else
-    // Never reached: RequireJpeg throws first. They keep the JPEG entry points below compiling.
+    // Stubs that keep the JPEG entry points compiling; never reached.
     ffpsd::Image LoadJpeg(const std::string&, ffpsd::ColorMode, std::uint16_t, bool)
     {
         return ffpsd::Image();
@@ -320,7 +320,7 @@ namespace
     using ffpsd::LoadWebp;
     using ffpsd::SaveWebp;
 #else
-    // Never reached: RequireWebp throws first. They keep the WebP entry points below compiling.
+    // Stubs that keep the WebP entry points compiling; never reached.
     ffpsd::Image LoadWebp(const std::string&, ffpsd::ColorMode, std::uint16_t)
     {
         return ffpsd::Image();
@@ -338,7 +338,7 @@ namespace
     }
 #endif
 
-    // UNSUPPORTED for a format this build lacks, as every PNG, JPEG and WebP call reports it.
+    // UNSUPPORTED for a format this build lacks.
     ffpsd::Image LoadPicture(const std::uint8_t* data, std::size_t size, ffpsd_color_mode_t color_mode, std::uint16_t depth)
     {
         const std::optional<ffpsd::Format> format = ffpsd::detail::FindFormat(data, size);

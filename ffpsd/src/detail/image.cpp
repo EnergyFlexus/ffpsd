@@ -74,12 +74,13 @@ namespace ffpsd::detail
         const auto run = static_cast<std::size_t>(last_column - first_column) * sample;
         for (std::size_t channel = 0; channel < target.channel_count; ++channel)
         {
+            const std::uint8_t* from_plane = source.data + channel * source_plane;
+            std::uint8_t* to_plane = target.bytes.data() + channel * target_plane;
             for (std::int64_t y = first_row; y < last_row; ++y)
             {
                 const auto from = static_cast<std::size_t>((y - top) * source.width + (first_column - left));
                 const auto to = static_cast<std::size_t>(y * target.width + first_column);
-                std::memcpy(
-                    target.bytes.data() + channel * target_plane + to * sample, source.data + channel * source_plane + from * sample, run);
+                std::memcpy(to_plane + to * sample, from_plane + from * sample, run);
             }
         }
     }

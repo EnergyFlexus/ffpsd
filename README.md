@@ -85,18 +85,20 @@ By hand: `cmake --preset static-debug`, `cmake --build --preset static-debug`,
 
 ## Benchmarks
 
-Reading and writing the files in `tests/data/photoshop/`. The debug presets only build
+Documents, layers and the picture formats on the files in `tests/data/photoshop/`;
+[benchmarks/README.md](benchmarks/README.md) lists them. The debug presets only build
 them; numbers come from `bench-release`:
 
 ```sh
 python scripts/run_benchmarks.py                    # everything, 10 repetitions
-python scripts/run_benchmarks.py --filter rgb       # by regular expression
+python scripts/run_benchmarks.py --filter Layer/    # by regular expression
 python scripts/run_benchmarks.py --save before      # keep this run as "before"
 python scripts/run_benchmarks.py --compare before   # run again and compare
+python scripts/run_benchmarks.py --against v0.4.1   # build that version too, run both, compare
 python scripts/run_benchmarks.py --no-build         # just run
 ```
 
-Runs are kept in `build/bench-release/results/`. `--compare` uses Google
+Runs are kept in `build/bench-release/results/`. `--compare` and `--against` use Google
 Benchmark's `compare.py`, which needs
 `pip install -r vendor/benchmark/tools/requirements.txt`.
 

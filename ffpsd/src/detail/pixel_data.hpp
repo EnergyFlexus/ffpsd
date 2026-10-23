@@ -20,7 +20,6 @@ namespace ffpsd::detail
     public:
         PixelData() = default;
 
-        // Stored bytes, the rows they hold and the size of a sample in them.
         PixelData(std::vector<std::uint8_t> bytes, std::size_t rows, std::size_t row_bytes, std::size_t sample_size);
 
         // Native rows; a row whose count does not fit its field leaves the channel raw.

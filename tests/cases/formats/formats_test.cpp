@@ -1,75 +1,75 @@
-// The codecs themselves are checked in png_test.cpp, jpeg_test.cpp and webp_test.cpp; here only what picks them.
+// Only how a picture finds its codec, not the codecs themselves.
 #include "support/test_support.hpp"
 
 #include <cstdint>
 #include <ffpsd/ffpsd.hpp>
 #include <filesystem>
-#include <fstream>
 #include <gtest/gtest.h>
 #include <stdexcept>
-#include <vector>
+#include <string>
 
 using namespace ffpsd_test;
 
-TEST(FormatsTest, IsFormatSupportedFollowsTheBuild)
+namespace
 {
+    // What the build was configured with, which IsFormatSupported reports.
 #if defined(FFPSD_HAS_PNG)
-    EXPECT_TRUE(ffpsd::IsFormatSupported(ffpsd::Format::kPng));
+    constexpr bool kHasPng = true;
 #else
-    EXPECT_FALSE(ffpsd::IsFormatSupported(ffpsd::Format::kPng));
+    constexpr bool kHasPng = false;
 #endif
 #if defined(FFPSD_HAS_JPEG)
-    EXPECT_TRUE(ffpsd::IsFormatSupported(ffpsd::Format::kJpeg));
+    constexpr bool kHasJpeg = true;
 #else
-    EXPECT_FALSE(ffpsd::IsFormatSupported(ffpsd::Format::kJpeg));
+    constexpr bool kHasJpeg = false;
 #endif
 #if defined(FFPSD_HAS_WEBP)
-    EXPECT_TRUE(ffpsd::IsFormatSupported(ffpsd::Format::kWebp));
+    constexpr bool kHasWebp = true;
 #else
-    EXPECT_FALSE(ffpsd::IsFormatSupported(ffpsd::Format::kWebp));
+    constexpr bool kHasWebp = false;
 #endif
-}
+} // namespace
 
-TEST(FormatsTest, LoadPictureGoesByTheSignatureNotTheName)
+TEST(FormatsTest, LoadPictureGoesByTheSignatureOfAFormatTheBuildHas)
 {
     struct Case
     {
-        const char* file;
+        std::string file;
         const char* misnamed;
         ffpsd::Format format;
+        bool built;
         std::uint32_t width;
         std::uint32_t height;
         std::uint16_t channel_count;
     };
-    const Case cases[] = {
-        {"generated/rgba_8bit.png", "ffpsd_\xD0\xBA\xD0\xB0\xD1\x80\xD1\x82\xD0\xB8\xD0\xBD\xD0\xBA\xD0\xB0.jpg", ffpsd::Format::kPng, 3, 2,
-         4},
-        {"generated/rgb_quadrants.jpg", "ffpsd_picture.png", ffpsd::Format::kJpeg, 32, 16, 3},
-        {"generated/rgba_lossless.webp", "ffpsd_picture.jpg", ffpsd::Format::kWebp, 3, 2, 4}};
 
+    // The first name is "picture" in Cyrillic: a path is UTF-8 whatever the system's code page.
+    const Case cases[] = {
+        {kRgbaPng, "ffpsd_\xD0\xBA\xD0\xB0\xD1\x80\xD1\x82\xD0\xB8\xD0\xBD\xD0\xBA\xD0\xB0.jpg", ffpsd::Format::kPng, kHasPng, 3, 2, 4},
+        {kQuadrantsJpeg, "ffpsd_picture.png", ffpsd::Format::kJpeg, kHasJpeg, 32, 16, 3},
+        {kRgbaWebp, "ffpsd_picture.jpg", ffpsd::Format::kWebp, kHasWebp, 3, 2, 4},
+    };
     for (const Case& c : cases)
     {
-        const std::vector<std::uint8_t> data = ReadFile(DataFile(c.file));
-        // The first name is "picture" in Cyrillic: a path is UTF-8 whatever the system's code page.
-        const std::filesystem::path path = std::filesystem::path(testing::TempDir()) / std::filesystem::u8path(c.misnamed);
-        std::ofstream(path, std::ios::binary).write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(data.size()));
+        EXPECT_EQ(ffpsd::IsFormatSupported(c.format), c.built) << c.file;
 
-        if (ffpsd::IsFormatSupported(c.format))
+        const TempFile misnamed(c.misnamed);
+        misnamed.Write(ReadFile(c.file));
+        if (c.built)
         {
-            const ffpsd::Image picture = ffpsd::LoadPicture(path.u8string(), ffpsd::ColorMode::kRgb, 8);
+            const ffpsd::Image picture = ffpsd::LoadPicture(misnamed.Utf8(), ffpsd::ColorMode::kRgb, 8);
             EXPECT_EQ(picture.width, c.width) << c.file;
             EXPECT_EQ(picture.height, c.height) << c.file;
             EXPECT_EQ(picture.channel_count, c.channel_count) << c.file;
         }
         else
         {
-            EXPECT_THROW(ffpsd::LoadPicture(path.u8string(), ffpsd::ColorMode::kRgb, 8), std::logic_error) << c.file;
+            EXPECT_THROW(ffpsd::LoadPicture(misnamed.Utf8(), ffpsd::ColorMode::kRgb, 8), std::logic_error) << c.file;
         }
-        std::filesystem::remove(path);
     }
 }
 
-TEST(FormatsTest, LoadPictureRefusesAnUnsupportedFormat)
+TEST(FormatsTest, LoadPictureRefusesWhatIsNoPicture)
 {
     const std::uint8_t psd[] = {'8', 'B', 'P', 'S', 0, 1};
     const std::uint8_t png_start[] = {0x89, 'P', 'N', 'G'};

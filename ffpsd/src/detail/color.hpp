@@ -16,7 +16,7 @@ namespace ffpsd::detail
     // The gray plane three times; planes after the colors, such as alpha, stay as they are.
     Image GrayToRgb(const ImageView& gray);
 
-    // The image as it is in its own mode, otherwise through RgbToGray or GrayToRgb, which refuse anything else.
+    // Only between gray and RGB; the image's own mode passes through.
     Image ConvertColorMode(Image image, ColorMode color_mode);
 } // namespace ffpsd::detail
 

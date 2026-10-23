@@ -24,7 +24,7 @@ namespace ffpsd::detail
     void DecodeLayerPixels(
         const LayerRecord& record, ColorMode color_mode, std::uint16_t depth, bool is_psb, std::uint8_t* out, std::size_t size);
 
-    // The shape DecodeLayerPixels gives, without decoding; the same into out, exactly its GetSizeBytes.
+    // The decoded shape, without decoding.
     ImageInfo LayerPixelsInfo(const LayerRecord& record, ColorMode color_mode, std::uint16_t depth);
 
     // New color and transparency channels at the same top left corner; the masks stay.

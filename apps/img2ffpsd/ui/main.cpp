@@ -35,7 +35,7 @@ namespace
     constexpr float kFontSize = 18.0f;
     constexpr int kOutput = -1;
 
-    // In the order of img2ffpsd::ColorChoice: what the settings file keeps, and what the list shows.
+    // Indexed by img2ffpsd::ColorChoice: what the settings file keeps and what the list shows.
     const char* const kColorKeys[] = {"auto", "color", "gray"};
     const char* const kColorNames[] = {"Auto", "Color", "Grayscale"};
 

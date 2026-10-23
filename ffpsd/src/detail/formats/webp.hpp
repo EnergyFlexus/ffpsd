@@ -9,7 +9,6 @@
 
 namespace ffpsd::detail
 {
-    // libwebp behind LoadWebp and EncodeWebp.
     Image DecodeWebp(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth);
     std::vector<std::uint8_t> EncodeWebp(const ImageView& image, int quality, bool lossless);
 } // namespace ffpsd::detail

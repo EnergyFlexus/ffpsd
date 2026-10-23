@@ -10,8 +10,7 @@
 
 namespace ffpsd::detail
 {
-    // Length byte plus characters, padded together to a multiple of the alignment; not decoded: the bytes are in the writer's
-    // system code page.
+    // Length byte and characters, padded together; not decoded, as the bytes are in the writer's code page.
     std::string ReadPascalString(BigEndianReader& reader, std::size_t alignment);
 
     // Truncated to 255 bytes at a character boundary.

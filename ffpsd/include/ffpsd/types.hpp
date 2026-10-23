@@ -35,7 +35,7 @@ namespace ffpsd
         kZipPrediction = 3
     };
 
-    // Where Document::ResizeCanvas keeps the old canvas; row by row, since it reads value / 3 and value % 3.
+    // Where the old canvas stays; the order matters: value / 3 is the row, value % 3 the column.
     enum class Anchor : std::uint8_t
     {
         kTopLeft = 0,
@@ -64,7 +64,6 @@ namespace ffpsd
         kVertical = 1
     };
 
-    // How Layer::Resize and Document::Resize compute the new pixels.
     enum class ResampleFilter : std::uint8_t
     {
         kNearest, // the nearest source pixel: hard edges, no new values

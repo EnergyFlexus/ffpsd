@@ -13,7 +13,7 @@
 
 namespace img2ffpsd
 {
-    // Auto takes the colors of the top picture, as the size: gray by its file or by every pixel having equal red, green and blue.
+    // Auto takes the top picture's colors: gray by its file or by every pixel having equal red, green and blue.
     enum class ColorChoice
     {
         kAuto,
@@ -21,7 +21,6 @@ namespace img2ffpsd
         kGray
     };
 
-    // What every file is converted with.
     struct Conversion
     {
         std::vector<std::filesystem::path> folders; // the bottom, the top and the optional ones above it

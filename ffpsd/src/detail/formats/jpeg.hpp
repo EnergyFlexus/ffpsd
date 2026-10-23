@@ -9,7 +9,6 @@
 
 namespace ffpsd::detail
 {
-    // libjpeg behind LoadJpeg and EncodeJpeg.
     Image DecodeJpeg(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth, bool apply_orientation);
     std::vector<std::uint8_t> EncodeJpeg(const ImageView& image, int quality);
 } // namespace ffpsd::detail

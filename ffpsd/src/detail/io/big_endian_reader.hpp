@@ -30,7 +30,7 @@ namespace ffpsd::detail
 
         // Reads past the end throw std::runtime_error.
         void Skip(std::size_t count);
-        // Skips until the distance from start is a multiple of alignment, as BigEndianWriter::PadFrom pads.
+        // Skips until the distance from start is a multiple of alignment.
         void SkipPaddingFrom(std::size_t start, std::size_t alignment);
         std::size_t Tell() const noexcept;
         std::size_t GetSize() const noexcept;

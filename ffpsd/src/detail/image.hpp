@@ -16,7 +16,7 @@ namespace ffpsd::detail
     // The colors of the mode and at most one plane more, transparency.
     void CheckColorChannels(const ImageView& image);
 
-    // An empty image, or one of that mode and depth that passes CheckImage and CheckColorChannels.
+    // An empty image passes; otherwise the mode, depth, bytes and channels must fit.
     void CheckImageFormat(const ImageView& image, ColorMode color_mode, std::uint16_t depth);
 
     bool HasTransparency(const ImageView& image);

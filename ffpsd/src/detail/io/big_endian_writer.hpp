@@ -49,7 +49,6 @@ namespace ffpsd::detail
         void WriteF64Array(const double* src, std::size_t count);
 
         void WriteZeros(std::size_t count);
-        // The bytes as they are, the pair of BigEndianReader::ReadBytes.
         void WriteBytes(const std::vector<std::uint8_t>& data);
 
         // A 4 byte length, then the bytes.
@@ -65,7 +64,7 @@ namespace ffpsd::detail
 
         // A length field of 4 bytes, or 8 when wide; a length too long for 4 throws std::length_error.
         void WriteLength(std::uint64_t length, bool wide);
-        // The same, patched with the bytes written after it.
+        // A zero length field, to patch once the bytes after it are written.
         std::size_t ReserveLength(bool wide);
         void PatchLength(std::size_t position, bool wide);
 

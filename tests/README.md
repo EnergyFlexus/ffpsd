@@ -9,14 +9,15 @@ for the folder's main file, so `run_tests.py --filter Document` runs `cases/docu
 ```
 cases/           what builds into ffpsd_tests
   smoke/         Photoshop files end to end against scripts/dump_psd.py, read and written
-  document/      document.hpp: the header, resources, the stack, parsing, saving,
-                 PSD and PSB, compression
-  layer/         layer.hpp: properties, name, kind and blocks, pixels and position,
-                 the background, resizing
+  document/      document.hpp: the header, composite, blocks and resources; files,
+                 PSD and PSB; compression, the stack, the canvas, color modes
+  layer/         layer.hpp: properties, name and kind, pixels, masks, the background,
+                 moving, resizing and turning
   adjustments/   adjustments.hpp: Levels
   formats/       formats.hpp: LoadPicture; png, jpeg and webp only with their options
   c_api/         c_api.h alone; c_header_check.c compiles it as C
-  support/       test_support.hpp: the data files, their layer names, small builders
+  support/       test_support.hpp: the data files and their known pixels, builders,
+                 round trips, byte search, temporary files, color checks
 data/            photoshop/: written by Photoshop; generated/: written by scripts/
 scripts/         what writes data/generated/ and dumps data/photoshop/; run by hand
 ```
@@ -25,7 +26,12 @@ One feature per test, named as a sentence:
 `DocumentStackTest.AStackChangeThatBreaksAGroupIsRolledBack`. Its cases go into the
 same test, after a one-line comment where they need one, and variations are a loop
 rather than parameters. No two tests check the same thing. A refusal is checked
-together with what it leaves behind.
+together with what it leaves behind, in the test of the call it refuses.
+
+What more than one file needs lives in `support/`: `RoundTrip(doc)` rather than
+`Parse(doc.Save())`, `Pixels(doc, i)` for a layer's bytes, `TempFile` for anything
+written to disk, `Find` to look for bytes in a saved file. The C API tests hold
+handles in `Owned<T>`, which destroys them.
 
 `python scripts/run_coverage.py` builds them with clang's coverage into
 `build/coverage/` and reports what of `ffpsd/src` and `ffpsd/include` they reach;

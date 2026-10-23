@@ -61,7 +61,6 @@ namespace ffpsd::detail
         // A deep copy, blocks included; a new field has to be added here too.
         LayerRecord Copy() const;
 
-        // Null when the record has no channel of that id.
         const ChannelImageData* FindChannel(std::int16_t id) const noexcept;
         void RemoveChannels(std::int16_t id);
 

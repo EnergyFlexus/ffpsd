@@ -36,7 +36,6 @@ namespace ffpsd::detail
 
     const ImageResource* ImageResourceAt(const ImageResources& image_resources, std::size_t index);
 
-    // The first with the id; false when there is none.
     bool RemoveImageResource(ImageResources& image_resources, std::uint16_t id);
 
     // Specialized by each resource ffpsd interprets, for its struct with kId; empty when the data cannot be read.

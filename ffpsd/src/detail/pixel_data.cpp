@@ -323,8 +323,8 @@ namespace ffpsd::detail
         if (GetCompression() == kCompressionRaw && bytes_.size() >= sizeof(std::uint16_t) + rows_ * row_bytes_)
         {
             bool fits = true;
-            std::optional<PixelData> packed =
-                Pack(bytes_.data() + sizeof(std::uint16_t), rows_, row_bytes_, 1, to_psb, compression == Compression::kRleOrRaw, fits);
+            const bool smallest = compression == Compression::kRleOrRaw;
+            std::optional<PixelData> packed = Pack(bytes_.data() + sizeof(std::uint16_t), rows_, row_bytes_, 1, to_psb, smallest, fits);
             if (packed.has_value())
                 packed->sample_size_ = sample_size_;
             return packed;

@@ -172,7 +172,7 @@ extern "C"
         size_t size;
     } ffpsd_image_resource_t;
 
-    /* Borrowed like ffpsd_image_resource_t. */
+    /* Borrowed: from a get until the block changes, into a set for the call. */
     typedef struct ffpsd_tagged_block_t
     {
         uint32_t signature;
@@ -230,10 +230,10 @@ extern "C"
     /* Past the end, the records in between are added as the identity. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_levels_set_channel(ffpsd_levels_t* levels, size_t index, const ffpsd_levels_channel_t* channel);
 
-    /* Channels by the mode, as the C++ constructor; a multichannel document is INVALID_ARGUMENT. */
+    /* Channels follow the mode; a multichannel document is INVALID_ARGUMENT. */
     FFPSD_EXPORT ffpsd_status_t
     ffpsd_document_create_with(uint32_t width, uint32_t height, ffpsd_color_mode_t color_mode, uint16_t depth, ffpsd_document_t** out);
-    /* Paths are UTF-8 on every system, here and in the PNG, JPEG and picture calls. */
+    /* Paths are UTF-8 on every system. */
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_open(const char* path, ffpsd_document_t** out);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_open_memory(const uint8_t* data, size_t size, ffpsd_document_t** out);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_save(const ffpsd_document_t* doc, const char* path, ffpsd_compression_t compression);
@@ -310,7 +310,7 @@ extern "C"
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_remove_layer(ffpsd_document_t* doc, size_t index);
     FFPSD_EXPORT ffpsd_status_t ffpsd_document_move_layer(ffpsd_document_t* doc, size_t from, size_t to);
 
-    /* Section 4 blocks after the layers; the same rules as a layer's. */
+    /* Section 4 blocks after the layers, unchecked. */
     FFPSD_EXPORT size_t ffpsd_document_get_tagged_block_count(const ffpsd_document_t* doc);
     FFPSD_EXPORT ffpsd_status_t
     ffpsd_document_get_tagged_block_by_index(const ffpsd_document_t* doc, size_t index, ffpsd_tagged_block_t* out);

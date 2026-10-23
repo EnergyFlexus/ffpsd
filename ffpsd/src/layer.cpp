@@ -144,7 +144,7 @@ namespace ffpsd
         document_->SetHasRealMergedData(false);
     }
 
-    // A line per struct in adjustments.hpp, as in document.cpp.
+    // One explicit instantiation per adjustment struct.
     template FFPSD_EXPORT std::optional<LevelsInfo> Layer::GetAdjustment<LevelsInfo>() const;
     template FFPSD_EXPORT void Layer::SetAdjustment<LevelsInfo>(const LevelsInfo& value);
 
@@ -166,9 +166,9 @@ namespace ffpsd
         detail::CheckLayerSides(image.width, image.height, document_->IsPsb());
         detail::CheckImageFormat(image, document_->GetColorMode(), document_->GetDepth());
 
-        // Transparency would make it an ordinary layer, so it stays as AddBackgroundLayer made it.
-        if (IsBackground() && (image.IsEmpty() || image.width != document_->GetWidth() || image.height != document_->GetHeight() ||
-                               detail::HasTransparency(image)))
+        // Transparency would make the background an ordinary layer.
+        const bool fills_canvas = image.width == document_->GetWidth() && image.height == document_->GetHeight();
+        if (IsBackground() && (image.IsEmpty() || !fills_canvas || detail::HasTransparency(image)))
             throw std::invalid_argument("ffpsd: the background takes an opaque image of the canvas size");
         detail::ReplaceLayerPixels(*record_, image, document_->GetColorMode(), IsBackground(), document_->IsPsb());
         document_->SetHasRealMergedData(false);
@@ -206,11 +206,9 @@ namespace ffpsd
         if (bounds.GetWidth() <= 0 || bounds.GetHeight() <= 0)
             throw std::logic_error("ffpsd: an empty layer has nothing to resize");
 
-        Apply(
-            detail::Transform::Scale(
-                static_cast<double>(width) / static_cast<double>(bounds.GetWidth()),
-                static_cast<double>(height) / static_cast<double>(bounds.GetHeight()), bounds.left, bounds.top),
-            filter);
+        const double scale_x = static_cast<double>(width) / static_cast<double>(bounds.GetWidth());
+        const double scale_y = static_cast<double>(height) / static_cast<double>(bounds.GetHeight());
+        Apply(detail::Transform::Scale(scale_x, scale_y, bounds.left, bounds.top), filter);
     }
 
     void Layer::Flip(FlipDirection direction)
@@ -236,8 +234,9 @@ namespace ffpsd
             const auto half_down = [](std::int64_t value) { return value >= 0 ? value / 2 : -((-value + 1) / 2); };
             const std::int64_t width = bounds.GetWidth();
             const std::int64_t height = bounds.GetHeight();
-            transform = transform.Then(
-                detail::Transform::Shift(static_cast<double>(half_down(width - height)), static_cast<double>(half_down(height - width))));
+            const auto dx = static_cast<double>(half_down(width - height));
+            const auto dy = static_cast<double>(half_down(height - width));
+            transform = transform.Then(detail::Transform::Shift(dx, dy));
         }
         Apply(transform);
     }

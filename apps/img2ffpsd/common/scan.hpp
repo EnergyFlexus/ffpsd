@@ -10,14 +10,13 @@
 
 namespace img2ffpsd
 {
-    // One finding: what is wrong, and the files or pages it is about, if it names any.
     struct Issue
     {
         std::string text;
         std::vector<std::string> items;
     };
 
-    // What the folders hold: errors stop the conversion, warnings want a look before it.
+    // Errors stop the conversion; warnings only want a look.
     struct FolderScan
     {
         std::vector<Pictures> found;              // per folder of the conversion
@@ -26,7 +25,7 @@ namespace img2ffpsd
         std::vector<Issue> warnings;
     };
 
-    // The folders against each other and the output, as both apps check them before converting.
+    // Checks the folders against each other and the output.
     FolderScan ScanFolders(const Conversion& conversion, bool recursive);
 } // namespace img2ffpsd
 

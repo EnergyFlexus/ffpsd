@@ -14,7 +14,7 @@ namespace img2ffpsd
     // The regular files under the folder, or in it alone unless recursive; hidden files and whatever hidden folders hold left out.
     std::vector<std::filesystem::path> VisibleFiles(const std::filesystem::path& folder, bool recursive);
 
-    // The PNG, JPEG and WebP files of VisibleFiles; a name that more than one has, 01.png and 01.jpg, goes into duplicates instead.
+    // PNG, JPEG and WebP files by name without the extension; a name more than one has, 01.png and 01.jpg, goes into duplicates.
     Pictures FindPictures(const std::filesystem::path& folder, bool recursive, std::vector<std::vector<std::filesystem::path>>& duplicates);
 
     // A PNG of gray or gray with alpha, or a JPEG of one component, by the file's header alone; false for anything else, WebP included.

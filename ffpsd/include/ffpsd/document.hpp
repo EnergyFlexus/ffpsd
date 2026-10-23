@@ -19,7 +19,7 @@ namespace ffpsd
     class Document
     {
     public:
-        // Paths are UTF-8 on every system, here and in formats.hpp.
+        // Paths are UTF-8 on every system.
         FFPSD_EXPORT static Document Open(const std::string& path);
         FFPSD_EXPORT static Document Parse(const std::vector<std::uint8_t>& data);
         FFPSD_EXPORT static Document Parse(const std::uint8_t* data, std::size_t size);
@@ -44,13 +44,12 @@ namespace ffpsd
         FFPSD_EXPORT std::uint16_t GetDepth() const noexcept;
         FFPSD_EXPORT ColorMode GetColorMode() const noexcept;
 
-        // PSB: the large document format, with wider lengths.
         FFPSD_EXPORT bool IsPsb() const noexcept;
 
         // False: the composite in section 5 is a placeholder, build the picture from the layers.
         FFPSD_EXPORT bool HasRealMergedData() const noexcept;
 
-        // Resource 1057 in full; allocates for the names.
+        // Resource 1057 in full.
         FFPSD_EXPORT VersionInfo GetVersionInfo() const;
 
         // 72 dpi when the file omits resource 1005.
@@ -75,7 +74,6 @@ namespace ffpsd
         // Patches one byte of resource 1057, keeping its names; creates the block if missing.
         FFPSD_EXPORT void SetHasRealMergedData(bool value);
 
-        // Replace the whole resource block, creating it when there is none.
         FFPSD_EXPORT void SetVersionInfo(VersionInfo value);
         FFPSD_EXPORT void SetResolutionInfo(ResolutionInfo value);
 
@@ -96,10 +94,10 @@ namespace ffpsd
         FFPSD_EXPORT Layer* GetLayerByIndex(std::size_t index);
         FFPSD_EXPORT const Layer* GetLayerByIndex(std::size_t index) const;
 
-        // Where the layer is now, for MoveLayer and RemoveLayer; empty for a layer of another document.
+        // Empty for a layer of another document.
         FFPSD_EXPORT std::optional<std::size_t> FindLayerIndex(const Layer& layer) const noexcept;
 
-        // Adds a raster layer on top. One image plane beyond the color channels is transparency.
+        // A raster layer on top; one plane beyond the color channels is transparency.
         FFPSD_EXPORT Layer*
         AddLayer(const std::string& name, const ImageView& image = ImageView(), std::int32_t top = 0, std::int32_t left = 0);
 
@@ -112,15 +110,13 @@ namespace ffpsd
         // Makes the background an ordinary layer where it is, unlocked; false when there is none.
         FFPSD_EXPORT bool UnsetBackgroundLayer();
 
-        // An empty group on top, open and passing through as Photoshop makes one; returns its header. MoveLayer puts a layer
-        // in: one that ends up between the end marker and the header is inside.
+        // An empty open pass-through group on top, returning its header; a layer moved between it and its end marker is inside.
         FFPSD_EXPORT Layer* AddGroup(const std::string& name);
 
-        // An adjustment layer on top; T is a struct from adjustments.hpp.
+        // An adjustment layer on top; T is an adjustment struct such as LevelsInfo.
         template <class T> FFPSD_EXPORT Layer* AddAdjustmentLayer(const std::string& name, const T& value = T());
 
-        // A copy on top, from a document of the same format; a copy of the background is an ordinary layer.
-        // A group's header brings the whole group, nested ones too, and the header is returned; its end marker throws.
+        // Same-format source only; the background's copy is ordinary, a header copies the whole group, an end marker throws.
         FFPSD_EXPORT Layer* AddLayerCopy(const Layer& source);
 
         // Destroys the layer, so pointers to it dangle.
@@ -129,7 +125,7 @@ namespace ffpsd
         // Afterwards the layer is at index to; pointers stay valid. The background does not move.
         FFPSD_EXPORT void MoveLayer(std::size_t from, std::size_t to);
 
-        // Section 4 blocks after the layers, unchecked; the same rules as a layer's blocks.
+        // Section 4 blocks after the layers, unchecked.
         FFPSD_EXPORT std::size_t GetTaggedBlockCount() const noexcept;
         FFPSD_EXPORT const TaggedBlock* GetTaggedBlockByIndex(std::size_t index) const;
         FFPSD_EXPORT const TaggedBlock* GetTaggedBlockByKey(std::uint32_t key) const noexcept;

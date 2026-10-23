@@ -35,7 +35,6 @@ namespace ffpsd::detail
     // The first block with this key, or a new empty one at the end.
     TaggedBlock& FindOrAppendTaggedBlock(TaggedBlocks& blocks, std::uint32_t key);
 
-    // Removes the first block with this key.
     bool RemoveTaggedBlock(TaggedBlocks& blocks, std::uint32_t key);
 
     // Specialized by each block ffpsd interprets, for its struct with kKey; empty when the data cannot be read.

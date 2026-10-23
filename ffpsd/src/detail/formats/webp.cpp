@@ -170,9 +170,8 @@ namespace ffpsd::detail
                 NarrowRow(row.data(), narrow.size(), narrow.data());
                 samples = narrow.data();
             }
-            PackRow(
-                samples, image.width, image.channel_count, colors,
-                encoder.picture.argb + std::size_t{y} * static_cast<std::size_t>(encoder.picture.argb_stride));
+            std::uint32_t* argb_row = encoder.picture.argb + std::size_t{y} * static_cast<std::size_t>(encoder.picture.argb_stride);
+            PackRow(samples, image.width, image.channel_count, colors, argb_row);
         }
 
         if (WebPEncode(&encoder.config, &encoder.picture) == 0)

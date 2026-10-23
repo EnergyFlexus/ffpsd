@@ -31,17 +31,21 @@ TEST(DocumentStackTest, AddLayerPutsItOnTopWithTheNextId)
     EXPECT_FALSE(doc.HasRealMergedData());
 }
 
-TEST(DocumentStackTest, MoveAndRemoveKeepEveryPointer)
+TEST(DocumentStackTest, MoveAndRemoveKeepEveryPointerAndItsIndexIsFound)
 {
     ffpsd::Document doc = NewDocument();
     ffpsd::Layer* a = doc.AddLayer("a");
     ffpsd::Layer* b = doc.AddLayer("b");
     ffpsd::Layer* c = doc.AddLayer("c");
+    EXPECT_EQ(doc.FindLayerIndex(*a).value_or(9), 0u);
+    EXPECT_EQ(doc.FindLayerIndex(*c).value_or(9), 2u);
 
     doc.MoveLayer(0, 2);
     EXPECT_EQ(doc.GetLayerByIndex(0), b);
     EXPECT_EQ(doc.GetLayerByIndex(1), c);
     EXPECT_EQ(doc.GetLayerByIndex(2), a);
+    EXPECT_EQ(doc.FindLayerIndex(*a).value_or(9), 2u);
+    EXPECT_EQ(doc.FindLayerIndex(*b).value_or(9), 0u);
     doc.MoveLayer(2, 0);
     EXPECT_EQ(doc.GetLayerByIndex(0), a);
     EXPECT_EQ(doc.GetLayerByIndex(2), c);
@@ -54,26 +58,9 @@ TEST(DocumentStackTest, MoveAndRemoveKeepEveryPointer)
     EXPECT_EQ(doc.GetLayerByIndex(1), c);
     EXPECT_THROW(doc.RemoveLayer(2), std::out_of_range);
     EXPECT_THROW(doc.GetLayerByIndex(2), std::out_of_range);
-}
 
-TEST(DocumentStackTest, ACopyGetsItsOwnIdFromADocumentOfTheSameFormat)
-{
-    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
-    const ffpsd::Layer* source = doc.GetLayerByIndex(1);
-    const std::uint32_t source_id = LayerId(*source);
-
-    const ffpsd::Layer* copy = doc.AddLayerCopy(*source);
-
-    EXPECT_EQ(copy->GetName(), source->GetName());
-    EXPECT_EQ(copy->GetPixels().bytes, source->GetPixels().bytes);
-    EXPECT_NE(LayerId(*copy), source_id);
-    EXPECT_EQ(LayerId(*source), source_id);
-
-    const ffpsd::Document gray = ffpsd::Document::Open(kGrayscalePsd);
-    ffpsd::Document target = NewDocument();
-    EXPECT_EQ(target.AddLayerCopy(*doc.GetLayerByIndex(0))->GetName(), kBackgroundName);
-    EXPECT_THROW(target.AddLayerCopy(*gray.GetLayerByIndex(0)), std::invalid_argument);
-    EXPECT_EQ(target.GetLayerCount(), 1u);
+    ffpsd::Document other = NewDocument();
+    EXPECT_FALSE(doc.FindLayerIndex(*other.AddLayer("elsewhere")).has_value());
 }
 
 TEST(DocumentStackTest, AStackChangeThatBreaksAGroupIsRolledBack)
@@ -102,39 +89,26 @@ TEST(DocumentStackTest, AStackChangeThatBreaksAGroupIsRolledBack)
     EXPECT_EQ(doc.GetLayerByIndex(1), inside);
 }
 
-TEST(DocumentStackTest, EditsSurviveSaving)
+TEST(DocumentStackTest, ACopyGetsNewIdsAndAGroupHeaderBringsItsWholeGroup)
 {
-    // The background stays at the bottom; the new layer goes under the copy.
-    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
-    doc.AddLayer("added", Pattern(2, 2, 4), 1, 2);
-    doc.MoveLayer(2, 1);
-    ffpsd::Layer* copy = doc.GetLayerByIndex(2);
-    copy->SetOpacity(100);
-    copy->SetVisible(false);
-    copy->SetClipped(true);
-    copy->SetBlendKey(Fourcc("mul "));
+    ffpsd::Document rgb = ffpsd::Document::Open(kRgbPsd);
+    const ffpsd::Layer* source = rgb.GetLayerByIndex(1);
+    const std::uint32_t source_id = LayerId(*source);
 
-    const ffpsd::Document back = ffpsd::Document::Parse(doc.Save());
+    const ffpsd::Layer* copy = rgb.AddLayerCopy(*source);
 
-    ASSERT_EQ(back.GetLayerCount(), 3u);
-    EXPECT_EQ(back.GetLayerByIndex(0)->GetName(), kBackgroundName);
-    const ffpsd::Layer* copy_back = back.GetLayerByIndex(2);
-    EXPECT_EQ(copy_back->GetName(), kBackgroundCopyName);
-    EXPECT_EQ(copy_back->GetOpacity(), 100u);
-    EXPECT_FALSE(copy_back->IsVisible());
-    EXPECT_TRUE(copy_back->IsClipped());
-    EXPECT_EQ(copy_back->GetBlendKey(), Fourcc("mul "));
+    EXPECT_EQ(copy->GetName(), source->GetName());
+    EXPECT_EQ(copy->GetPixels().bytes, source->GetPixels().bytes);
+    EXPECT_NE(LayerId(*copy), source_id);
+    EXPECT_EQ(LayerId(*source), source_id);
 
-    const ffpsd::Layer* added = back.GetLayerByIndex(1);
-    EXPECT_EQ(added->GetName(), "added");
-    EXPECT_EQ(added->GetBounds().top, 1);
-    EXPECT_EQ(added->GetBounds().left, 2);
-    EXPECT_EQ(added->GetPixels().bytes, Pattern(2, 2, 4).bytes);
-    EXPECT_FALSE(back.HasRealMergedData());
-}
+    // Only from a document of the same format.
+    const ffpsd::Document gray = ffpsd::Document::Open(kGrayscalePsd);
+    ffpsd::Document target = NewDocument();
+    EXPECT_EQ(target.AddLayerCopy(*rgb.GetLayerByIndex(0))->GetName(), kBackgroundName);
+    EXPECT_THROW(target.AddLayerCopy(*gray.GetLayerByIndex(0)), std::invalid_argument);
+    EXPECT_EQ(target.GetLayerCount(), 1u);
 
-TEST(DocumentStackTest, ACopyOfAGroupHeaderBringsTheWholeGroup)
-{
     // Bottom to top: a layer below, the group with a nested one inside, a layer above.
     ffpsd::Document doc = NewDocument();
     const char* const names[] = {"below", "end", "inner end", "inner layer", "inner", "inside", "group", "above"};
@@ -152,20 +126,20 @@ TEST(DocumentStackTest, ACopyOfAGroupHeaderBringsTheWholeGroup)
 
     // Into the same document and into another one: the six records from the end marker to the header, each with a new id.
     ffpsd::Document other = NewDocument();
-    for (ffpsd::Document* target : {&doc, &other})
+    for (ffpsd::Document* into : {&doc, &other})
     {
-        const std::size_t before = target->GetLayerCount();
+        const std::size_t before = into->GetLayerCount();
         std::uint32_t last_id = 0;
         for (std::size_t i = 0; i < before; ++i)
-            last_id = std::max(last_id, LayerId(*target->GetLayerByIndex(i)));
+            last_id = std::max(last_id, LayerId(*into->GetLayerByIndex(i)));
 
-        const ffpsd::Layer* copy = target->AddLayerCopy(*layers[6]);
+        const ffpsd::Layer* header = into->AddLayerCopy(*layers[6]);
 
-        ASSERT_EQ(target->GetLayerCount(), before + 6);
-        EXPECT_EQ(copy, target->GetLayerByIndex(before + 5));
+        ASSERT_EQ(into->GetLayerCount(), before + 6);
+        EXPECT_EQ(header, into->GetLayerByIndex(before + 5));
         for (std::size_t i = 0; i < 6; ++i)
         {
-            const ffpsd::Layer* copied = target->GetLayerByIndex(before + i);
+            const ffpsd::Layer* copied = into->GetLayerByIndex(before + i);
             EXPECT_EQ(copied->GetName(), names[i + 1]);
             EXPECT_EQ(copied->GetKind(), layers[i + 1]->GetKind());
             EXPECT_EQ(LayerId(*copied), last_id + 1 + i);
@@ -182,18 +156,15 @@ TEST(DocumentStackTest, ACopyOfAGroupHeaderBringsTheWholeGroup)
     EXPECT_EQ(other.GetLayerCount(), 9u);
     EXPECT_THROW(other.AddLayerCopy(*layers[1]), std::invalid_argument);
     EXPECT_EQ(other.GetLayerCount(), 9u);
-}
 
-TEST(DocumentStackTest, AGroupWithoutItsEndMarkerIsNotCopied)
-{
-    ffpsd::Document doc = NewDocument();
-    doc.AddLayer("inside");
-    ffpsd::Layer* header = doc.AddLayer("group");
-    SetSectionDivider(*header, 1);
-
-    ffpsd::Document target = NewDocument();
-    EXPECT_THROW(target.AddLayerCopy(*header), std::invalid_argument);
-    EXPECT_EQ(target.GetLayerCount(), 0u);
+    // A header without its end marker is no group to copy.
+    ffpsd::Document broken = NewDocument();
+    broken.AddLayer("inside");
+    ffpsd::Layer* lone = broken.AddLayer("group");
+    SetSectionDivider(*lone, 1);
+    ffpsd::Document empty = NewDocument();
+    EXPECT_THROW(empty.AddLayerCopy(*lone), std::invalid_argument);
+    EXPECT_EQ(empty.GetLayerCount(), 0u);
 }
 
 TEST(DocumentStackTest, AGroupStartsEmptyOnTopAndTakesLayersThroughMoveLayer)
@@ -218,29 +189,43 @@ TEST(DocumentStackTest, AGroupStartsEmptyOnTopAndTakesLayersThroughMoveLayer)
     EXPECT_EQ(doc.GetLayerByIndex(3), group);
 
     // As Photoshop writes a new group: the end marker without opacity, the header passing through, an ordinary group.
-    const ffpsd::Document back = ffpsd::Document::Parse(doc.Save());
+    const ffpsd::Document back = RoundTrip(doc);
     ASSERT_EQ(back.GetLayerCount(), 4u);
     EXPECT_EQ(back.GetLayerByIndex(1)->GetKind(), ffpsd::LayerKind::kGroupEnd);
     EXPECT_EQ(back.GetLayerByIndex(1)->GetOpacity(), 0u);
-    EXPECT_EQ(back.GetLayerByIndex(2)->GetPixels().bytes, Pattern(2, 2, 4).bytes);
+    EXPECT_EQ(Pixels(back, 2), Pattern(2, 2, 4).bytes);
     EXPECT_EQ(back.GetLayerByIndex(3)->GetName(), "group");
     EXPECT_EQ(
-        back.GetLayerByIndex(3)->GetTaggedBlockByKey(Fourcc("lsct"))->data,
+        BlockData(*back.GetLayerByIndex(3), "lsct"),
         (std::vector<std::uint8_t>{0, 0, 0, 1, '8', 'B', 'I', 'M', 'p', 'a', 's', 's', 0, 0, 0, 0}));
 }
 
-TEST(DocumentStackTest, ALayerIsFoundWhereItIsNow)
+TEST(DocumentStackTest, EditsSurviveSaving)
 {
-    ffpsd::Document doc = NewDocument();
-    const ffpsd::Layer* a = doc.AddLayer("a");
-    const ffpsd::Layer* b = doc.AddLayer("b");
-    EXPECT_EQ(doc.FindLayerIndex(*a).value_or(9), 0u);
-    EXPECT_EQ(doc.FindLayerIndex(*b).value_or(9), 1u);
+    // The background stays at the bottom; the new layer goes under the copy.
+    ffpsd::Document doc = ffpsd::Document::Open(kRgbPsd);
+    doc.AddLayer("added", Pattern(2, 2, 4), 1, 2);
+    doc.MoveLayer(2, 1);
+    ffpsd::Layer* copy = doc.GetLayerByIndex(2);
+    copy->SetOpacity(100);
+    copy->SetVisible(false);
+    copy->SetClipped(true);
+    copy->SetBlendKey(Fourcc("mul "));
 
-    doc.MoveLayer(1, 0);
-    EXPECT_EQ(doc.FindLayerIndex(*b).value_or(9), 0u);
-    EXPECT_EQ(doc.FindLayerIndex(*a).value_or(9), 1u);
+    const ffpsd::Document back = RoundTrip(doc);
 
-    ffpsd::Document other = NewDocument();
-    EXPECT_FALSE(doc.FindLayerIndex(*other.AddLayer("elsewhere")).has_value());
+    ASSERT_EQ(back.GetLayerCount(), 3u);
+    EXPECT_EQ(back.GetLayerByIndex(0)->GetName(), kBackgroundName);
+    const ffpsd::Layer* copy_back = back.GetLayerByIndex(2);
+    EXPECT_EQ(copy_back->GetName(), kBackgroundCopyName);
+    EXPECT_EQ(copy_back->GetOpacity(), 100u);
+    EXPECT_FALSE(copy_back->IsVisible());
+    EXPECT_TRUE(copy_back->IsClipped());
+    EXPECT_EQ(copy_back->GetBlendKey(), Fourcc("mul "));
+
+    const ffpsd::Layer* added = back.GetLayerByIndex(1);
+    EXPECT_EQ(added->GetName(), "added");
+    ExpectRect(added->GetBounds(), 1, 2, 3, 4);
+    EXPECT_EQ(added->GetPixels().bytes, Pattern(2, 2, 4).bytes);
+    EXPECT_FALSE(back.HasRealMergedData());
 }

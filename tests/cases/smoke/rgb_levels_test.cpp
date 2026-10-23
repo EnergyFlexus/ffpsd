@@ -1,4 +1,4 @@
-// Every value of photoshop/rgb_levels.psd as tests/scripts/dump_psd.py reads it, and what writing keeps of them.
+// Every value of photoshop/rgb_levels.psd, and what writing keeps of them.
 #include "support/test_support.hpp"
 
 #include <cstddef>
@@ -53,30 +53,40 @@ namespace
         {1069, {6, 0xcb3618cfac4e0527u}},    {1032, {16, 0x2eedd863bcbb4382u}},    {1092, {16, 0xf66e13281806203fu}},
         {1097, {4, 0x4d25767f9dce13f5u}},    {1054, {4, 0x4d25767f9dce13f5u}},     {1050, {843, 0x7430f8ad0304c1f9u}},
         {1064, {12, 0x7eeb0eabd8ce58a0u}},   {1041, {1, 0xaf63bc4c8601b62cu}},     {1044, {4, 0x4d25737f9dce0edcu}},
-        {1036, {3386, 0x6b3d035fc74a12b3u}}, {1057, {87, 0xb3a133c73d8594d5u}},    {1058, {306, 0x9b76c6a421f2b366u}}};
+        {1036, {3386, 0x6b3d035fc74a12b3u}}, {1057, {87, 0xb3a133c73d8594d5u}},    {1058, {306, 0x9b76c6a421f2b366u}},
+    };
 
-    constexpr Block kBackgroundBlocks[] = {{"luni", {12, 0x43ff96afb55fe1edu}}, {"lnsr", {4, 0x8816ae9b9f9af474u}},
-                                           {"lyid", {4, 0x4d25757f9dce1242u}},  {"clbl", {4, 0xad2aca7747985764u}},
-                                           {"infx", {4, 0x4d25767f9dce13f5u}},  {"knko", {4, 0x4d25767f9dce13f5u}},
-                                           {"lspf", {4, 0x4d25797f9dce190eu}},  {"lclr", {8, 0xa8c7f832281a39c5u}},
-                                           {"shmd", {72, 0x5ce3ce871eff2dafu}}, {"fxrp", {16, 0x88201fb960ff6465u}}};
+    constexpr Block kBackgroundBlocks[] = {
+        {"luni", {12, 0x43ff96afb55fe1edu}}, {"lnsr", {4, 0x8816ae9b9f9af474u}}, {"lyid", {4, 0x4d25757f9dce1242u}},
+        {"clbl", {4, 0xad2aca7747985764u}},  {"infx", {4, 0x4d25767f9dce13f5u}}, {"knko", {4, 0x4d25767f9dce13f5u}},
+        {"lspf", {4, 0x4d25797f9dce190eu}},  {"lclr", {8, 0xa8c7f832281a39c5u}}, {"shmd", {72, 0x5ce3ce871eff2dafu}},
+        {"fxrp", {16, 0x88201fb960ff6465u}},
+    };
 
     constexpr Block kLevelsBlocks[] = {
         {"levl", {632, 0xa2e2e1243c338566u}}, {"luni", {20, 0x864a60dfc089b234u}}, {"lnsr", {4, 0x0bca0c91195d8d6du}},
         {"lyid", {4, 0x4d25737f9dce0edcu}},   {"clbl", {4, 0xad2aca7747985764u}},  {"infx", {4, 0x4d25767f9dce13f5u}},
         {"knko", {4, 0x4d25767f9dce13f5u}},   {"lspf", {4, 0x4d25767f9dce13f5u}},  {"lclr", {8, 0xa8c7f832281a39c5u}},
-        {"shmd", {72, 0x5d8022871f83ff0du}},  {"fxrp", {16, 0x88201fb960ff6465u}}};
+        {"shmd", {72, 0x5d8022871f83ff0du}},  {"fxrp", {16, 0x88201fb960ff6465u}},
+    };
 
-    constexpr Block kSectionBlocks[] = {{"Patt", {0, 0xcbf29ce484222325u}},   {"CAI ", {77, 0x21f9ae263b0166bau}},
-                                        {"OCIO", {172, 0x2700bc2e57347752u}}, {"GenI", {84, 0xf5e31de68e39d017u}},
-                                        {"FMsk", {12, 0x5573a365a84623c1u}},  {"cinf", {410, 0x6767f23796513ee6u}}};
+    constexpr Block kSectionBlocks[] = {
+        {"Patt", {0, 0xcbf29ce484222325u}},  {"CAI ", {77, 0x21f9ae263b0166bau}}, {"OCIO", {172, 0x2700bc2e57347752u}},
+        {"GenI", {84, 0xf5e31de68e39d017u}}, {"FMsk", {12, 0x5573a365a84623c1u}}, {"cinf", {410, 0x6767f23796513ee6u}},
+    };
 
     constexpr Plane kBackgroundPlanes[] = {
-        {613051406, 0x8c99fc77735fe575u}, {675524991, 0xd8a3f567293a0b3eu}, {646754204, 0x410d65fa2aab9d97u}};
+        {613051406, 0x8c99fc77735fe575u},
+        {675524991, 0xd8a3f567293a0b3eu},
+        {646754204, 0x410d65fa2aab9d97u},
+    };
 
     // The background with the Levels applied.
     constexpr Plane kCompositePlanes[] = {
-        {612985261, 0xdc30c4a089111436u}, {682923150, 0x978207291fe19333u}, {640542472, 0x0bf1dab859ff58ffu}};
+        {612985261, 0xdc30c4a089111436u},
+        {682923150, 0x978207291fe19333u},
+        {640542472, 0x0bf1dab859ff58ffu},
+    };
 
     // Input floor and ceiling, onto 0 to 255 at gamma 1.
     constexpr std::uint16_t kLevelsRecords[4][2] = {{70, 200}, {10, 245}, {20, 250}, {10, 250}};
@@ -203,28 +213,25 @@ namespace
     }
 } // namespace
 
-TEST(SmokeRgbLevelsTest, EveryValueIsTheDumps)
+TEST(SmokeRgbLevelsTest, EveryValueIsTheDumpsInTheFileAndWhatItIsWrittenInto)
 {
     const std::vector<std::uint8_t> file = ReadFile(kRgbLevelsPsd);
     ASSERT_EQ(file.size(), kFileSize);
     ASSERT_EQ(Fnv1a64(file), kFileFnv);
+    const ffpsd::Document doc = ffpsd::Document::Parse(file);
+    ExpectTheFile(doc, false);
 
-    ExpectTheFile(ffpsd::Document::Parse(file), false);
-}
-
-TEST(SmokeRgbLevelsTest, RawAndPsbKeepEveryValue)
-{
-    const std::vector<std::uint8_t> raw = ffpsd::Document::Open(kRgbLevelsPsd).Save(ffpsd::Compression::kRaw);
+    const std::vector<std::uint8_t> raw = doc.Save(ffpsd::Compression::kRaw);
     const ffpsd::Document from_raw = ffpsd::Document::Parse(raw);
     ExpectTheFile(from_raw, false);
-    ExpectTheFile(ffpsd::Document::Parse(from_raw.Save()), false);
+    ExpectTheFile(RoundTrip(from_raw), false);
 
     // Unpacked, the composite alone is three planes of 1890 x 1417.
     EXPECT_GT(raw.size(), std::size_t{kWidth} * kHeight * 3);
 
-    ffpsd::Document doc = ffpsd::Document::Open(kRgbLevelsPsd);
-    doc.SetPsb(true);
-    ffpsd::Document psb = ffpsd::Document::Parse(doc.Save());
+    ffpsd::Document to_psb = ffpsd::Document::Open(kRgbLevelsPsd);
+    to_psb.SetPsb(true);
+    ffpsd::Document psb = RoundTrip(to_psb);
     ExpectTheFile(psb, true);
 
     psb.SetPsb(false);
@@ -246,7 +253,7 @@ TEST(SmokeRgbLevelsTest, EditsChangeOnlyWhatTheyTouch)
     levels->SetVisible(false);
     background->SetOpacity(128);
 
-    const ffpsd::Document back = ffpsd::Document::Parse(doc.Save());
+    const ffpsd::Document back = RoundTrip(doc);
     const ffpsd::Layer* background_back = back.GetLayerByIndex(0);
     const ffpsd::Layer* levels_back = back.GetLayerByIndex(1);
 

@@ -47,7 +47,7 @@ namespace ffpsd
         std::uint64_t size = 0; // the stored length, compression field and RLE row counts included
     };
 
-    // Created by Document::AddLayer; not copyable or movable, so a pointer to it stays valid.
+    // Not copyable or movable, so a pointer to it stays valid.
     class Layer
     {
     public:
@@ -91,7 +91,7 @@ namespace ffpsd
         // The block of an adjustment layer, such as 'levl', or 0; raw, so unknown ones are seen too.
         FFPSD_EXPORT std::uint32_t GetAdjustmentKey() const noexcept;
 
-        // T is a struct from adjustments.hpp; null unless this layer is that adjustment.
+        // Empty unless this layer is that adjustment.
         template <class T> FFPSD_EXPORT std::optional<T> GetAdjustment() const;
 
         // Only on a layer of T's kind; the composite goes stale.
@@ -146,7 +146,7 @@ namespace ffpsd
 
         Layer(std::unique_ptr<detail::LayerRecord> record, Document* document) noexcept;
 
-        // Throws for what SetPosition and Resize cannot handle; what names the call.
+        // Throws for a layer that cannot move or resize; what names the call.
         void CheckTransformable(const char* what) const;
 
         void Apply(const detail::Transform& transform, ResampleFilter filter = ResampleFilter::kNearest);

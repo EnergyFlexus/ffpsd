@@ -36,7 +36,7 @@ docs/                  PSD.md, the format reference
 vendor/                libpng, zlib-ng, libjpeg-turbo, libwebp, imgui, SDL, googletest, benchmark: submodules pinned to tags
 tests/cases/           GoogleTest, built with FFPSD_BUILD_TESTS
 tests/data/            the files they read; tests/scripts/ writes generated/
-benchmarks/            Google Benchmark, built with FFPSD_BUILD_BENCHMARKS
+benchmarks/            Google Benchmark, a file per public header, built with FFPSD_BUILD_BENCHMARKS
 examples/              programs that use the installed package
 scripts/   build.py    tooling
 ```

@@ -96,7 +96,7 @@ namespace ffpsd::detail
             return sum;
         }
 
-        // Four pixels with as many taps at once, as independent sums: each adds in FilterPixel's order, so to the bit.
+        // Four pixels at once as independent sums, each in tap order, so they match one pixel at a time to the bit.
         void FilterAcross(const float* row, const Taps& across, float* out) noexcept
         {
             constexpr std::size_t kGroup = 4;

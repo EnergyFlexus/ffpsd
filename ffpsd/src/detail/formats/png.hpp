@@ -10,7 +10,6 @@
 
 namespace ffpsd::detail
 {
-    // libpng behind LoadPng and EncodePng.
     Image DecodePng(const std::uint8_t* data, std::size_t size, ColorMode color_mode, std::uint16_t depth);
     std::vector<std::uint8_t> EncodePng(const ImageView& image, PngCompression compression);
 } // namespace ffpsd::detail
