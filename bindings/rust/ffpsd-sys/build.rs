@@ -10,7 +10,20 @@ const RELEASES: &str = "https://github.com/EnergyFlexus/ffpsd/releases/download"
 const RELEASE: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 
 /// The SHA-256 of each archive of RELEASE by Rust target; a target missing here is built from source.
-const PREBUILT: &[(&str, &str)] = &[];
+const PREBUILT: &[(&str, &str)] = &[
+    (
+        "aarch64-apple-darwin",
+        "b0c395c49c30d36342637b01f52b7a07d1db5e55e1cb4e6f31fdc7f14fd0882f",
+    ),
+    (
+        "x86_64-pc-windows-msvc",
+        "e9f5b873ed68c14fe91117e204e45ccba9041576eb8c8b30d7078783bc1b2a36",
+    ),
+    (
+        "x86_64-unknown-linux-gnu",
+        "a171959aff5f0a1602cfbcc899c26528070f51a705a9c0438eed7a7ea49c5495",
+    ),
+];
 
 /// What CMake reads; Cargo would otherwise rerun the script for any file of the package.
 const SOURCES: &[&str] = &[

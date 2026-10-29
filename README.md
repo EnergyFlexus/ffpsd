@@ -162,6 +162,8 @@ cmake -S . -B build '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>
 The libraries on the Releases page are Release builds with `/MD`, so a Debug program can use only
 the C API of the shared one. The apps there are built with `/MT` and need no Visual C++ runtime installed.
 
+They are built with the toolset of Visual Studio 2019, MSVC 14.29, so Visual Studio 2019 and later link them.
+
 ## Trademarks
 
 Adobe and Photoshop are either registered trademarks or trademarks of Adobe in
