@@ -13,15 +13,15 @@ const RELEASE: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 const PREBUILT: &[(&str, &str)] = &[
     (
         "aarch64-apple-darwin",
-        "b0c395c49c30d36342637b01f52b7a07d1db5e55e1cb4e6f31fdc7f14fd0882f",
+        "9659af62e1e3438a2e43878148031ab06820f28a81fa827e6fb361a449bc28ff",
     ),
     (
         "x86_64-pc-windows-msvc",
-        "e9f5b873ed68c14fe91117e204e45ccba9041576eb8c8b30d7078783bc1b2a36",
+        "ccac007da30b1d8aa1427b05ad93b0d03b28b87d3c7df78b652860eb0ce80d63",
     ),
     (
         "x86_64-unknown-linux-gnu",
-        "a171959aff5f0a1602cfbcc899c26528070f51a705a9c0438eed7a7ea49c5495",
+        "6e44664dc9760187822711106aae229b53ca604a854e52f0d271eef36d4f9127",
     ),
 ];
 
