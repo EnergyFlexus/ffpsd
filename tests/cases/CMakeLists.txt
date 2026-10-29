@@ -38,3 +38,9 @@ target_link_libraries(ffpsd_tests PRIVATE ffpsd::ffpsd GTest::gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(ffpsd_tests)
+
+# A static ffpsd holds the image libraries; a symbol of theirs without the prefix would clash with the program's own copy.
+if(NOT BUILD_SHARED_LIBS AND (FFPSD_WITH_PNG OR FFPSD_WITH_JPEG OR FFPSD_WITH_WEBP))
+    ffpsd_symbols_command(ffpsd_command check "-DARCHIVE=$<TARGET_FILE:ffpsd>")
+    add_test(NAME vendored_symbols COMMAND ${ffpsd_command})
+endif()

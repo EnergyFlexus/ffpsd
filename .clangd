@@ -1,6 +1,7 @@
-# Third-party code under vendor/ is not ours to fix: no diagnostics, no background index.
+# Third-party code under vendor/ is not ours to fix: no diagnostics, no background index. The headers of
+# cmake/prefix/ are forced into that code and have its include paths only there.
 If:
-  PathMatch: vendor/.*
+  PathMatch: (vendor|cmake/prefix)/.*
 Diagnostics:
   Suppress: "*"
   ClangTidy:

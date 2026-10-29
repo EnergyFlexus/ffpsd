@@ -1,143 +1,70 @@
 //! Opens a PSD, prints what it holds, copies the top layer, adds a gradient and saves the result.
-mod ffi;
-
-use std::ffi::{CStr, CString};
+use ffpsd::{ColorMode, Compression, Document, ImageInfo, ImageView};
 use std::process::ExitCode;
-use std::ptr;
 
-/// Turns a failed status into the message ffpsd left for it.
-fn check(status: ffi::ffpsd_status_t) -> Result<(), String> {
-    if status == ffi::FFPSD_STATUS_OK {
-        return Ok(());
-    }
-    // SAFETY: ffpsd_last_error always returns a valid, null-terminated string.
-    Err(unsafe { CStr::from_ptr(ffi::ffpsd_last_error()) }
-        .to_string_lossy()
-        .into_owned())
-}
+fn run(input: &str, output: &str) -> ffpsd::Result<()> {
+    let mut doc = Document::open(input)?;
 
-/// Owns the handle: the document, with its layers, is destroyed when this goes out of scope.
-struct Document(*mut ffi::ffpsd_document_t);
-
-impl Drop for Document {
-    fn drop(&mut self) {
-        unsafe { ffi::ffpsd_document_destroy(self.0) };
-    }
-}
-
-/// Asks for the length first, then fills a buffer of exactly that size.
-fn layer_name(layer: *const ffi::ffpsd_layer_t) -> Result<String, String> {
-    let mut length = 0usize;
-    check(unsafe { ffi::ffpsd_layer_get_name(layer, ptr::null_mut(), 0, &mut length) })?;
-    let mut buffer = vec![0u8; length + 1];
-    check(unsafe { ffi::ffpsd_layer_get_name(layer, buffer.as_mut_ptr().cast(), buffer.len(), &mut length) })?;
-    buffer.truncate(length);
-    Ok(String::from_utf8_lossy(&buffer).into_owned())
-}
-
-/// The layer's planes straight into a Vec of ours: the shape first, then exactly that many bytes.
-///
-/// Another path: ffpsd decodes into an image it owns, read through a view and destroyed after:
-///     ffpsd_layer_get_pixels(layer, &mut image);
-///     ffpsd_image_get_view(image, &mut view);
-///     let pixels = slice::from_raw_parts(view.data, view.size).to_vec();
-///     ffpsd_image_destroy(image);
-fn layer_pixels(layer: *const ffi::ffpsd_layer_t) -> Result<(ffi::ffpsd_image_view_t, Vec<u8>), String> {
-    let mut info = ffi::ffpsd_image_view_t::default();
-    check(unsafe { ffi::ffpsd_layer_get_pixels_info(layer, &mut info) })?;
-    // Zeroed, so no unsafe set_len; Vec::with_capacity and set_len after the call would skip the zeros for big pictures.
-    let mut pixels = vec![0u8; info.size];
-    check(unsafe { ffi::ffpsd_layer_get_pixels_bytes(layer, pixels.as_mut_ptr(), pixels.len()) })?;
-    Ok((info, pixels))
-}
-
-fn run(input: &str, output: &str) -> Result<(), String> {
-    let input_path = CString::new(input).map_err(|_| format!("{input}: a path with a null byte"))?;
-    let output_path = CString::new(output).map_err(|_| format!("{output}: a path with a null byte"))?;
-
-    // Open the document.
-    let mut handle = ptr::null_mut();
-    check(unsafe { ffi::ffpsd_document_open(input_path.as_ptr(), &mut handle) })?;
-    let doc = Document(handle);
-
-    // Read what it holds; layers go from the bottom up.
-    let (width, height, depth, count) = unsafe {
-        (
-            ffi::ffpsd_document_get_width(doc.0),
-            ffi::ffpsd_document_get_height(doc.0),
-            ffi::ffpsd_document_get_depth(doc.0),
-            ffi::ffpsd_document_get_layer_count(doc.0),
-        )
-    };
-    println!("{width} x {height}, {depth} bit, {count} layers");
-    for index in 0..count {
-        let mut layer = ptr::null_mut();
-        check(unsafe { ffi::ffpsd_document_get_layer(doc.0, index, &mut layer) })?;
-        let mut bounds = ffi::ffpsd_rect_t::default();
-        check(unsafe { ffi::ffpsd_layer_get_bounds(layer, &mut bounds) })?;
-        let (info, pixels) = layer_pixels(layer)?;
+    // Layers go from the bottom up.
+    println!(
+        "{} x {}, {} bit, {} layers",
+        doc.width(),
+        doc.height(),
+        doc.depth(),
+        doc.layer_count()
+    );
+    for (index, layer) in doc.layers().enumerate() {
+        let bounds = layer.bounds();
+        let pixels = layer.pixels()?;
 
         // Planes lie one after another, so the first plane is the first width * height samples.
-        let plane = info.width as usize * info.height as usize;
-        let mean = match (info.depth, plane) {
+        let plane = pixels.info.width as usize * pixels.info.height as usize;
+        let mean = match (pixels.info.depth, plane) {
             (8, 1..) => format!(
                 ", mean of the first plane {}",
-                pixels[..plane].iter().map(|&v| u64::from(v)).sum::<u64>() / plane as u64
+                pixels.data[..plane].iter().map(|&v| u64::from(v)).sum::<u64>() / plane as u64
             ),
             _ => String::new(),
         };
         println!(
             "  {index}: {}, {} x {}, {} planes{mean}",
-            layer_name(layer)?,
-            bounds.right - bounds.left,
-            bounds.bottom - bounds.top,
-            info.channel_count
+            layer.name(),
+            bounds.width(),
+            bounds.height(),
+            pixels.info.channel_count
         );
     }
 
     // Put a copy of the top layer on top; a group marker alone cannot be copied.
-    let mut top = ptr::null_mut();
-    check(unsafe { ffi::ffpsd_document_get_layer(doc.0, count.wrapping_sub(1), &mut top) })?;
-    let mut copy = ptr::null_mut();
-    check(unsafe { ffi::ffpsd_document_add_layer_copy(doc.0, top, &mut copy) })?;
+    doc.duplicate_layer(doc.layer_count().wrapping_sub(1))?;
 
     // Add a gradient over the canvas, planar as PSD keeps it: red grows to the right, green down, blue stays at half.
-    let color_mode = unsafe { ffi::ffpsd_document_get_color_mode(doc.0) };
-    let channels: u16 = if color_mode == ffi::FFPSD_COLOR_MODE_GRAYSCALE {
-        1
-    } else {
-        3
-    };
-    let (columns, rows) = (width as usize, height as usize);
+    let color_mode = doc.color_mode();
+    let channel_count: u16 = if color_mode == ColorMode::Grayscale { 1 } else { 3 };
+    let (columns, rows) = (doc.width() as usize, doc.height() as usize);
     let plane = columns * rows;
-    let mut pixels = vec![128u8; plane * usize::from(channels)];
+    let mut pixels = vec![128u8; plane * usize::from(channel_count)];
     for y in 0..rows {
         for x in 0..columns {
             let at = y * columns + x;
             pixels[at] = (x * 255 / columns) as u8;
-            if channels == 3 {
+            if channel_count == 3 {
                 pixels[plane + at] = (y * 255 / rows) as u8;
             }
         }
     }
-    let view = ffi::ffpsd_image_view_t {
-        width,
-        height,
-        channel_count: channels,
+    let info = ImageInfo {
+        width: doc.width(),
+        height: doc.height(),
+        channel_count,
         depth: 8,
         color_mode,
-        data: pixels.as_ptr(),
-        size: pixels.len(),
     };
-    let name = CString::new("Gradient").expect("the name has no null byte");
-    let mut gradient = ptr::null_mut();
-    check(unsafe { ffi::ffpsd_document_add_layer(doc.0, name.as_ptr(), &view, 0, 0, &mut gradient) })?;
+    doc.add_layer("Gradient", Some(ImageView::new(info, &pixels)), 0, 0)?;
 
     // Save, each channel RLE or raw, whichever is smaller.
-    check(unsafe { ffi::ffpsd_document_save(doc.0, output_path.as_ptr(), ffi::FFPSD_COMPRESSION_RLE_OR_RAW) })?;
-    println!("saved {} layers to {output}", unsafe {
-        ffi::ffpsd_document_get_layer_count(doc.0)
-    });
+    doc.save(output, Compression::RleOrRaw)?;
+    println!("saved {} layers to {output}", doc.layer_count());
     Ok(())
 }
 
@@ -150,8 +77,8 @@ fn main() -> ExitCode {
 
     match run(&args[1], &args[2]) {
         Ok(()) => ExitCode::SUCCESS,
-        Err(message) => {
-            eprintln!("{message}");
+        Err(error) => {
+            eprintln!("{error}");
             ExitCode::FAILURE
         }
     }

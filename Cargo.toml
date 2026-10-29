@@ -1,0 +1,56 @@
+# ffpsd-sys lives here, at the root, because a published crate holds only files below its manifest, and
+# its build from source needs the library and vendor/. Its own files are in bindings/rust/ffpsd-sys/.
+[package]
+name = "ffpsd-sys"
+version.workspace = true
+description = "Raw bindings to ffpsd, a library that reads and writes Photoshop PSD and PSB files"
+readme = "bindings/rust/ffpsd-sys/README.md"
+keywords = ["psd", "psb", "photoshop", "ffi"]
+categories = ["external-ffi-bindings", "multimedia::images"]
+links = "ffpsd"
+build = "bindings/rust/ffpsd-sys/build.rs"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+# The C++ library and what CMake reads of the libraries it carries, without their tests; libjpeg-turbo installs
+# the text files of its doc/, so only its HTML stays out.
+include = [
+    "/Cargo.toml", "/CMakeLists.txt", "/LICENSE", "/bindings/rust/ffpsd-sys", "/cmake", "/ffpsd",
+    "/vendor/CMakeLists.txt", "/vendor/libpng", "/vendor/zlib-ng", "/vendor/libjpeg-turbo", "/vendor/libwebp",
+    "!/vendor/libpng/contrib", "!/vendor/libpng/tests", "!/vendor/libpng/ci", "!/vendor/libpng/projects",
+    "!/vendor/zlib-ng/test", "!/vendor/zlib-ng/doc",
+    "!/vendor/libjpeg-turbo/testimages", "!/vendor/libjpeg-turbo/doc/turbojpeg", "!/vendor/libjpeg-turbo/fuzz",
+    "!/vendor/libjpeg-turbo/java", "!/vendor/libjpeg-turbo/simd",
+    "!/vendor/libwebp/tests", "!/vendor/libwebp/swig", "!/vendor/libwebp/webp_js", "!/vendor/libwebp/doc",
+    "!/vendor/libwebp/man",
+]
+
+[lib]
+path = "bindings/rust/ffpsd-sys/src/lib.rs"
+
+[features]
+# Which formats a build from source includes; a downloaded library has all three.
+default = ["png", "jpeg", "webp"]
+png = []
+jpeg = []
+webp = []
+
+[build-dependencies]
+cmake = "0.1.58"
+sha2 = "0.10"
+
+[workspace]
+members = ["bindings/rust/ffpsd", "examples/rust"]
+resolver = "2"
+
+# The crates take the version of the library they bind, which CI checks against the tag.
+[workspace.package]
+version = "0.4.5"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/EnergyFlexus/ffpsd"
+rust-version = "1.74"
+
+[workspace.dependencies]
+ffpsd-sys = { version = "0.4.5", path = ".", default-features = false }

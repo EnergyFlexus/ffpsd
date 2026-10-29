@@ -37,8 +37,10 @@ build/
 compile_commands.json
 ffpsd-out/
 __pycache__/
-examples/rust/target/
-examples/rust/Cargo.lock
 
 # other trash
 *.log
+
+# Rust
+/target/
+/Cargo.lock

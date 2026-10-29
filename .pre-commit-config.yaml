@@ -14,3 +14,11 @@ repos:
         language: python
         additional_dependencies: ['clang-format==23.1.0']
         files: '\.(h|hpp|c|cpp|cc)$'
+
+      # Formats the whole workspace, so it runs once and only when a commit has Rust in it.
+      - id: rustfmt
+        name: Format Rust sources
+        entry: cargo fmt --all --
+        language: system
+        types: [rust]
+        pass_filenames: false

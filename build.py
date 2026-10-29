@@ -95,7 +95,7 @@ def pick_generator():
     return "Unix Makefiles"
 
 
-def build_env():
+def build_env(msvc_version=None):
     """Environment for the cmake calls: MSVC toolchain on Windows, plain elsewhere."""
     if not IS_WINDOWS:
         compiler = next((name for name in ("c++", "g++", "clang++") if shutil.which(name)), None)
@@ -105,14 +105,14 @@ def build_env():
         print(f"compiler   {shutil.which(compiler)}")
         return None
 
-    if shutil.which("cl"):
+    if shutil.which("cl") and not msvc_version:
         print("compiler   cl (already on PATH)")
         return None
 
-    return msvc_env()
+    return msvc_env(msvc_version)
 
 
-def msvc_env():
+def msvc_env(version=None):
     """Locate Visual Studio and return the environment vcvarsall.bat produces."""
     program_files = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
     vswhere = Path(program_files) / "Microsoft Visual Studio" / "Installer" / "vswhere.exe"
@@ -135,13 +135,15 @@ def msvc_env():
 
     arch = MSVC_ARCH.get(platform.machine(), "x64")
     # A single shell string: cmd needs the batch file and `set` in one invocation.
-    dump = capture(f'"{vcvarsall}" {arch} >nul && set', shell=True)
+    toolset = f" -vcvars_ver={version}" if version else ""
+    dump = capture(f'"{vcvarsall}" {arch}{toolset} >nul && set', shell=True)
 
     env = dict(line.split("=", 1) for line in dump.splitlines() if "=" in line)
     if "VCINSTALLDIR" not in env:
-        fail(f"{vcvarsall.name} {arch} did not produce a usable environment")
+        fail(f"{vcvarsall.name} {arch}{toolset} did not produce a usable environment",
+             f"install the MSVC {version} build tools" if version else None)
 
-    print(f"compiler   MSVC from {installs[0]} ({arch})")
+    print(f"compiler   MSVC {env.get('VCToolsVersion', '').strip()} from {installs[0]} ({arch})")
     return env
 
 
@@ -196,8 +198,9 @@ def main():
     parser.add_argument("--no-webp", action="store_true",
                         help="build without WebP loading and saving, so without libwebp")
     parser.add_argument("--crt", choices=("static", "dynamic"),
-                        help="MSVC: the C runtime, /MT or /MD (default: static for "
-                             "--static, dynamic for a shared library)")
+                        help="MSVC: the C runtime, /MT or /MD (default: dynamic)")
+    parser.add_argument("--msvc", metavar="VERSION",
+                        help="MSVC: the toolset, such as 14.29 of Visual Studio 2019 (default: the latest)")
     parser.add_argument("--clean", action="store_true",
                         help="delete the build directory before configuring")
     parser.add_argument("--jobs", type=int, default=os.cpu_count() or 1,
@@ -207,7 +210,7 @@ def main():
     args = parser.parse_args()
 
     kind = "static" if args.static else "shared"
-    crt = args.crt or ("static" if args.static else "dynamic")
+    crt = args.crt or "dynamic"
     crt_note = f", {crt} CRT" if IS_WINDOWS else ""
     print(f"== ffpsd release build: {kind}{crt_note}, {platform.system()} {platform.machine()}")
 
@@ -217,7 +220,7 @@ def main():
     check_vendor((() if args.no_png else PNG_VENDORED) + (() if args.no_jpeg else JPEG_VENDORED)
                  + (() if args.no_webp else WEBP_VENDORED) + (UI_VENDORED if ui else ()))
     generator = pick_generator()
-    env = build_env()
+    env = build_env(args.msvc)
 
     build_dir = ROOT / "build" / f"{kind}-release-out"
     out_dir = args.out.resolve()

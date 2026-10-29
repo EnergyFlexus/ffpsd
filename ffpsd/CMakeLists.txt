@@ -114,34 +114,77 @@ target_sources(ffpsd
 
 target_include_directories(ffpsd PRIVATE src)
 
+# LTO for a shared library only: a static one hands its objects to the program's linker, which may not read
+# LTO objects. PIC lets a static ffpsd go into a shared library too, such as a Rust cdylib.
+if(BUILD_SHARED_LIBS AND ffpsd_has_lto)
+    set_property(TARGET ffpsd PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+endif()
+set_property(TARGET ffpsd PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+# The public headers use std::optional, so a program needs C++17 too; the package passes it on.
+target_compile_features(ffpsd PUBLIC cxx_std_17)
+
+# The image libraries end up inside ffpsd: a shared one links them, a static one takes only their headers here
+# and their objects below, so nothing, in the build tree or installed, links them beside it.
+# The file that calls a library needs the renames it was built with.
+set(ffpsd_vendored_archives)
+function(ffpsd_use_vendored source header)
+    ffpsd_prefix_option(option "${PROJECT_SOURCE_DIR}/cmake/prefix/${header}")
+    set_source_files_properties(${source} PROPERTIES COMPILE_OPTIONS "${option}")
+    set(archives ${ffpsd_vendored_archives})
+    foreach(library IN LISTS ARGN)
+        if(BUILD_SHARED_LIBS)
+            target_link_libraries(ffpsd PRIVATE ${library})
+        else()
+            target_include_directories(ffpsd PRIVATE "$<TARGET_PROPERTY:${library},INTERFACE_INCLUDE_DIRECTORIES>")
+            add_dependencies(ffpsd ${library})
+            list(APPEND archives "$<TARGET_FILE:${library}>")
+        endif()
+    endforeach()
+    set(ffpsd_vendored_archives ${archives} PARENT_SCOPE)
+endfunction()
+
 if(FFPSD_WITH_PNG)
     target_sources(ffpsd PRIVATE src/detail/formats/png.cpp src/detail/formats/png.hpp)
-    target_link_libraries(ffpsd PRIVATE png_static)
+    ffpsd_use_vendored(src/detail/formats/png.cpp libpng.h png_static zlib-ng)
     target_compile_definitions(ffpsd PUBLIC FFPSD_HAS_PNG)
 endif()
 
 if(FFPSD_WITH_JPEG)
     target_sources(ffpsd PRIVATE src/detail/formats/jpeg.cpp src/detail/formats/jpeg.hpp)
-    # An imported library cannot join the export set, so a static package names the file it installs.
-    get_target_property(ffpsd_jpeg_location ffpsd_jpeg IMPORTED_LOCATION)
-    get_filename_component(ffpsd_jpeg_file "${ffpsd_jpeg_location}" NAME)
-    target_link_libraries(ffpsd PRIVATE
-        "$<BUILD_INTERFACE:ffpsd_jpeg>"
-        "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_LIBDIR}/${ffpsd_jpeg_file}>")
+    ffpsd_use_vendored(src/detail/formats/jpeg.cpp libjpeg_turbo.h ffpsd_jpeg)
     target_compile_definitions(ffpsd PUBLIC FFPSD_HAS_JPEG)
 endif()
 
 if(FFPSD_WITH_WEBP)
     target_sources(ffpsd PRIVATE src/detail/formats/webp.cpp src/detail/formats/webp.hpp)
-    get_target_property(ffpsd_webp_location ffpsd_webp IMPORTED_LOCATION)
-    get_target_property(ffpsd_sharpyuv_location ffpsd_sharpyuv IMPORTED_LOCATION)
-    get_filename_component(ffpsd_webp_file "${ffpsd_webp_location}" NAME)
-    get_filename_component(ffpsd_sharpyuv_file "${ffpsd_sharpyuv_location}" NAME)
-    target_link_libraries(ffpsd PRIVATE
-        "$<BUILD_INTERFACE:ffpsd_webp>"
-        "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_LIBDIR}/${ffpsd_webp_file}>"
-        "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_LIBDIR}/${ffpsd_sharpyuv_file}>")
+    ffpsd_use_vendored(src/detail/formats/webp.cpp libwebp.h ffpsd_webp ffpsd_sharpyuv)
     target_compile_definitions(ffpsd PUBLIC FFPSD_HAS_WEBP)
+endif()
+
+# A static library cannot link others, so their objects are added to it after it is archived.
+if(NOT BUILD_SHARED_LIBS AND ffpsd_vendored_archives)
+    if(MSVC)
+        set(ffpsd_merge_args -DSTYLE=msvc "-DTOOL=${CMAKE_LINKER}")
+    elseif(APPLE)
+        get_filename_component(ffpsd_tools "${CMAKE_AR}" DIRECTORY)
+        find_program(FFPSD_LIBTOOL libtool HINTS "${ffpsd_tools}" REQUIRED)
+        set(ffpsd_merge_args -DSTYLE=apple "-DTOOL=${FFPSD_LIBTOOL}")
+    elseif(CMAKE_CXX_COMPILER_AR)
+        # gcc-ar or llvm-ar, which index the LTO objects of a Release build.
+        set(ffpsd_merge_args -DSTYLE=gnu "-DTOOL=${CMAKE_CXX_COMPILER_AR}")
+    else()
+        set(ffpsd_merge_args -DSTYLE=gnu "-DTOOL=${CMAKE_AR}")
+    endif()
+    # A list on the command line would meet the quoting of cmd.exe, so it goes through a file.
+    set(ffpsd_archives "${CMAKE_CURRENT_BINARY_DIR}/vendored_archives_$<CONFIG>.txt")
+    file(GENERATE OUTPUT "${ffpsd_archives}" CONTENT "$<JOIN:${ffpsd_vendored_archives},\n>\n")
+    add_custom_command(TARGET ffpsd POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" ${ffpsd_merge_args} "-DLIBRARY=$<TARGET_FILE:ffpsd>" "-DARCHIVES=${ffpsd_archives}"
+                -P "${PROJECT_SOURCE_DIR}/cmake/merge_archives.cmake"
+        VERBATIM)
+    # Otherwise a library rebuilt alone would leave its old objects inside ffpsd.
+    set_property(TARGET ffpsd APPEND PROPERTY LINK_DEPENDS ${ffpsd_vendored_archives})
 endif()
 
 # Keeps the symbols of the vendored libraries inside the .so.
@@ -172,24 +215,13 @@ install(TARGETS ffpsd
 install(FILES "${PROJECT_SOURCE_DIR}/LICENSE"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/ffpsd/licenses" RENAME ffpsd.txt)
 
-# A static ffpsd needs them at link time, so they ship in the same package.
-if(FFPSD_WITH_PNG AND NOT BUILD_SHARED_LIBS)
-    install(TARGETS png_static zlib-ng EXPORT ffpsd-targets)
-endif()
-if(FFPSD_WITH_JPEG AND NOT BUILD_SHARED_LIBS)
-    install(FILES "${ffpsd_jpeg_location}" DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-endif()
-if(FFPSD_WITH_WEBP AND NOT BUILD_SHARED_LIBS)
-    install(FILES "${ffpsd_webp_location}" "${ffpsd_sharpyuv_location}" DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-endif()
-
 install(EXPORT ffpsd-targets
     FILE ffpsd-targets.cmake
     NAMESPACE ffpsd::
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/ffpsd")
 
-# The dependencies are in the same export set, so the package config only pulls
-# in the exported targets - no template file needed.
+# ffpsd has no dependencies to find, so the package config only pulls in the
+# exported target - no template file needed.
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/ffpsd-config.cmake"
     [[include("${CMAKE_CURRENT_LIST_DIR}/ffpsd-targets.cmake")]])
 

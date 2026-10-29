@@ -5,8 +5,11 @@ Read and write Photoshop PSD and PSB files, with two APIs from one build:
 * `ffpsd/ffpsd.hpp` - C++
 * `ffpsd/c_api.h` - C, for other languages and toolchains
 
+Until 1.0.0 the APIs are not stable: a release may break source and binary compatibility.
+
 Code style: [CONTRIBUTING.md](CONTRIBUTING.md). Programs in C++, C and Rust:
-[examples/](examples/README.md).
+[examples/](examples/README.md). Rust crates: [ffpsd](bindings/rust/ffpsd/README.md) and
+[ffpsd-sys](bindings/rust/ffpsd-sys/README.md).
 
 libpng, zlib-ng, libjpeg-turbo, libwebp, Dear ImGui, SDL3, GoogleTest and Google Benchmark are git submodules under
 `vendor/`; the test PSD files are in Git LFS (`git lfs install` before cloning).
@@ -28,19 +31,19 @@ python build.py --static   # static library
 
 It checks for CMake >= 3.23, Ninja and a compiler, sets up MSVC on Windows by
 itself and fetches missing submodules. Flags: `--clean`, `--jobs N`,
-`--no-apps`, `--no-png`, `--no-jpeg`, `--no-webp`, `--crt static|dynamic`, `--out DIR`.
+`--no-apps`, `--no-png`, `--no-jpeg`, `--no-webp`, `--out DIR`, and on Windows
+`--crt static|dynamic` ([C runtime on Windows](#c-runtime-on-windows)) and `--msvc 14.29`, the toolset
+of an older Visual Studio installed beside the latest.
 
 ```
-ffpsd-out/bin/        ffpsd.dll, img2ffpsd-cli, img2ffpsd-ui
-ffpsd-out/lib/        ffpsd.lib / libffpsd.a, cmake/ffpsd/
-                      static only: libpng16_static.lib, zlibstatic.lib, jpeg-static.lib,
-                      libwebp.lib, libsharpyuv.lib
+ffpsd-out/bin/        img2ffpsd-cli, img2ffpsd-ui; ffpsd.dll on Windows
+ffpsd-out/lib/        libffpsd.so, libffpsd.dylib, ffpsd.lib or libffpsd.a; cmake/ffpsd/
 ffpsd-out/include/    ffpsd/*.hpp, ffpsd/c_api.h, ffpsd/export.h
 ffpsd-out/share/      ffpsd/licenses/
 ```
 
-A DLL has libpng, zlib-ng, libjpeg-turbo and libwebp inside and exports none of their
-symbols; a static library ships them next to it, and the CMake package links them.
+libpng, zlib-ng, libjpeg-turbo and libwebp are inside the library, the static one too, and
+every symbol of theirs starts with `ffpsd_`: a program can link its own copies of them beside ffpsd.
 libjpeg-turbo is plain C, without SIMD, and libwebp's SIMD is C intrinsics, so no assembler is needed.
 
 ## Apps
@@ -104,7 +107,8 @@ Benchmark's `compare.py`, which needs
 
 ## Compiler flags
 
-* Release: `/O2 /Ob3 /Oi /Ot /Gy` (MSVC) or `-O3`, and LTO where available.
+* Release: `/O2 /Ob3 /Oi /Ot /Gy` (MSVC) or `-O3`; LTO for the shared library where available.
+  The static one has none, so any linker takes its objects, and it is position-independent.
 * Debug: `/W4 /permissive-` (MSVC) or
   `-Wall -Wextra -Wpedantic -Wshadow -Wconversion`, `-Wold-style-cast` for C++.
 
@@ -121,33 +125,42 @@ Benchmark's `compare.py`, which needs
 | `FFPSD_BUILD_TESTS` | `OFF`, `ON` in the debug presets | `tests/` |
 | `FFPSD_BUILD_BENCHMARKS` | `OFF`, `ON` in `bench-release` and the debug presets | `benchmarks/` |
 | `FFPSD_BUILD_EXAMPLES` | `OFF`, `ON` in the debug presets | `examples/` in C and C++ |
-| `FFPSD_MSVC_STATIC_RUNTIME` | `ON` static, `OFF` shared | MSVC: `/MT` instead of `/MD` |
+| `FFPSD_MSVC_STATIC_RUNTIME` | `OFF` | MSVC: `/MT` instead of `/MD`, see [C runtime on Windows](#c-runtime-on-windows) |
 
 On top of a preset: `cmake --preset shared-release -DFFPSD_BUILD_APPS=OFF`.
 
 ## Use from another CMake project
 
 ```cmake
-find_package(ffpsd 0.1 REQUIRED)
+find_package(ffpsd 0.4 REQUIRED)
 target_link_libraries(my_app PRIVATE ffpsd::ffpsd)
 ```
 
 The package defines `FFPSD_STATIC` for a static build, so `ffpsd/export.h`
-picks the right linkage. On MSVC the CRT follows the library kind:
+picks the right linkage. On Windows the program also has to match the C runtime, below.
 
-* **Static library:** `/MT`, `/MTd`; the program needs the same, or it links two
-  CRTs:
+## C runtime on Windows
 
-  ```sh
-  # quoted: the shell would read < > as redirection
-  cmake -S . -B build '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>'
-  ```
+MSVC links the C runtime as a DLL (`/MD`, `/MDd` in Debug) or statically (`/MT`, `/MTd`).
+ffpsd and the libraries inside it take `/MD`, as CMake gives any program;
+`-DFFPSD_MSVC_STATIC_RUNTIME=ON` or `build.py --crt static` makes it `/MT`.
 
-* **DLL:** `/MD`, `/MDd`. The C++ API passes `std::string` and `std::vector`, so
-  the program needs `/MD` too, the same compiler and the same configuration.
+| ffpsd                | The program needs                                                             |
+|----------------------|-------------------------------------------------------------------------------|
+| static               | the same CRT and configuration, or the link fails (LNK2038)                    |
+| shared, the C++ API  | the same CRT, compiler and configuration: `std::string` and `std::vector` cross over |
+| shared, the C API    | any                                                                           |
 
-A DLL built with `-DFFPSD_MSVC_STATIC_RUNTIME=ON` has its own CRT and heap, so
-only the C API is safe with it; CMake warns about it.
+A shared library built with `/MT` has its own CRT and heap, so only the C API is safe with it;
+CMake warns about it. A program that wants `/MT` with a static ffpsd built so:
+
+```sh
+# quoted: the shell would read < > as redirection
+cmake -S . -B build '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>'
+```
+
+The libraries on the Releases page are Release builds with `/MD`, so a Debug program can use only
+the C API of the shared one. The apps there are built with `/MT` and need no Visual C++ runtime installed.
 
 ## Trademarks
 

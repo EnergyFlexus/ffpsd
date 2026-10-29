@@ -20,7 +20,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "BUILD_SHARED_LIBS": "OFF",
-        "FFPSD_MSVC_STATIC_RUNTIME": "ON",
+        "FFPSD_MSVC_STATIC_RUNTIME": "OFF",
         "FFPSD_BUILD_TESTS": "ON",
         "FFPSD_BUILD_EXAMPLES": "ON",
         "FFPSD_BUILD_BENCHMARKS": "ON"
@@ -33,7 +33,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "BUILD_SHARED_LIBS": "OFF",
-        "FFPSD_MSVC_STATIC_RUNTIME": "ON"
+        "FFPSD_MSVC_STATIC_RUNTIME": "OFF"
       }
     },
     {
@@ -43,14 +43,14 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "BUILD_SHARED_LIBS": "OFF",
-        "FFPSD_MSVC_STATIC_RUNTIME": "ON",
+        "FFPSD_MSVC_STATIC_RUNTIME": "OFF",
         "FFPSD_BUILD_APPS": "OFF",
         "FFPSD_BUILD_BENCHMARKS": "ON"
       }
     },
     {
       "name": "shared-debug",
-      "displayName": "Shared (DLL) · Debug",
+      "displayName": "Shared · Debug",
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
@@ -63,7 +63,7 @@
     },
     {
       "name": "shared-release",
-      "displayName": "Shared (DLL) · Release",
+      "displayName": "Shared · Release",
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",

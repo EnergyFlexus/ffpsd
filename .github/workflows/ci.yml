@@ -9,7 +9,7 @@ on:
   pull_request:
 
 jobs:
-  # The same checks as the pre-commit hooks: clang-format and the file names.
+  # The same checks as the pre-commit hooks: clang-format and the file names; rustfmt for the crates.
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -19,6 +19,16 @@ jobs:
           python-version: "3.12"
       - run: pip install pre-commit
       - run: pre-commit run --all-files --show-diff-on-failure
+      - run: cargo fmt --all -- --check
+
+  # The Rust declarations of c_api.h, as bindgen of Ubuntu 24.04 writes them.
+  bindings:
+    runs-on: ubuntu-latest
+    container: ubuntu:24.04
+    steps:
+      - uses: actions/checkout@v7
+      - run: apt-get update && apt-get install -y bindgen clang rustfmt python3
+      - run: python3 scripts/generate_rust_bindings.py --check
 
   # Debug with the tests, static and then shared.
   test:
@@ -47,16 +57,35 @@ jobs:
       - name: Shared
         run: python scripts/run_tests.py --shared
 
-  # Three archives per system: the shared library, the static one, and the apps alone.
-  package:
-    needs: [lint, test]
+  # The crates with ffpsd built from source, as a build without a release archive does.
+  rust:
     strategy:
       fail-fast: false
       matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      FFPSD_FROM_SOURCE: 1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          lfs: true
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+
+  # Three archives per system: the shared library, the static one, and the apps alone.
+  package:
+    needs: [lint, test, bindings, rust]
+    strategy:
+      fail-fast: false
+      matrix:
+        # Named by the Rust target triple, so ffpsd-sys finds its archive by TARGET. The libraries of Windows are
+        # built with the toolset of Visual Studio 2019, as a static library links only with one as new or newer.
         target:
-          - { os: windows-latest, name: windows-x64 }
-          - { os: ubuntu-22.04, name: linux-x64 } # glibc 2.35, so older distributions run it too
-          - { os: macos-latest, name: macos-arm64 }
+          - { os: windows-latest, name: x86_64-pc-windows-msvc, flags: --msvc 14.29 }
+          - { os: ubuntu-22.04, name: x86_64-unknown-linux-gnu } # glibc 2.35, so older distributions run it too
+          - { os: macos-latest, name: aarch64-apple-darwin }
     runs-on: ${{ matrix.target.os }}
     steps:
       - uses: actions/checkout@v7
@@ -83,21 +112,20 @@ jobs:
       - name: Shared library
         shell: bash
         run: |
-          python build.py --no-apps
+          python build.py --no-apps ${{ matrix.target.flags }}
           cp -R ffpsd-out "ffpsd-shared-$GITHUB_REF_NAME-${{ matrix.target.name }}"
 
-      # With the dynamic C runtime on Windows, /MD, as most programs that link it use.
       - name: Static library
         shell: bash
         run: |
-          python build.py --static --crt dynamic --no-apps
+          python build.py --static --no-apps ${{ matrix.target.flags }}
           cp -R ffpsd-out "ffpsd-static-$GITHUB_REF_NAME-${{ matrix.target.name }}"
 
       # /MT on Windows, so the apps need no Visual C++ runtime; clean, as the static library shares the build directory.
       - name: Apps
         shell: bash
         run: |
-          python build.py --static --clean
+          python build.py --static --crt static --clean
           name="img2ffpsd-$GITHUB_REF_NAME-${{ matrix.target.name }}"
           mkdir "$name"
           cp ffpsd-out/bin/img2ffpsd* "$name"/
@@ -137,12 +165,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # The tag must name the version in CMakeLists.txt.
+      # The tag must name the version in CMakeLists.txt, and the crates the same one.
       - name: Tag matches VERSION
         run: |
           version=$(sed -nE 's/^[[:space:]]*VERSION[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt | head -n 1)
           if [ "v$version" != "$GITHUB_REF_NAME" ]; then
             echo "::error::tag $GITHUB_REF_NAME, but CMakeLists.txt has VERSION $version"
+            exit 1
+          fi
+          if ! grep -qxF "version = \"$version\"" Cargo.toml || ! grep -qF "ffpsd-sys = { version = \"$version\"" Cargo.toml; then
+            echo "::error::the crates in Cargo.toml are not version $version"
             exit 1
           fi
 
@@ -151,6 +183,10 @@ jobs:
           pattern: archives-*
           path: archives
           merge-multiple: true
+
+      # One line per archive, for sha256sum -c; ffpsd-sys carries its own copy of these hashes.
+      - name: Checksums
+        run: cd archives && sha256sum * > SHA256SUMS
 
       - name: Release
         run: |
@@ -161,6 +197,7 @@ jobs:
           "- \`ffpsd-shared-*\`: the shared library, its headers and CMake package.
           - \`ffpsd-static-*\`: the static library, its headers and CMake package.
           - \`img2ffpsd-*\`: the app, img2ffpsd-cli for the command line and img2ffpsd-ui with a window.
+          - \`SHA256SUMS\`: their SHA-256, checked with \`sha256sum -c SHA256SUMS --ignore-missing\`.
 
           macOS builds are for Apple Silicon and unsigned: run \`xattr -d com.apple.quarantine\` on them once.
 

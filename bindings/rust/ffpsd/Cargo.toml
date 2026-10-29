@@ -1,0 +1,21 @@
+[package]
+name = "ffpsd"
+version.workspace = true
+description = "Rust bindings to ffpsd, a library that reads and writes Photoshop PSD and PSB files"
+readme = "README.md"
+keywords = ["psd", "psb", "photoshop", "image", "layers"]
+categories = ["multimedia::images", "encoding", "api-bindings"]
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+# Which formats a build of ffpsd from source includes; see ffpsd-sys.
+default = ["png", "jpeg", "webp"]
+png = ["ffpsd-sys/png"]
+jpeg = ["ffpsd-sys/jpeg"]
+webp = ["ffpsd-sys/webp"]
+
+[dependencies]
+ffpsd-sys.workspace = true

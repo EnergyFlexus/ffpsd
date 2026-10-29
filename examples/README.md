@@ -20,13 +20,13 @@ saved 4 layers to out.psd
 |--------|-----|-------|
 | `cpp/` | C++, `ffpsd/ffpsd.hpp` | CMake |
 | `c/`   | C, `ffpsd/c_api.h` | CMake |
-| `rust/` | C, bindings by hand in `src/ffi.rs` | Cargo |
+| `rust/` | Rust, the `ffpsd` crate | Cargo |
 
 ## C and C++
 
 The debug presets build them into `build/<preset>/bin/`; elsewhere turn on
 `FFPSD_BUILD_EXAMPLES`. Each folder also builds on its own against an installed
-ffpsd, and copies a DLL next to the program:
+ffpsd, and on Windows copies the shared library next to the program:
 
 ```sh
 python build.py
@@ -36,13 +36,8 @@ cmake --build build/example-cpp
 
 ## Rust
 
-Links a shared ffpsd from `ffpsd-out/`, or from `FFPSD_DIR`:
+A member of the Cargo workspace at the root; `ffpsd-sys` builds ffpsd for it:
 
 ```sh
-python build.py
-cd examples/rust
-cargo run -- ../../tests/data/photoshop/rgb_levels.psd out.psd
+cargo run -p ffpsd-example -- tests/data/photoshop/rgb_levels.psd out.psd
 ```
-
-On Windows `ffpsd-out/bin` must be on the `PATH`; on Linux and macOS the program
-records where the library is. Paths reach ffpsd as UTF-8, as Rust keeps them.

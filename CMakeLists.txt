@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.23)
 
 project(ffpsd
-    VERSION 0.4.4
+    VERSION 0.4.5
     DESCRIPTION "ffpsd library"
     LANGUAGES CXX)
 
@@ -19,14 +19,8 @@ option(FFPSD_BUILD_TESTS "Build the unit tests, with GoogleTest from vendor/" OF
 option(FFPSD_BUILD_BENCHMARKS "Build the benchmarks, with Google Benchmark from vendor/" OFF)
 option(FFPSD_BUILD_EXAMPLES "Build the C and C++ examples in examples/" OFF)
 
-# The CRT follows the library kind: a static library carries none of its own,
-# while a DLL with /MT gets a second CRT that frees std types from the wrong heap.
-if(BUILD_SHARED_LIBS)
-    set(ffpsd_static_runtime_default OFF)
-else()
-    set(ffpsd_static_runtime_default ON)
-endif()
-option(FFPSD_MSVC_STATIC_RUNTIME "MSVC: link the C runtime statically (/MT)" ${ffpsd_static_runtime_default})
+# /MD, as CMake gives programs; a DLL with /MT gets a second CRT that frees std types from the wrong heap.
+option(FFPSD_MSVC_STATIC_RUNTIME "MSVC: link the C runtime statically (/MT)" OFF)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -91,11 +85,10 @@ add_compile_options(
     "$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CXX>>:${ffpsd_cxx_warnings}>"
     "$<$<CONFIG:Release>:${ffpsd_optimize}>")
 
+# C++ only: C is enabled by the vendored projects in their own directories, where CMake keeps its IPO settings.
 include(CheckIPOSupported)
-check_ipo_supported(RESULT ffpsd_has_lto OUTPUT ffpsd_lto_error)
-if(ffpsd_has_lto)
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-else()
+check_ipo_supported(RESULT ffpsd_has_lto OUTPUT ffpsd_lto_error LANGUAGES CXX)
+if(NOT ffpsd_has_lto)
     message(STATUS "LTO unavailable: ${ffpsd_lto_error}")
 endif()
 

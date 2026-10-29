@@ -1,5 +1,5 @@
-# Third-party code, always static: a DLL carries it inside, a static ffpsd ships
-# it next to itself. The CRT setting comes from the top level.
+# Third-party code, always static: a shared or a static ffpsd carries it inside.
+# The CRT setting comes from the top level.
 set(BUILD_SHARED_LIBS OFF)
 set(BUILD_TESTING OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -8,12 +8,20 @@ set(SKIP_INSTALL_ALL ON)
 
 include(GNUInstallDirs)
 
+# Every symbol of the image libraries gets the ffpsd_ prefix, so a program may link its own copies beside
+# a static ffpsd. The headers in cmake/prefix/ rename them and are forced into the library and the files that call it.
+include("${PROJECT_SOURCE_DIR}/cmake/prefix/prefix.cmake")
+set(ffpsd_update_commands)
+
 if(FFPSD_WITH_PNG)
-    # zlib-ng with the zlib API, which is what libpng is written against.
+    # zlib-ng with the zlib API, which is what libpng is written against; its zconf.h renames that API.
     set(ZLIB_COMPAT ON)
     set(WITH_GTEST OFF)
     set(WITH_GZFILEOP OFF)
+    set(ZLIB_SYMBOL_PREFIX ffpsd_ CACHE STRING "Prefix of the zlib API" FORCE)
     add_subdirectory(zlib-ng)
+    ffpsd_prefix_option(ffpsd_option "${PROJECT_SOURCE_DIR}/cmake/prefix/zlib_ng.h")
+    target_compile_options(zlib-ng PRIVATE "${ffpsd_option}")
 
     # libpng calls find_package(ZLIB); the cache entries and the alias make it take
     # zlib-ng instead of searching the system.
@@ -27,10 +35,19 @@ if(FFPSD_WITH_PNG)
     set(PNG_TOOLS OFF)
     set(PNG_FRAMEWORK OFF)
     add_subdirectory(libpng)
+    ffpsd_prefix_option(ffpsd_option "${PROJECT_SOURCE_DIR}/cmake/prefix/libpng.h")
+    target_compile_options(png_static PRIVATE "${ffpsd_option}")
 
     # ffpsd includes png.h privately; an installed consumer needs the library, not the headers.
     set_property(TARGET png_static PROPERTY INTERFACE_INCLUDE_DIRECTORIES
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libpng;${CMAKE_CURRENT_BINARY_DIR}/libpng>")
+
+    ffpsd_symbols_command(ffpsd_command update
+        "-DHEADER=${PROJECT_SOURCE_DIR}/cmake/prefix/zlib_ng.h" "-DARCHIVE=$<TARGET_FILE:zlib-ng>")
+    list(APPEND ffpsd_update_commands COMMAND ${ffpsd_command})
+    ffpsd_symbols_command(ffpsd_command update
+        "-DHEADER=${PROJECT_SOURCE_DIR}/cmake/prefix/libpng.h" "-DARCHIVE=$<TARGET_FILE:png_static>")
+    list(APPEND ffpsd_update_commands COMMAND ${ffpsd_command})
 
     # Their licenses travel with the binaries that contain their code.
     install(FILES libpng/LICENSE
@@ -46,7 +63,8 @@ if(FFPSD_WITH_JPEG OR FFPSD_WITH_WEBP)
         -DCMAKE_INSTALL_LIBDIR=lib
         -DCMAKE_INSTALL_INCLUDEDIR=include
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-        -DCMAKE_C_VISIBILITY_PRESET=hidden)
+        -DCMAKE_C_VISIBILITY_PRESET=hidden
+        -DCMAKE_PROJECT_INCLUDE=${PROJECT_SOURCE_DIR}/cmake/prefix/prefix.cmake)
     foreach(ffpsd_variable IN ITEMS CMAKE_BUILD_TYPE CMAKE_C_COMPILER CMAKE_MAKE_PROGRAM CMAKE_TOOLCHAIN_FILE
                                     CMAKE_OSX_ARCHITECTURES CMAKE_OSX_DEPLOYMENT_TARGET)
         if(${ffpsd_variable})
@@ -71,10 +89,13 @@ if(FFPSD_WITH_JPEG)
         set(ffpsd_jpeg_crt_dll 1)
     endif()
 
+    set(ffpsd_jpeg_prefix "${PROJECT_SOURCE_DIR}/cmake/prefix/libjpeg_turbo.h")
+
     # Plain C, without SIMD: no assembler to install on any system.
     set(ffpsd_jpeg_args
         ${ffpsd_external_args}
         -DCMAKE_INSTALL_PREFIX=${ffpsd_jpeg_dir}
+        -DFFPSD_PREFIX_HEADER=${ffpsd_jpeg_prefix}
         -DENABLE_SHARED=0
         -DENABLE_STATIC=1
         -DWITH_TURBOJPEG=0
@@ -83,14 +104,19 @@ if(FFPSD_WITH_JPEG)
         -DWITH_SIMD=0
         -DWITH_CRT_DLL=${ffpsd_jpeg_crt_dll})
 
+    # Short folders: MSBuild cannot write a file whose path passes 260 characters, and CMake's test builds go deep.
     ExternalProject_Add(libjpeg-turbo
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libjpeg-turbo"
+        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/jpeg"
+        BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/jpeg/build"
         CMAKE_ARGS ${ffpsd_jpeg_args}
         BUILD_BYPRODUCTS "${ffpsd_jpeg_dir}/lib/${ffpsd_jpeg_file}"
         LOG_CONFIGURE ON
         LOG_BUILD ON
         LOG_INSTALL ON
         LOG_OUTPUT_ON_FAILURE ON)
+    # Its own build does not know the header changed.
+    ExternalProject_Add_StepDependencies(libjpeg-turbo build "${ffpsd_jpeg_prefix}")
 
     # The include directory has to exist when the imported target is made, long before the build fills it.
     file(MAKE_DIRECTORY "${ffpsd_jpeg_dir}/include")
@@ -99,6 +125,10 @@ if(FFPSD_WITH_JPEG)
         IMPORTED_LOCATION "${ffpsd_jpeg_dir}/lib/${ffpsd_jpeg_file}"
         INTERFACE_INCLUDE_DIRECTORIES "${ffpsd_jpeg_dir}/include")
     add_dependencies(ffpsd_jpeg libjpeg-turbo)
+
+    ffpsd_symbols_command(ffpsd_command update
+        "-DHEADER=${ffpsd_jpeg_prefix}" "-DARCHIVE=${ffpsd_jpeg_dir}/lib/${ffpsd_jpeg_file}")
+    list(APPEND ffpsd_update_commands COMMAND ${ffpsd_command})
 
     install(FILES libjpeg-turbo/LICENSE.md
         DESTINATION "${CMAKE_INSTALL_DATADIR}/ffpsd/licenses" RENAME libjpeg-turbo.md)
@@ -126,10 +156,14 @@ if(FFPSD_WITH_WEBP)
         string(APPEND ffpsd_webp_crt DLL)
     endif()
 
+    set(ffpsd_webp_prefix "${PROJECT_SOURCE_DIR}/cmake/prefix/libwebp.h")
+
     # SIMD through intrinsics, so no assembler; no threads, as ffpsd has none.
     set(ffpsd_webp_args
         ${ffpsd_external_args}
         -DCMAKE_INSTALL_PREFIX=${ffpsd_webp_dir}
+        -DFFPSD_PREFIX_HEADER=${ffpsd_webp_prefix}
+        -DFFPSD_PREFIX_INCLUDE=${PROJECT_SOURCE_DIR}/cmake/prefix/libwebp
         -DCMAKE_MSVC_RUNTIME_LIBRARY=${ffpsd_webp_crt}
         -DBUILD_SHARED_LIBS=OFF
         -DWEBP_USE_THREAD=OFF
@@ -146,12 +180,16 @@ if(FFPSD_WITH_WEBP)
 
     ExternalProject_Add(libwebp
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libwebp"
+        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/webp"
+        BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/webp/build"
         CMAKE_ARGS ${ffpsd_webp_args}
         BUILD_BYPRODUCTS "${ffpsd_webp_dir}/lib/${ffpsd_webp_file}" "${ffpsd_webp_dir}/lib/${ffpsd_sharpyuv_file}"
         LOG_CONFIGURE ON
         LOG_BUILD ON
         LOG_INSTALL ON
         LOG_OUTPUT_ON_FAILURE ON)
+    ExternalProject_Add_StepDependencies(libwebp build "${ffpsd_webp_prefix}"
+        "${PROJECT_SOURCE_DIR}/cmake/prefix/libwebp/src/utils/bit_reader_utils.h")
 
     # libwebp converts colors with libsharpyuv, so the one links the other.
     file(MAKE_DIRECTORY "${ffpsd_webp_dir}/include")
@@ -165,10 +203,25 @@ if(FFPSD_WITH_WEBP)
         INTERFACE_LINK_LIBRARIES ffpsd_sharpyuv)
     add_dependencies(ffpsd_webp libwebp)
 
+    foreach(ffpsd_file IN ITEMS ${ffpsd_webp_file} ${ffpsd_sharpyuv_file})
+        ffpsd_symbols_command(ffpsd_command update "-DHEADER=${ffpsd_webp_prefix}" "-DARCHIVE=${ffpsd_webp_dir}/lib/${ffpsd_file}")
+        list(APPEND ffpsd_update_commands COMMAND ${ffpsd_command})
+    endforeach()
+
     install(FILES libwebp/COPYING
         DESTINATION "${CMAKE_INSTALL_DATADIR}/ffpsd/licenses" RENAME libwebp.txt)
     install(FILES libwebp/PATENTS
         DESTINATION "${CMAKE_INSTALL_DATADIR}/ffpsd/licenses" RENAME libwebp-patents.txt)
+endif()
+
+# Adds the symbols still without the prefix to the headers in cmake/prefix/; build everything again afterwards.
+if(ffpsd_update_commands)
+    add_custom_target(update_vendor_prefixes ${ffpsd_update_commands} VERBATIM)
+    foreach(ffpsd_library IN ITEMS zlib-ng png_static libjpeg-turbo libwebp)
+        if(TARGET ${ffpsd_library})
+            add_dependencies(update_vendor_prefixes ${ffpsd_library})
+        endif()
+    endforeach()
 endif()
 
 if(FFPSD_WITH_IMGUI)

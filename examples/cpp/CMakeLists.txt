@@ -7,7 +7,6 @@ if(NOT TARGET ffpsd::ffpsd)
 endif()
 
 add_executable(ffpsd_example_cpp main.cpp)
-target_compile_features(ffpsd_example_cpp PRIVATE cxx_std_17)
 target_link_libraries(ffpsd_example_cpp PRIVATE ffpsd::ffpsd)
 
 # Windows looks for a DLL next to the program first.

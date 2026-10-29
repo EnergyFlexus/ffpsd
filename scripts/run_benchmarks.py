@@ -107,7 +107,7 @@ def build_baseline(ref, cmake, env):
     directory = baseline_sources(ref)
     binary = directory / "build"
     build.run([cmake, "-S", directory / "src", "-B", binary, "-G", "Ninja",
-               "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_SHARED_LIBS=OFF", "-DFFPSD_MSVC_STATIC_RUNTIME=ON",
+               "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_SHARED_LIBS=OFF", "-DFFPSD_MSVC_STATIC_RUNTIME=OFF",
                "-DFFPSD_BUILD_APPS=OFF", "-DFFPSD_BUILD_TESTS=OFF", "-DFFPSD_BUILD_EXAMPLES=OFF",
                "-DFFPSD_BUILD_BENCHMARKS=ON", f"-DFFPSD_BENCHMARK_DATA_DIR={(ROOT / 'tests' / 'data').as_posix()}"], env)
     build.run([cmake, "--build", binary, "--target", "ffpsd_benchmarks"], env)

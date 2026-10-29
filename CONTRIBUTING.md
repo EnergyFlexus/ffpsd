@@ -14,6 +14,7 @@ reading it line by line and being able to explain every line of it.
 * `build.py`, anything under `scripts/`
 * CI configuration, `.pre-commit-config.yaml`, `.clang-format`
 * `vendor/CMakeLists.txt`
+* language bindings: everything under `bindings/` and the root `Cargo.toml`
 * documentation, including this file
 
 **Forbidden** - all C++ under `ffpsd/` and `apps/`: every line of `.hpp`,
@@ -34,10 +35,12 @@ ffpsd/src/detail/      everything not in the public API
 apps/                  the apps, a folder each: img2ffpsd, with cli/, ui/ and the common/ they share
 docs/                  PSD.md, the format reference
 vendor/                libpng, zlib-ng, libjpeg-turbo, libwebp, imgui, SDL, googletest, benchmark: submodules pinned to tags
+cmake/                 the ffpsd_ prefix for their symbols, and their objects merged into a static ffpsd
 tests/cases/           GoogleTest, built with FFPSD_BUILD_TESTS
 tests/data/            the files they read; tests/scripts/ writes generated/
 benchmarks/            Google Benchmark, a file per public header, built with FFPSD_BUILD_BENCHMARKS
 examples/              programs that use the installed package
+bindings/rust/         the crates ffpsd and ffpsd-sys; ffpsd-sys's manifest is Cargo.toml at the root
 scripts/   build.py    tooling
 ```
 
@@ -272,13 +275,35 @@ so review and `git add` again. Without committing:
 `vendor/CMakeLists.txt` is ours and builds everything static with our CRT.
 libjpeg-turbo refuses `add_subdirectory`, and libwebp installs its own headers and
 package whatever it is told, so each is an `ExternalProject` installed into the
-build tree and imported as `ffpsd_jpeg`, or `ffpsd_webp` with `ffpsd_sharpyuv`. To update one:
+build tree and imported as `ffpsd_jpeg`, or `ffpsd_webp` with `ffpsd_sharpyuv`.
+
+A static ffpsd takes their objects into itself after it is archived (`cmake/merge_archives.cmake`),
+so it has to rename every symbol of theirs, or a program with its own libpng or zlib would get two
+definitions of each. zlib-ng renames its API itself (`ZLIB_SYMBOL_PREFIX`); the headers in
+`cmake/prefix/` rename the rest with `#define name ffpsd_name` and are forced into each library
+and into the one file of ours that calls it. The test `vendored_symbols` fails on any symbol of the
+static library without the prefix. A few names the libraries' own macros undo are renamed by hand
+in those headers; `cmake/prefix/libwebp/` shadows one libwebp header for the same reason.
+
+To update a library:
 
 ```sh
 git -C vendor/libpng fetch --tags
 git -C vendor/libpng checkout v1.6.59
 git add vendor/libpng
+python scripts/update_prefixes.py   # adds the new symbols to cmake/prefix/, then runs vendored_symbols
 ```
+
+The script runs the `update_vendor_prefixes` target until a round adds nothing. The renames are
+the union of what each system defines, so a symbol only one system has (NEON code on arm64, say)
+shows up when the test fails there: run the script on that system.
+
+## Rust bindings
+
+`ffpsd-sys` declares the C API from `bindings/rust/ffpsd-sys/src/bindings.rs`, which
+`scripts/generate_rust_bindings.py` writes with bindgen; CI fails when it differs from `c_api.h`.
+After changing the header, run the script, as its top says, in Ubuntu 24.04. `ffpsd` wraps the
+declarations; a new C function needs a method there too.
 
 ## Before you commit
 
@@ -296,7 +321,7 @@ Tests, `tests/README.md` has the folders:
 * `tests/cases/<folder>/<part>_test.cpp` with the suite `<Folder><Part>Test`; the name reads
   as a sentence: `DocumentStackTest.MoveLayerKeepsEveryPointer`.
 * New `.psd` and `.psb` files go to Git LFS by themselves.
-* A `detail` function links only in the static build: a DLL does not export it.
+* A `detail` function links only in the static build: the shared library does not export it.
 
 ## Public API changes
 
