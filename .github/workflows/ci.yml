@@ -85,8 +85,10 @@ jobs:
         target:
           - { os: windows-latest, name: x86_64-pc-windows-msvc, flags: --msvc 14.29 }
           - { os: ubuntu-22.04, name: x86_64-unknown-linux-gnu } # glibc 2.35, so older distributions run it too
-          - { os: macos-latest, name: aarch64-apple-darwin }
+          - { os: macos-latest, name: aarch64-apple-darwin, macos: "11.0" } # else the macOS of the runner is the oldest
     runs-on: ${{ matrix.target.os }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.target.macos }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -199,6 +201,6 @@ jobs:
           - \`img2ffpsd-*\`: the app, img2ffpsd-cli for the command line and img2ffpsd-ui with a window.
           - \`SHA256SUMS\`: their SHA-256, checked with \`sha256sum -c SHA256SUMS --ignore-missing\`.
 
-          macOS builds are for Apple Silicon and unsigned: run \`xattr -d com.apple.quarantine\` on them once.
+          macOS builds are for Apple Silicon with macOS 11 or later, and unsigned: run \`xattr -d com.apple.quarantine\` on them once.
 
           Linux builds need glibc 2.35 or later."
