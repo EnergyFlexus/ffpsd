@@ -84,7 +84,7 @@ jobs:
         # built with the toolset of Visual Studio 2019, as a static library links only with one as new or newer.
         target:
           - { os: windows-latest, name: x86_64-pc-windows-msvc, flags: --msvc 14.29 }
-          - { os: ubuntu-22.04, name: x86_64-unknown-linux-gnu } # glibc 2.35, so older distributions run it too
+          - { os: ubuntu-22.04, name: x86_64-unknown-linux-gnu } # the oldest runner, so older distributions run it too
           - { os: macos-latest, name: aarch64-apple-darwin, macos: "11.0" } # without it, the build runs only on the runner's macOS and newer
     runs-on: ${{ matrix.target.os }}
     env:
@@ -203,4 +203,4 @@ jobs:
 
           macOS builds are for Apple Silicon with macOS 11 or later, and unsigned: run \`xattr -d com.apple.quarantine\` on them once.
 
-          Linux builds need glibc 2.35 or later."
+          Linux builds need glibc 2.34 and libstdc++ of GCC 11 or later, as in Ubuntu 22.04 and Debian 12."
