@@ -5,25 +5,30 @@ and PSB files.
 
 ```rust
 use ffpsd::formats::{load_picture, save_png_to_memory};
-use ffpsd::{
-    fourcc, Anchor, ColorMode, Compression, Document, FlipDirection, ImageInfo, ImageView, Levels, LevelsChannel, PngCompression,
-    ResampleFilter,
-};
+use ffpsd::{fourcc, Levels, LevelsChannel};
+use ffpsd::{Anchor, Document, Result};
+use ffpsd::{ColorMode, ImageInfo, ImageView};
+use ffpsd::{Compression, PngCompression};
+use ffpsd::{FlipDirection, ResampleFilter};
 
-fn run(input: &str, picture_path: &str, output: &str) -> ffpsd::Result<()> {
+fn run(input: &str, picture: &str, output: &str) -> Result<()> {
     let mut doc = Document::open(input)?;
     let (width, height) = (doc.width(), doc.height());
-    println!("{width} x {height}, {} bit, {} layers", doc.depth(), doc.layer_count());
+    let (depth, count) = (doc.depth(), doc.layer_count());
+    println!("{width} x {height}, {depth} bit, {count} layers");
 
     // The composite Photoshop saved with the file, as PNG.
-    let png = save_png_to_memory(doc.merged_image()?.view(), PngCompression::Balanced)?;
+    let composite = doc.merged_image()?;
+    let compression = PngCompression::Balanced;
+    let png = save_png_to_memory(composite.view(), compression)?;
     println!("composite: {} bytes of PNG", png.len());
 
-    // Layers go from the bottom up, so the top one is the last; with none, layer() fails.
-    let top_index = doc.layer_count().wrapping_sub(1);
+    // The top layer is the last; with no layers, layer() fails.
+    let top_index = count.wrapping_sub(1);
     let top = doc.layer(top_index)?;
-    let bounds = top.bounds();
-    println!("top layer: {}, {} x {}", top.name(), bounds.width(), bounds.height());
+    let (name, rect) = (top.name(), top.bounds());
+    let (w, h) = (rect.width(), rect.height());
+    println!("top layer: {name}, {w} x {h}");
 
     // A copy of it on top, half transparent, in Multiply mode.
     let mut copy = doc.duplicate_layer(top_index)?;
@@ -31,13 +36,14 @@ fn run(input: &str, picture_path: &str, output: &str) -> ffpsd::Result<()> {
     copy.set_opacity(128)?;
     copy.set_blend_key(fourcc(b"mul "))?;
 
-    // A PNG, JPEG or WebP as a layer in the document's mode and depth, 50 px from the corner, half the canvas in size, mirrored.
-    let image = load_picture(picture_path, doc.color_mode(), doc.depth())?;
-    let mut picture = doc.add_layer("Picture", Some(image.view()), 50, 50)?;
-    picture.resize(width / 2, height / 2, ResampleFilter::Bicubic)?;
-    picture.flip(FlipDirection::Horizontal)?;
+    // A PNG, JPEG or WebP at (50, 50), half the canvas, mirrored.
+    let image = load_picture(picture, doc.color_mode(), depth)?;
+    let view = Some(image.view());
+    let mut layer = doc.add_layer("Picture", view, 50, 50)?;
+    layer.resize(width / 2, height / 2, ResampleFilter::Bicubic)?;
+    layer.flip(FlipDirection::Horizontal)?;
 
-    // A mask that hides a 100 x 100 square in the picture's corner and shows the rest.
+    // A mask that hides a 100 x 100 square in its corner.
     let hidden = vec![0u8; 100 * 100];
     let info = ImageInfo {
         width: 100,
@@ -46,17 +52,19 @@ fn run(input: &str, picture_path: &str, output: &str) -> ffpsd::Result<()> {
         depth: 8,
         color_mode: ColorMode::Grayscale,
     };
-    picture.set_mask(ImageView::new(info, &hidden), 50, 50, 255)?;
+    layer.set_mask(ImageView::new(info, &hidden), 50, 50, 255)?;
 
     // A Levels layer over everything that brightens the midtones.
     let brighter = LevelsChannel {
         gamma: 1.5,
         ..LevelsChannel::IDENTITY
     };
-    doc.add_levels_layer("Levels", Some(&Levels { channels: vec![brighter] }))?;
+    let levels = Levels { channels: vec![brighter] };
+    doc.add_levels_layer("Levels", Some(&levels))?;
 
-    // 100 px more canvas on every side, then save, each channel RLE or raw, whichever is smaller.
+    // 100 px more canvas on every side.
     doc.resize_canvas(width + 200, height + 200, Anchor::Center)?;
+    // Each channel RLE or raw, whichever is smaller.
     doc.save(output, Compression::RleOrRaw)?;
     println!("saved {} layers to {output}", doc.layer_count());
     Ok(())

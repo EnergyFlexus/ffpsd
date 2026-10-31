@@ -54,19 +54,19 @@ static int run(const char* input, const char* picture_path, const char* output)
         goto done;
     printf("top layer: %s, %d x %d\n", name, bounds.right - bounds.left, bounds.bottom - bounds.top);
 
-    /* A copy of it on top, half transparent, in Multiply mode: 'mul '. */
+    /* A copy of it on top, half transparent, in Multiply mode. */
     if (failed(ffpsd_document_add_layer_copy(doc, top, &copy)) || failed(ffpsd_layer_set_name(copy, "Copy")) ||
-        failed(ffpsd_layer_set_opacity(copy, 128)) || failed(ffpsd_layer_set_blend_key(copy, 0x6D756C20u)))
+        failed(ffpsd_layer_set_opacity(copy, 128)) || failed(ffpsd_layer_set_blend_key(copy, 0x6D756C20u))) /* 'mul ' */
         goto done;
 
-    /* A PNG, JPEG or WebP as a layer in the document's mode and depth, 50 px from the corner, half the canvas in size, mirrored. */
+    /* A PNG, JPEG or WebP at (50, 50), half the canvas, mirrored. */
     if (failed(ffpsd_picture_load(picture_path, ffpsd_document_get_color_mode(doc), ffpsd_document_get_depth(doc), &image)) ||
         failed(ffpsd_image_get_view(image, &view)) || failed(ffpsd_document_add_layer(doc, "Picture", &view, 50, 50, &picture)) ||
         failed(ffpsd_layer_resize(picture, width / 2, height / 2, FFPSD_RESAMPLE_FILTER_BICUBIC)) ||
         failed(ffpsd_layer_flip(picture, FFPSD_FLIP_HORIZONTAL)))
         goto done;
 
-    /* A mask that hides a 100 x 100 square in the picture's corner and shows the rest. */
+    /* A mask that hides a 100 x 100 square in its corner. */
     if (failed(ffpsd_layer_set_mask(picture, &mask, 50, 50, 255)))
         goto done;
 
@@ -76,7 +76,7 @@ static int run(const char* input, const char* picture_path, const char* output)
         failed(ffpsd_document_add_levels_layer(doc, "Levels", levels, &adjustment)))
         goto done;
 
-    /* 100 px more canvas on every side, then save, each channel RLE or raw, whichever is smaller. */
+    /* 100 px more canvas on every side, then save each channel RLE or raw, whichever is smaller. */
     if (failed(ffpsd_document_resize_canvas(doc, width + 200, height + 200, FFPSD_ANCHOR_CENTER)) ||
         failed(ffpsd_document_save(doc, output, FFPSD_COMPRESSION_RLE_OR_RAW)))
         goto done;

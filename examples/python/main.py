@@ -12,7 +12,7 @@ def run(input_path, picture_path, output_path):
     width, height = doc.width, doc.height
     print(f"{width} x {height}, {doc.depth} bit, {doc.layer_count} layers")
 
-    # The composite Photoshop saved with the file, as PNG; None when the file has none.
+    # The composite Photoshop saved with the file, as PNG; None when there is none.
     composite = doc.merged_image()
     if composite is not None:
         print(f"composite: {len(ffpsd.encode_png(composite))} bytes of PNG")
@@ -27,20 +27,22 @@ def run(input_path, picture_path, output_path):
     copy.opacity = 128
     copy.blend_key = ffpsd.fourcc("mul ")
 
-    # A PNG, JPEG or WebP as a layer in the document's mode and depth, 50 px from the corner, half the canvas in size, mirrored.
+    # A PNG, JPEG or WebP at (50, 50), half the canvas, mirrored.
     image = ffpsd.load_picture(picture_path, doc.color_mode, doc.depth)
     picture = doc.add_layer("Picture", image, 50, 50)
     picture.resize(width // 2, height // 2)
     picture.flip(ffpsd.FlipDirection.HORIZONTAL)
 
-    # A mask that hides a 100 x 100 square in the picture's corner and shows the rest.
+    # A mask that hides a 100 x 100 square in its corner.
     picture.set_mask(np.zeros((100, 100), np.uint8), 50, 50, 255)
 
     # A Levels layer over everything that brightens the midtones.
-    doc.add_levels_layer("Levels", ffpsd.Levels(channels=[ffpsd.LevelsChannel(gamma=1.5)]))
+    levels = ffpsd.Levels(channels=[ffpsd.LevelsChannel(gamma=1.5)])
+    doc.add_levels_layer("Levels", levels)
 
-    # 100 px more canvas on every side, then save, each channel RLE or raw, whichever is smaller.
+    # 100 px more canvas on every side.
     doc.resize_canvas(width + 200, height + 200, ffpsd.Anchor.CENTER)
+    # Each channel RLE or raw, whichever is smaller.
     doc.save(output_path, ffpsd.Compression.RLE_OR_RAW)
     print(f"saved {doc.layer_count} layers to {output_path}")
 

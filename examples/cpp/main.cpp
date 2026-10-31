@@ -33,13 +33,13 @@ void Run(const std::string& input, const std::string& picture_path, const std::s
     copy->SetOpacity(128);
     copy->SetBlendKey(0x6D756C20); // 'mul '
 
-    // A PNG, JPEG or WebP as a layer in the document's mode and depth, 50 px from the corner, half the canvas in size, mirrored.
+    // A PNG, JPEG or WebP at (50, 50), half the canvas, mirrored.
     const ffpsd::Image image = ffpsd::LoadPicture(picture_path, doc.GetColorMode(), doc.GetDepth());
     ffpsd::Layer* picture = doc.AddLayer("Picture", image, 50, 50);
     picture->Resize(width / 2, height / 2);
     picture->Flip(ffpsd::FlipDirection::kHorizontal);
 
-    // A mask that hides a 100 x 100 square in the picture's corner and shows the rest.
+    // A mask that hides a 100 x 100 square in its corner.
     const std::vector<std::uint8_t> hidden(100 * 100, 0);
     picture->SetMask(ffpsd::ImageView(100, 100, 1, 8, ffpsd::ColorMode::kGrayscale, hidden.data(), hidden.size()), 50, 50, 255);
 
@@ -49,8 +49,9 @@ void Run(const std::string& input, const std::string& picture_path, const std::s
     levels.channels[0].gamma = 1.5;
     doc.AddAdjustmentLayer("Levels", levels);
 
-    // 100 px more canvas on every side, then save, each channel RLE or raw, whichever is smaller.
+    // 100 px more canvas on every side.
     doc.ResizeCanvas(width + 200, height + 200, ffpsd::Anchor::kCenter);
+    // Each channel RLE or raw, whichever is smaller.
     doc.Save(output, ffpsd::Compression::kRleOrRaw);
     std::cout << "saved " << doc.GetLayerCount() << " layers to " << output << "\n";
 }
