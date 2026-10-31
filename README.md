@@ -6,6 +6,7 @@ Read and write Photoshop PSD and PSB files, with two APIs from one build:
 * `ffpsd/c_api.h` - C, for other languages and toolchains
 
 Until 1.0.0 the APIs are not stable: a release may break source and binary compatibility.
+What comes next: [ROADMAP.md](ROADMAP.md).
 
 Bindings, built from this repository:
 
