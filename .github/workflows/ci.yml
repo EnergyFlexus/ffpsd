@@ -91,7 +91,7 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install .[pil] pytest
       - run: python -m pytest bindings/python/tests
-      - run: python examples/python/main.py tests/data/photoshop/rgb_levels.psd out.psd
+      - run: python examples/python/main.py tests/data/photoshop/rgb_two_layers.psd tests/data/generated/rgb_quadrants.jpg out.psd
 
   # Three archives per system: the shared library, the static one, and the apps alone.
   package:

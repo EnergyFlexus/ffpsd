@@ -1,4 +1,4 @@
-"""Opens a PSD, prints what it holds, copies the top layer, adds a gradient and saves the result."""
+"""Opens a PSD, adds a copy of the top layer, a picture with a mask and a Levels layer, grows the canvas and saves the result."""
 
 import io
 import sys
@@ -7,33 +7,40 @@ import ffpsd
 import numpy as np
 
 
-def run(input_path, output_path):
+def run(input_path, picture_path, output_path):
     doc = ffpsd.Document.open(input_path)
+    width, height = doc.width, doc.height
+    print(f"{width} x {height}, {doc.depth} bit, {doc.layer_count} layers")
 
-    # Layers go from the bottom up.
-    print(f"{doc.width} x {doc.height}, {doc.depth} bit, {doc.layer_count} layers")
-    for index, layer in enumerate(doc.layers):
-        bounds = layer.bounds
-        pixels = layer.pixels()
+    # The composite Photoshop saved with the file, as PNG; None when the file has none.
+    composite = doc.merged_image()
+    if composite is not None:
+        print(f"composite: {len(ffpsd.encode_png(composite))} bytes of PNG")
 
-        # Pixels are planar, (planes, height, width), so the first plane is pixels[0].
-        mean = f", mean of the first plane {int(pixels[0].mean())}" if pixels.dtype == np.uint8 and pixels.size else ""
-        print(f"  {index}: {layer.name}, {bounds.width} x {bounds.height}, {len(pixels)} planes{mean}")
+    # Layers go from the bottom up, so the top one is -1.
+    top = doc.layer(-1)
+    print(f"top layer: {top.name}, {top.bounds.width} x {top.bounds.height}")
 
-    # Put a copy of the top layer on top; a group marker alone cannot be copied.
-    doc.duplicate_layer(-1)
+    # A copy of it on top, half transparent, in Multiply mode.
+    copy = doc.duplicate_layer(-1)
+    copy.name = "Copy"
+    copy.opacity = 128
+    copy.blend_key = ffpsd.fourcc("mul ")
 
-    # Add a gradient over the canvas: red grows to the right, green down, blue stays at half.
-    gray = doc.color_mode == ffpsd.ColorMode.GRAYSCALE
-    columns = np.arange(doc.width) * 255 // doc.width
-    rows = np.arange(doc.height) * 255 // doc.height
-    red = np.broadcast_to(columns, (doc.height, doc.width))
-    green = np.broadcast_to(rows[:, None], (doc.height, doc.width))
-    blue = np.full((doc.height, doc.width), 128)
-    planes = [red] if gray else [red, green, blue]
-    doc.add_layer("Gradient", np.array(planes, dtype=np.uint8))
+    # A PNG, JPEG or WebP as a layer in the document's mode and depth, 50 px from the corner, half the canvas in size, mirrored.
+    image = ffpsd.load_picture(picture_path, doc.color_mode, doc.depth)
+    picture = doc.add_layer("Picture", image, 50, 50)
+    picture.resize(width // 2, height // 2)
+    picture.flip(ffpsd.FlipDirection.HORIZONTAL)
 
-    # Save, each channel RLE or raw, whichever is smaller.
+    # A mask that hides a 100 x 100 square in the picture's corner and shows the rest.
+    picture.set_mask(np.zeros((100, 100), np.uint8), 50, 50, 255)
+
+    # A Levels layer over everything that brightens the midtones.
+    doc.add_levels_layer("Levels", ffpsd.Levels(channels=[ffpsd.LevelsChannel(gamma=1.5)]))
+
+    # 100 px more canvas on every side, then save, each channel RLE or raw, whichever is smaller.
+    doc.resize_canvas(width + 200, height + 200, ffpsd.Anchor.CENTER)
     doc.save(output_path, ffpsd.Compression.RLE_OR_RAW)
     print(f"saved {doc.layer_count} layers to {output_path}")
 
@@ -42,11 +49,11 @@ def main():
     # Layer names are UTF-8; on Windows a redirected stdout would otherwise take the system code page, cp1252 say.
     if isinstance(sys.stdout, io.TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8")
-    if len(sys.argv) != 3:
-        print("usage: python examples/python/main.py <in.psd> <out.psd>", file=sys.stderr)
+    if len(sys.argv) != 4:
+        print("usage: python examples/python/main.py <in.psd> <picture> <out.psd>", file=sys.stderr)
         return 2
     try:
-        run(sys.argv[1], sys.argv[2])
+        run(sys.argv[1], sys.argv[2], sys.argv[3])
     except ffpsd.Error as error:
         print(error, file=sys.stderr)
         return 1

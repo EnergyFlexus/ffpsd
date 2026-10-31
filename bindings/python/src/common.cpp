@@ -6,6 +6,18 @@
 
 namespace ffpsd_python
 {
+    ffpsd::Document& DocumentObject::Get()
+    {
+        return const_cast<ffpsd::Document&>(std::as_const(*this).Get());
+    }
+
+    const ffpsd::Document& DocumentObject::Get() const
+    {
+        if (busy)
+            throw std::logic_error("ffpsd: the document is used by another thread");
+        return document;
+    }
+
     std::uint64_t DocumentObject::Serial(const ffpsd::Layer* layer)
     {
         const auto [at, added] = serials.try_emplace(layer, next_serial);
@@ -25,7 +37,7 @@ namespace ffpsd_python
 
     std::size_t DocumentObject::Index(std::int64_t index) const
     {
-        const auto count = static_cast<std::int64_t>(document.GetLayerCount());
+        const auto count = static_cast<std::int64_t>(Get().GetLayerCount());
         const std::int64_t at = index < 0 ? index + count : index;
         if (at < 0 || at >= count)
             throw std::out_of_range("ffpsd: layer index " + std::to_string(index) + " of " + std::to_string(count));
@@ -34,6 +46,7 @@ namespace ffpsd_python
 
     ffpsd::Layer& LayerObject::Get() const
     {
+        document->Get();
         const auto at = document->serials.find(layer);
         if (at == document->serials.end() || at->second != serial)
             throw std::logic_error("ffpsd: the layer was removed from its document");

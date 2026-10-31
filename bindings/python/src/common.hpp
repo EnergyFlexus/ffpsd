@@ -54,10 +54,17 @@ namespace ffpsd_python
         std::unordered_map<const ffpsd::Layer*, std::uint64_t> serials;
         std::uint64_t next_serial = 1;
 
+        // Set while a call works on the document without the GIL; read and written only with the GIL held.
+        mutable bool busy = false;
+
         explicit DocumentObject(ffpsd::Document&& value)
             : document(std::move(value))
         {
         }
+
+        // Throws std::logic_error while another thread works on the document, instead of racing it.
+        ffpsd::Document& Get();
+        const ffpsd::Document& Get() const;
 
         std::uint64_t Serial(const ffpsd::Layer* layer);
 
@@ -80,6 +87,24 @@ namespace ffpsd_python
     };
 
     LayerObject MakeLayer(DocumentObject& document, ffpsd::Layer* layer);
+
+    // Runs work without the GIL, with the document busy meanwhile; work reaches the document directly, not through Get().
+    template <class Work> auto WithoutGil(const DocumentObject& document, Work&& work)
+    {
+        document.Get();
+        document.busy = true;
+        struct Done
+        {
+            const DocumentObject& document;
+            ~Done()
+            {
+                document.busy = false;
+            }
+        } done{document};
+        // Destroyed before done: the GIL is back when busy clears.
+        nb::gil_scoped_release release;
+        return work();
+    }
 
     // Paths are UTF-8 for ffpsd on every system.
     std::string ToUtf8(const std::filesystem::path& path);

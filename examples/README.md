@@ -1,19 +1,19 @@
 # Examples
 
-One program in four languages: it opens a PSD, prints its size and layers,
-puts a copy of the top layer on top, adds a layer with a gradient over the
-canvas and saves the result. The gradient is 8 bit, gray or RGB, so the
-document has to be too.
+One program in four languages, all of it in one function, `run`: it opens a PSD, prints its size, the size
+of its composite as PNG and its top layer, puts a copy of that layer on top in Multiply mode, adds a PNG,
+JPEG or WebP as a layer, resized, mirrored and with a mask, adds a Levels layer, grows the canvas and saves
+the result. The four write the same file.
 
 ```sh
-ffpsd_example_cpp tests/data/photoshop/rgb_levels.psd out.psd
+ffpsd_example_cpp tests/data/photoshop/rgb_two_layers.psd tests/data/generated/rgb_quadrants.jpg out.psd
 ```
 
 ```
 1890 x 1417, 8 bit, 2 layers
-  0: <name>, 1890 x 1417
-  1: <name>, 0 x 0
-saved 4 layers to out.psd
+composite: 59415 bytes of PNG
+top layer: <name>, 1890 x 1417
+saved 5 layers to out.psd
 ```
 
 | Folder | API | Build |
@@ -40,7 +40,7 @@ cmake --build build/example-cpp
 A member of the Cargo workspace at the root; `ffpsd-sys` builds ffpsd for it:
 
 ```sh
-cargo run -p ffpsd-example -- tests/data/photoshop/rgb_levels.psd out.psd
+cargo run -p ffpsd-example -- tests/data/photoshop/rgb_two_layers.psd tests/data/generated/rgb_quadrants.jpg out.psd
 ```
 
 ## Python
@@ -49,5 +49,5 @@ cargo run -p ffpsd-example -- tests/data/photoshop/rgb_levels.psd out.psd
 
 ```sh
 pip install .
-python examples/python/main.py tests/data/photoshop/rgb_levels.psd out.psd
+python examples/python/main.py tests/data/photoshop/rgb_two_layers.psd tests/data/generated/rgb_quadrants.jpg out.psd
 ```

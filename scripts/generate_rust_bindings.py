@@ -16,6 +16,7 @@ import difflib
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -48,7 +49,9 @@ def generate():
         f"-I{HEADER.parent.parent}",
         "-DFFPSD_STATIC",
     ]
-    result = subprocess.run(command, capture_output=True, text=True)
+    # Outside the checkout, so rustfmt keeps its defaults instead of the repository's rustfmt.toml.
+    with tempfile.TemporaryDirectory() as outside:
+        result = subprocess.run(command, capture_output=True, text=True, cwd=outside)
     if result.returncode != 0:
         sys.exit("error: bindgen failed\n" + result.stderr)
     text = result.stdout

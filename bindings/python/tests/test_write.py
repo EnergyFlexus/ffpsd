@@ -229,3 +229,23 @@ def test_documents_open_in_threads():
     for thread in threads:
         thread.join()
     assert results == [2] * 4
+
+
+def test_document_another_thread_works_on_raises():
+    doc = ffpsd.Document(2000, 2000)
+    layer = doc.add_layer("a", flat(2000, 2000, [1, 2, 3, 255]))
+    worker = threading.Thread(target=lambda: doc.resize(4000, 4000, ffpsd.ResampleFilter.BICUBIC))
+    worker.start()
+
+    # The resize runs without the GIL, so this thread gets to touch the document meanwhile.
+    raised = False
+    while worker.is_alive():
+        try:
+            layer.name
+            doc.width
+        except ffpsd.InvalidOperationError as error:
+            assert "another thread" in str(error)
+            raised = True
+    worker.join()
+    assert raised
+    assert (doc.width, layer.bounds.width, layer.name) == (4000, 4000, "a")

@@ -40,7 +40,7 @@ namespace ffpsd_python
 
         nb::class_<LayerObject>(m, "Layer")
             .def_prop_ro("document", [](const LayerObject& self) { return self.owner; })
-            .def_prop_ro("index", [](const LayerObject& self) { return *self.document->document.FindLayerIndex(self.Get()); })
+            .def_prop_ro("index", [](const LayerObject& self) { return *self.document->Get().FindLayerIndex(self.Get()); })
             .def_prop_ro("kind", [](const LayerObject& self) { return self.Get().GetKind(); })
             .def_prop_ro("bounds", [](const LayerObject& self) { return self.Get().GetBounds(); })
             .def_prop_ro("is_background", [](const LayerObject& self) { return self.Get().IsBackground(); })
@@ -72,12 +72,19 @@ namespace ffpsd_python
                 "levels", [](const LayerObject& self) { return self.Get().GetAdjustment<ffpsd::LevelsInfo>(); },
                 [](LayerObject& self, const ffpsd::LevelsInfo& levels) { self.Get().SetAdjustment(levels); })
 
-            .def("pixels", [](const LayerObject& self) { return ToArray(self.Get().GetPixels()); })
+            .def(
+                "pixels",
+                [](const LayerObject& self) {
+                    const ffpsd::Layer& layer = self.Get();
+                    return ToArray(WithoutGil(*self.document, [&] { return layer.GetPixels(); }));
+                })
             .def("pixels_info", [](const LayerObject& self) { return self.Get().GetPixelsInfo(); })
             .def(
                 "set_pixels",
                 [](LayerObject& self, const PixelArray& pixels) {
-                    self.Get().SetPixels(ToView(pixels, self.document->document.GetColorMode()));
+                    ffpsd::Layer& layer = self.Get();
+                    const ffpsd::ImageView view = ToView(pixels, self.document->Get().GetColorMode());
+                    WithoutGil(*self.document, [&] { layer.SetPixels(view); });
                 },
                 "pixels"_a)
             .def(
@@ -86,18 +93,30 @@ namespace ffpsd_python
             .def(
                 "resize",
                 [](LayerObject& self, std::uint32_t width, std::uint32_t height, ffpsd::ResampleFilter filter) {
-                    self.Get().Resize(width, height, filter);
+                    ffpsd::Layer& layer = self.Get();
+                    WithoutGil(*self.document, [&] { layer.Resize(width, height, filter); });
                 },
                 "width"_a, "height"_a, "filter"_a = ffpsd::ResampleFilter::kBicubic)
             .def(
-                "flip", [](LayerObject& self, ffpsd::FlipDirection direction) { self.Get().Flip(direction); }, "direction"_a)
+                "flip",
+                [](LayerObject& self, ffpsd::FlipDirection direction) {
+                    ffpsd::Layer& layer = self.Get();
+                    WithoutGil(*self.document, [&] { layer.Flip(direction); });
+                },
+                "direction"_a)
             .def(
-                "rotate", [](LayerObject& self, ffpsd::Rotation rotation) { self.Get().Rotate(rotation); }, "rotation"_a)
+                "rotate",
+                [](LayerObject& self, ffpsd::Rotation rotation) {
+                    ffpsd::Layer& layer = self.Get();
+                    WithoutGil(*self.document, [&] { layer.Rotate(rotation); });
+                },
+                "rotation"_a)
 
             .def(
                 "mask",
                 [](const LayerObject& self) -> std::optional<MaskObject> {
-                    std::optional<ffpsd::LayerMask> mask = self.Get().GetMask();
+                    const ffpsd::Layer& layer = self.Get();
+                    std::optional<ffpsd::LayerMask> mask = WithoutGil(*self.document, [&] { return layer.GetMask(); });
                     if (!mask)
                         return std::nullopt;
                     return MaskObject{ToArray(std::move(mask->image)), mask->bounds, mask->default_color};
@@ -105,7 +124,9 @@ namespace ffpsd_python
             .def(
                 "set_mask",
                 [](LayerObject& self, const PixelArray& pixels, std::int32_t top, std::int32_t left, std::uint8_t default_color) {
-                    self.Get().SetMask(ToView(pixels, ffpsd::ColorMode::kGrayscale), top, left, default_color);
+                    ffpsd::Layer& layer = self.Get();
+                    const ffpsd::ImageView view = ToView(pixels, ffpsd::ColorMode::kGrayscale);
+                    WithoutGil(*self.document, [&] { layer.SetMask(view, top, left, default_color); });
                 },
                 "pixels"_a, "top"_a = 0, "left"_a = 0, "default_color"_a = 255)
             .def("remove_mask", [](LayerObject& self) { return self.Get().RemoveMask(); })
@@ -141,6 +162,8 @@ namespace ffpsd_python
                 nb::is_operator())
             .def("__hash__", [](const LayerObject& self) { return std::hash<const void*>()(self.layer) ^ self.serial; })
             .def("__repr__", [](const LayerObject& self) {
+                if (self.document->busy)
+                    return std::string("<ffpsd.Layer, its document used by another thread>");
                 const auto at = self.document->serials.find(self.layer);
                 if (at == self.document->serials.end() || at->second != self.serial)
                     return std::string("<ffpsd.Layer, removed>");
