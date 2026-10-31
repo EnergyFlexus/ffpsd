@@ -140,6 +140,9 @@ Benchmark's `compare.py`, which needs
   The static one has none, so any linker takes its objects, and it is position-independent.
 * Debug: `/W4 /permissive-` (MSVC) or
   `-Wall -Wextra -Wpedantic -Wshadow -Wconversion`, `-Wold-style-cast` for C++.
+* No AVX or AVX2 by default, so the builds run on any x86-64 processor. With them, writing
+  re-encoded channels is faster: `/arch:AVX2` (MSVC) or `-march=native` in `CMAKE_CXX_FLAGS` and
+  `CMAKE_C_FLAGS`.
 
 ## Options
 
@@ -161,7 +164,7 @@ On top of a preset: `cmake --preset shared-release -DFFPSD_BUILD_APPS=OFF`.
 ## Use from another CMake project
 
 ```cmake
-find_package(ffpsd 0.4 REQUIRED)
+find_package(ffpsd 0.4.7 REQUIRED)
 target_link_libraries(my_app PRIVATE ffpsd::ffpsd)
 ```
 
