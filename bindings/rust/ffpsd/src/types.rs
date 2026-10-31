@@ -247,8 +247,11 @@ impl Image {
     ) -> Result<Self> {
         let mut view = empty_view();
         check(info(&mut view))?;
-        let mut data = vec![0u8; view.size];
-        check(bytes(data.as_mut_ptr(), data.len()))?;
+        // Not zeroed first: ffpsd writes every byte or fails, and on failure the length stays 0.
+        let mut data = Vec::with_capacity(view.size);
+        check(bytes(data.as_mut_ptr(), view.size))?;
+        // SAFETY: the call above wrote all view.size bytes.
+        unsafe { data.set_len(view.size) };
         Ok(Self {
             info: ImageInfo::from_raw(&view)?,
             data,
