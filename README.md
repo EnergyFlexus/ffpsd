@@ -7,9 +7,13 @@ Read and write Photoshop PSD and PSB files, with two APIs from one build:
 
 Until 1.0.0 the APIs are not stable: a release may break source and binary compatibility.
 
+Bindings, built from this repository:
+
+* Rust - [ffpsd](https://crates.io/crates/ffpsd) on crates.io, sources in [bindings/rust/](bindings/rust/ffpsd/README.md)
+* Python - [ffpsd](https://pypi.org/project/ffpsd/) on PyPI, sources in [bindings/python/](bindings/python/README.md)
+
 Code style: [CONTRIBUTING.md](CONTRIBUTING.md). Programs in C++, C, Rust and Python:
-[examples/](examples/README.md). Rust crates: [ffpsd](bindings/rust/ffpsd/README.md) and
-[ffpsd-sys](bindings/rust/ffpsd-sys/README.md). Python package: [ffpsd](bindings/python/README.md).
+[examples/](examples/README.md).
 
 libpng, zlib-ng, libjpeg-turbo, libwebp, Dear ImGui, SDL3, GoogleTest and Google Benchmark are git submodules under
 `vendor/`; the test PSD files are in Git LFS (`git lfs install` before cloning).
