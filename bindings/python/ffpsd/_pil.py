@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from ._errors import InvalidArgumentError
-from ._ffpsd import ColorMode
+from ._ffpsd import ColorMode  # pyright: ignore[reportMissingImports]
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -45,7 +45,7 @@ def from_pil(image: Image, color_mode: ColorMode = ColorMode.RGB, depth: int = 8
         pixels = pixels[..., None]
     planes = pixels.transpose(2, 0, 1)
     if depth == 16:
-        planes = planes.astype(np.uint16) * 257
+        planes = planes.astype(np.uint16) * np.uint16(257)
     return np.ascontiguousarray(planes)
 
 

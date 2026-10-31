@@ -129,12 +129,12 @@ def test_levels_layer_keeps_its_records():
     doc.add_levels_layer("Ничего")
 
     read = round_trip(doc)
-    assert list(read.layer(0).levels.channels)[:2] == list(levels.channels)
+    assert list(found(read.layer(0).levels).channels)[:2] == list(levels.channels)
     assert read.layer(1).adjustment_key == fourcc("levl")
 
     layer = read.layer(1)
     layer.levels = levels
-    assert layer.levels.channels[1] == levels.channels[1]
+    assert found(layer.levels).channels[1] == levels.channels[1]
     with pytest.raises(ffpsd.InvalidArgumentError):
         layer.levels = ffpsd.Levels(channels=[ffpsd.LevelsChannel(gamma=0.0)])
 
@@ -175,7 +175,7 @@ def test_canvas_changes_and_composite_is_kept():
     doc.add_layer("a", flat(4, 2, [1, 2, 3, 255]))
     doc.set_merged_image(flat(4, 2, [1, 2, 3]))
     assert doc.has_real_merged_data
-    assert np.array_equal(round_trip(doc).merged_image(), flat(4, 2, [1, 2, 3]))
+    assert np.array_equal(found(round_trip(doc).merged_image()), flat(4, 2, [1, 2, 3]))
 
     doc.resize_canvas(6, 4, ffpsd.Anchor.CENTER)
     assert (doc.width, doc.height) == (6, 4)
