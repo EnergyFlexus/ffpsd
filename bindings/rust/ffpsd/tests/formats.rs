@@ -65,9 +65,7 @@ fn jpeg_keeps_the_shape_and_drops_alpha() {
 #[test]
 fn bad_input_is_an_error() {
     assert_eq!(
-        load_png_from_memory(b"not a png", ColorMode::Rgb, 8)
-            .unwrap_err()
-            .kind(),
+        load_png_from_memory(b"not a png", ColorMode::Rgb, 8).unwrap_err().kind(),
         ErrorKind::InvalidFile
     );
     assert_eq!(

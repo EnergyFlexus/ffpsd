@@ -10,7 +10,6 @@
 #include "detail/resample.hpp"
 
 #include <stdexcept>
-#include <string>
 #include <utility>
 
 namespace ffpsd::detail
@@ -41,7 +40,7 @@ namespace ffpsd::detail
         {
             if (!(keeps_fractions && block.fractions) && FindTaggedBlock(record.blocks, block.key) != nullptr)
                 throw std::logic_error(
-                    std::string("ffpsd: layer '") + record.name + "' has " + block.what + ", whose placement ffpsd does not update yet");
+                    "ffpsd: layer '" + record.GetName() + "' has " + block.what + ", whose placement ffpsd does not update yet");
         }
     }
 

@@ -14,7 +14,7 @@ reading it line by line and being able to explain every line of it.
 * `build.py`, anything under `scripts/`
 * CI configuration, `.pre-commit-config.yaml`, `.clang-format`
 * `vendor/CMakeLists.txt`
-* language bindings: everything under `bindings/` and the root `Cargo.toml`
+* language bindings: everything under `bindings/`, the root `Cargo.toml` and `pyproject.toml`
 * documentation, including this file
 
 **Forbidden** - all C++ under `ffpsd/` and `apps/`: every line of `.hpp`,
@@ -41,6 +41,7 @@ tests/data/            the files they read; tests/scripts/ writes generated/
 benchmarks/            Google Benchmark, a file per public header, built with FFPSD_BUILD_BENCHMARKS
 examples/              programs that use the installed package
 bindings/rust/         the crates ffpsd and ffpsd-sys; ffpsd-sys's manifest is Cargo.toml at the root
+bindings/python/       the Python package ffpsd, nanobind over the C++ API; its manifest is pyproject.toml at the root
 scripts/   build.py    tooling
 ```
 
@@ -305,10 +306,24 @@ shows up when the test fails there: run the script on that system.
 After changing the header, run the script, as its top says, in Ubuntu 24.04. `ffpsd` wraps the
 declarations; a new C function needs a method there too.
 
-## Before you commit
+## Python bindings
+
+The `ffpsd` package wraps the C++ API with nanobind in `bindings/python/src/`, with ffpsd built
+into the module. A public C++ change needs its wrapper there too; the type stubs come from the
+module itself.
 
 ```sh
-pip install pre-commit && pre-commit install   # once
+pip install .                           # builds this checkout into the current Python
+python -m pytest bindings/python/tests
+python scripts/python_compile_commands.py   # the flags clangd needs for bindings/python/src/
+```
+
+## Before you commit
+
+`requirements-dev.txt` holds what the scripts and hooks need, not what ffpsd needs.
+
+```sh
+pip install -r requirements-dev.txt && pre-commit install   # once
 python scripts/run_tests.py --all              # Debug has the warnings; keep it free of them
 python scripts/run_coverage.py                 # what of the library the tests reach, with clang
 ```

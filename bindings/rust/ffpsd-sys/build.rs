@@ -123,15 +123,7 @@ fn download(out: &Path, target: &str) -> Result<Option<PathBuf>, String> {
     let archive = out.join(format!("ffpsd.{extension}"));
     if source.contains("://") {
         let status = Command::new("curl")
-            .args([
-                "--fail",
-                "--silent",
-                "--show-error",
-                "--location",
-                "--retry",
-                "3",
-                "--output",
-            ])
+            .args(["--fail", "--silent", "--show-error", "--location", "--retry", "3", "--output"])
             .arg(&archive)
             .arg(&source)
             .status()
@@ -146,10 +138,7 @@ fn download(out: &Path, target: &str) -> Result<Option<PathBuf>, String> {
     // A wrong hash is a broken or replaced release, which a build from source would hide.
     if let Some(expected) = sha256 {
         let bytes = fs::read(&archive).map_err(|error| format!("cannot read {}: {error}", archive.display()))?;
-        let actual: String = Sha256::digest(&bytes)
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
+        let actual: String = Sha256::digest(&bytes).iter().map(|byte| format!("{byte:02x}")).collect();
         if actual != expected {
             panic!("ffpsd-sys: {source} has SHA-256 {actual}, not {expected}");
         }

@@ -496,13 +496,7 @@ impl<T> Drop for Owned<T> {
 /// Copies a buffer ffpsd made and destroys it.
 pub(crate) fn take_buffer(buffer: *mut sys::ffpsd_buffer_t) -> Vec<u8> {
     let buffer = Owned::new(buffer, sys::ffpsd_buffer_destroy);
-    unsafe {
-        bytes(
-            sys::ffpsd_buffer_get_data(buffer.ptr),
-            sys::ffpsd_buffer_get_size(buffer.ptr),
-        )
-    }
-    .to_vec()
+    unsafe { bytes(sys::ffpsd_buffer_get_data(buffer.ptr), sys::ffpsd_buffer_get_size(buffer.ptr)) }.to_vec()
 }
 
 pub(crate) fn empty_view() -> sys::ffpsd_image_view_t {

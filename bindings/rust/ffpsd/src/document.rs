@@ -1,8 +1,8 @@
 use crate::error::{c_path, c_string, check, check_found, Result};
 use crate::layer::{empty_block, Layer, LayerMut};
 use crate::types::{
-    empty_view, take_buffer, Anchor, ChannelCompression, ColorMode, Compression, FlipDirection, Image, ImageInfo,
-    ImageResource, ImageView, Levels, ResampleFilter, ResolutionInfo, Rotation, TaggedBlock, VersionInfo,
+    empty_view, take_buffer, Anchor, ChannelCompression, ColorMode, Compression, FlipDirection, Image, ImageInfo, ImageResource, ImageView,
+    Levels, ResampleFilter, ResolutionInfo, Rotation, TaggedBlock, VersionInfo,
 };
 use ffpsd_sys as sys;
 use std::fmt;
@@ -74,8 +74,7 @@ impl Document {
     }
 
     pub fn color_mode(&self) -> ColorMode {
-        ColorMode::from_raw(unsafe { sys::ffpsd_document_get_color_mode(self.ptr) })
-            .expect("ffpsd returned a color mode")
+        ColorMode::from_raw(unsafe { sys::ffpsd_document_get_color_mode(self.ptr) }).expect("ffpsd returned a color mode")
     }
 
     pub fn is_psb(&self) -> bool {

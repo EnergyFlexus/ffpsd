@@ -1,0 +1,90 @@
+# The Python package lives here, at the root, because its source archive needs the library and vendor/; its own files
+# are in bindings/python/.
+[build-system]
+requires = ["scikit-build-core>=0.11", "nanobind==3.1.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "ffpsd"
+dynamic = ["version"]
+description = "Read and write Photoshop PSD and PSB files"
+readme = "bindings/python/README.md"
+license = "MIT"
+license-files = [
+    "LICENSE",
+    "vendor/libpng/LICENSE",
+    "vendor/zlib-ng/LICENSE.md",
+    "vendor/libjpeg-turbo/LICENSE.md",
+    "vendor/libjpeg-turbo/README.ijg",
+    "vendor/libwebp/COPYING",
+    "vendor/libwebp/PATENTS",
+]
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.22"]
+keywords = ["psd", "psb", "photoshop", "image", "layers"]
+classifiers = [
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Graphics :: Graphics Conversion",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Repository = "https://github.com/EnergyFlexus/ffpsd"
+
+# The scripts and the package alike; 140 columns, as clang-format and rustfmt.
+[tool.ruff]
+line-length = 140
+target-version = "py310"
+extend-exclude = ["vendor"]
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+cmake.version = ">=3.23"
+cmake.source-dir = "bindings/python"
+build-dir = "build/python/{wheel_tag}"
+wheel.packages = ["bindings/python/ffpsd"]
+wheel.py-api = "cp312"
+install.components = ["python"]
+# What CMake reads of the libraries ffpsd carries, without their tests, and nothing of the apps or other bindings;
+# a pattern without the leading / would match a folder of that name anywhere, vendor/libpng/scripts too.
+sdist.exclude = [
+    "/.github", "/.vscode", "/apps", "/benchmarks", "/docs", "/examples", "/scripts", "/tests", "/bindings/rust",
+    "/bindings/python/tests", "/Cargo.toml",
+    "/vendor/SDL", "/vendor/imgui", "/vendor/googletest", "/vendor/benchmark",
+    "/vendor/libpng/contrib", "/vendor/libpng/tests", "/vendor/libpng/ci", "/vendor/libpng/projects",
+    "/vendor/zlib-ng/test", "/vendor/zlib-ng/doc",
+    "/vendor/libjpeg-turbo/testimages", "/vendor/libjpeg-turbo/doc/turbojpeg", "/vendor/libjpeg-turbo/fuzz",
+    "/vendor/libjpeg-turbo/java", "/vendor/libjpeg-turbo/simd",
+    "/vendor/libwebp/tests", "/vendor/libwebp/swig", "/vendor/libwebp/webp_js", "/vendor/libwebp/doc",
+    "/vendor/libwebp/man",
+]
+
+[tool.scikit-build.metadata.version]
+provider = "scikit_build_core.metadata.regex"
+input = "CMakeLists.txt"
+regex = 'VERSION\s+(?P<value>\d+\.\d+\.\d+)'
+
+# 3.10 and 3.11 get a wheel each, 3.12 and later share one of the stable ABI.
+[tool.cibuildwheel]
+build = ["cp310-*", "cp311-*", "cp312-*"]
+build-frontend = "pip" # python -m build in the project folder would run build.py, not the build package
+skip = ["*-musllinux_*"]
+test-requires = ["pytest"]
+test-command = "pytest {project}/bindings/python/tests"
+build-verbosity = 1
+
+[tool.cibuildwheel.linux]
+archs = ["x86_64"]
+manylinux-x86_64-image = "manylinux_2_28"
+
+[tool.cibuildwheel.macos]
+archs = ["arm64"]
+environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
+
+# Python brings vcruntime140.dll but not msvcp140.dll, so the wheel carries its own, from System32: an older one
+# elsewhere on PATH, a JDK's say, may lack what the module calls.
+[tool.cibuildwheel.windows]
+archs = ["AMD64"]
+before-build = "pip install delvewheel"
+repair-wheel-command = "delvewheel repair --add-path C:/Windows/System32 -w {dest_dir} {wheel}"

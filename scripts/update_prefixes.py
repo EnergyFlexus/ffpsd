@@ -28,13 +28,13 @@ MAX_ROUNDS = 4
 
 def renames():
     """The renamed names of each header in cmake/prefix/."""
-    return {path.name: set(RENAME.findall(path.read_text(encoding="utf-8")))
-            for path in sorted(PREFIX_DIR.glob("*.h"))}
+    return {path.name: set(RENAME.findall(path.read_text(encoding="utf-8"))) for path in sorted(PREFIX_DIR.glob("*.h"))}
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Add the unprefixed symbols of the vendored libraries "
-                                                 "to cmake/prefix/ and check the static library.")
+    parser = argparse.ArgumentParser(
+        description="Add the unprefixed symbols of the vendored libraries to cmake/prefix/ and check the static library."
+    )
     parser.add_argument("--no-check", action="store_true", help="skip the vendored_symbols test")
     args = parser.parse_args()
 
@@ -52,8 +52,9 @@ def main():
         if renames() == before:
             break
     else:
-        build.fail(f"the headers still change after {MAX_ROUNDS} rounds",
-                   "a library undoes some renames with macros of its own: see cmake/prefix/")
+        build.fail(
+            f"the headers still change after {MAX_ROUNDS} rounds", "a library undoes some renames with macros of its own: see cmake/prefix/"
+        )
 
     end = renames()
     print()

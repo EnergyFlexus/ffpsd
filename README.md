@@ -7,9 +7,9 @@ Read and write Photoshop PSD and PSB files, with two APIs from one build:
 
 Until 1.0.0 the APIs are not stable: a release may break source and binary compatibility.
 
-Code style: [CONTRIBUTING.md](CONTRIBUTING.md). Programs in C++, C and Rust:
+Code style: [CONTRIBUTING.md](CONTRIBUTING.md). Programs in C++, C, Rust and Python:
 [examples/](examples/README.md). Rust crates: [ffpsd](bindings/rust/ffpsd/README.md) and
-[ffpsd-sys](bindings/rust/ffpsd-sys/README.md).
+[ffpsd-sys](bindings/rust/ffpsd-sys/README.md). Python package: [ffpsd](bindings/python/README.md).
 
 libpng, zlib-ng, libjpeg-turbo, libwebp, Dear ImGui, SDL3, GoogleTest and Google Benchmark are git submodules under
 `vendor/`; the test PSD files are in Git LFS (`git lfs install` before cloning).
@@ -103,7 +103,7 @@ python scripts/run_benchmarks.py --no-build         # just run
 
 Runs are kept in `build/bench-release/results/`. `--compare` and `--against` use Google
 Benchmark's `compare.py`, which needs
-`pip install -r vendor/benchmark/tools/requirements.txt`.
+`pip install -r requirements-dev.txt`.
 
 ## Compiler flags
 

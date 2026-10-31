@@ -57,22 +57,11 @@ pub fn save_png_to_memory(image: ImageView<'_>, compression: PngCompression) -> 
 /// apply_orientation turns the pixels upright by the EXIF orientation.
 pub fn load_jpeg(path: impl AsRef<Path>, color_mode: ColorMode, depth: u16, apply_orientation: bool) -> Result<Image> {
     let path = c_path(path.as_ref())?;
-    load(|out| unsafe {
-        sys::ffpsd_jpeg_load(path.as_ptr(), color_mode.to_raw(), depth, apply_orientation.into(), out)
-    })
+    load(|out| unsafe { sys::ffpsd_jpeg_load(path.as_ptr(), color_mode.to_raw(), depth, apply_orientation.into(), out) })
 }
 
 pub fn load_jpeg_from_memory(data: &[u8], color_mode: ColorMode, depth: u16, apply_orientation: bool) -> Result<Image> {
-    load(|out| unsafe {
-        sys::ffpsd_jpeg_load_memory(
-            data.as_ptr(),
-            data.len(),
-            color_mode.to_raw(),
-            depth,
-            apply_orientation.into(),
-            out,
-        )
-    })
+    load(|out| unsafe { sys::ffpsd_jpeg_load_memory(data.as_ptr(), data.len(), color_mode.to_raw(), depth, apply_orientation.into(), out) })
 }
 
 /// Gray from 1 or 2 channels, RGB from 3 or 4; alpha is dropped and 16 bit narrowed to 8; quality is 1 to 100.

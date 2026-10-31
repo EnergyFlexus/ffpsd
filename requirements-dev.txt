@@ -1,0 +1,7 @@
+# What the scripts of this repository need, not ffpsd itself: pip install -r requirements-dev.txt
+pre-commit                                  # the hooks: clang-format, file names, rustfmt
+pytest                                      # bindings/python/tests
+Pillow==12.3.0                              # tests/scripts/ writes tests/data/generated/ with it
+nanobind==3.1.0                             # scripts/python_compile_commands.py, the one pyproject.toml builds with
+ninja                                       # the same, and build.py on Windows
+-r vendor/benchmark/tools/requirements.txt  # numpy and scipy for run_benchmarks.py --compare

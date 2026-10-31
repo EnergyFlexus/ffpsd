@@ -64,22 +64,38 @@ def profile_runtime(clang):
 
 def configure_and_build(cmake, clang, env):
     flags = "-fprofile-instr-generate -fcoverage-mapping"
-    command = [cmake, "-S", ROOT, "-B", BUILD_DIR, "-G", build.pick_generator(),
-               "-DCMAKE_BUILD_TYPE=Debug",
-               "-DFFPSD_BUILD_TESTS=ON", "-DFFPSD_BUILD_APPS=OFF",
-               "-DFFPSD_BUILD_BENCHMARKS=OFF", "-DFFPSD_BUILD_EXAMPLES=OFF",
-               f"-DCMAKE_CXX_FLAGS_INIT={flags}"]
+    command = [
+        cmake,
+        "-S",
+        ROOT,
+        "-B",
+        BUILD_DIR,
+        "-G",
+        build.pick_generator(),
+        "-DCMAKE_BUILD_TYPE=Debug",
+        "-DFFPSD_BUILD_TESTS=ON",
+        "-DFFPSD_BUILD_APPS=OFF",
+        "-DFFPSD_BUILD_BENCHMARKS=OFF",
+        "-DFFPSD_BUILD_EXAMPLES=OFF",
+        f"-DCMAKE_CXX_FLAGS_INIT={flags}",
+    ]
     if build.IS_WINDOWS:
         linker = clang.with_name("lld-link.exe")
-        command += [f"-DCMAKE_C_COMPILER={clang.as_posix()}", f"-DCMAKE_CXX_COMPILER={clang.as_posix()}",
-                    # clang-cl ignores MSVC's #pragma optimize in zlib-ng, loudly.
-                    "-DCMAKE_C_FLAGS_INIT=-Wno-ignored-pragma-optimize",
-                    f"-DCMAKE_EXE_LINKER_FLAGS_INIT={profile_runtime(clang).as_posix()}"]
+        command += [
+            f"-DCMAKE_C_COMPILER={clang.as_posix()}",
+            f"-DCMAKE_CXX_COMPILER={clang.as_posix()}",
+            # clang-cl ignores MSVC's #pragma optimize in zlib-ng, loudly.
+            "-DCMAKE_C_FLAGS_INIT=-Wno-ignored-pragma-optimize",
+            f"-DCMAKE_EXE_LINKER_FLAGS_INIT={profile_runtime(clang).as_posix()}",
+        ]
         if linker.is_file():
             command.append(f"-DCMAKE_LINKER={linker.as_posix()}")
     else:
-        command += [f"-DCMAKE_C_COMPILER={clang.with_name('clang')}", f"-DCMAKE_CXX_COMPILER={clang}",
-                    "-DCMAKE_EXE_LINKER_FLAGS_INIT=-fprofile-instr-generate"]
+        command += [
+            f"-DCMAKE_C_COMPILER={clang.with_name('clang')}",
+            f"-DCMAKE_CXX_COMPILER={clang}",
+            "-DCMAKE_EXE_LINKER_FLAGS_INIT=-fprofile-instr-generate",
+        ]
     build.run(command, env)
     # The build runs the tests once to list them; their profile goes next to the build, not into the source tree.
     build.run([cmake, "--build", BUILD_DIR], dict(env or os.environ, LLVM_PROFILE_FILE=str(BUILD_DIR / "discovery.profraw")))
@@ -165,8 +181,18 @@ def main():
     print()
     build.run([llvm_cov, "report", tests, f"-instr-profile={profile}", f"-ignore-filename-regex={IGNORED}"])
     if args.html:
-        build.run([llvm_cov, "show", tests, f"-instr-profile={profile}", f"-ignore-filename-regex={IGNORED}",
-                   "-format=html", f"-output-dir={args.html}", "-show-branches=count"])
+        build.run(
+            [
+                llvm_cov,
+                "show",
+                tests,
+                f"-instr-profile={profile}",
+                f"-ignore-filename-regex={IGNORED}",
+                "-format=html",
+                f"-output-dir={args.html}",
+                "-show-branches=count",
+            ]
+        )
         print(f"\nreport in {args.html / 'index.html'}")
 
     result = covered(llvm_cov, tests, profile)

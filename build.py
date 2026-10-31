@@ -120,11 +120,18 @@ def msvc_env(version=None):
     if not vswhere.is_file():
         fail("vswhere.exe not found, cannot locate Visual Studio", vs_hint)
 
-    installs = capture([
-        vswhere, "-latest", "-products", "*",
-        "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
-        "-property", "installationPath",
-    ]).splitlines()
+    installs = capture(
+        [
+            vswhere,
+            "-latest",
+            "-products",
+            "*",
+            "-requires",
+            "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+            "-property",
+            "installationPath",
+        ]
+    ).splitlines()
     installs = [line.strip() for line in installs if line.strip()]
     if not installs:
         fail("no Visual Studio installation with the C++ tools found", vs_hint)
@@ -140,8 +147,10 @@ def msvc_env(version=None):
 
     env = dict(line.split("=", 1) for line in dump.splitlines() if "=" in line)
     if "VCINSTALLDIR" not in env:
-        fail(f"{vcvarsall.name} {arch}{toolset} did not produce a usable environment",
-             f"install the MSVC {version} build tools" if version else None)
+        fail(
+            f"{vcvarsall.name} {arch}{toolset} did not produce a usable environment",
+            f"install the MSVC {version} build tools" if version else None,
+        )
 
     print(f"compiler   MSVC {env.get('VCToolsVersion', '').strip()} from {installs[0]} ({arch})")
     return env
@@ -174,39 +183,34 @@ def smoke_test(directory, env):
 def check_vendor(names=PNG_VENDORED + JPEG_VENDORED + WEBP_VENDORED):
     """PNG, JPEG, WebP and the window of img2ffpsd-ui build what they need from the submodules under vendor/."""
     # Dear ImGui has no CMakeLists.txt of its own, so its header shows the submodule is there.
-    missing = [name for name in names if not (ROOT / "vendor" / name / "CMakeLists.txt").is_file()
-               and not (ROOT / "vendor" / name / f"{name}.h").is_file()]
+    missing = [
+        name
+        for name in names
+        if not (ROOT / "vendor" / name / "CMakeLists.txt").is_file() and not (ROOT / "vendor" / name / f"{name}.h").is_file()
+    ]
     if not missing:
         return
     if not (ROOT / ".git").exists():
-        fail("vendor/ is missing " + ", ".join(missing),
-             "download them, or build without them: --no-png, --no-jpeg, --no-webp")
+        fail("vendor/ is missing " + ", ".join(missing), "download them, or build without them: --no-png, --no-jpeg, --no-webp")
     run(["git", "submodule", "update", "--init", "--recursive"])
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Build ffpsd in Release and install it into ffpsd-out/.")
-    parser.add_argument("--static", action="store_true",
-                        help="build a static library instead of a shared one")
-    parser.add_argument("--no-apps", action="store_true",
-                        help="skip the apps in apps/: img2ffpsd-cli and img2ffpsd-ui")
-    parser.add_argument("--no-png", action="store_true",
-                        help="build without PNG loading and saving, so without libpng, zlib-ng and img2ffpsd")
-    parser.add_argument("--no-jpeg", action="store_true",
-                        help="build without JPEG loading and saving, so without libjpeg-turbo and img2ffpsd")
-    parser.add_argument("--no-webp", action="store_true",
-                        help="build without WebP loading and saving, so without libwebp")
-    parser.add_argument("--crt", choices=("static", "dynamic"),
-                        help="MSVC: the C runtime, /MT or /MD (default: dynamic)")
-    parser.add_argument("--msvc", metavar="VERSION",
-                        help="MSVC: the toolset, such as 14.29 of Visual Studio 2019 (default: the latest)")
-    parser.add_argument("--clean", action="store_true",
-                        help="delete the build directory before configuring")
-    parser.add_argument("--jobs", type=int, default=os.cpu_count() or 1,
-                        help="parallel compile jobs (default: %(default)s)")
-    parser.add_argument("--out", type=Path, default=OUT_DIR,
-                        help="install directory (default: %(default)s)")
+    parser = argparse.ArgumentParser(description="Build ffpsd in Release and install it into ffpsd-out/.")
+    parser.add_argument("--static", action="store_true", help="build a static library instead of a shared one")
+    parser.add_argument("--no-apps", action="store_true", help="skip the apps in apps/: img2ffpsd-cli and img2ffpsd-ui")
+    parser.add_argument(
+        "--no-png", action="store_true", help="build without PNG loading and saving, so without libpng, zlib-ng and img2ffpsd"
+    )
+    parser.add_argument(
+        "--no-jpeg", action="store_true", help="build without JPEG loading and saving, so without libjpeg-turbo and img2ffpsd"
+    )
+    parser.add_argument("--no-webp", action="store_true", help="build without WebP loading and saving, so without libwebp")
+    parser.add_argument("--crt", choices=("static", "dynamic"), help="MSVC: the C runtime, /MT or /MD (default: dynamic)")
+    parser.add_argument("--msvc", metavar="VERSION", help="MSVC: the toolset, such as 14.29 of Visual Studio 2019 (default: the latest)")
+    parser.add_argument("--clean", action="store_true", help="delete the build directory before configuring")
+    parser.add_argument("--jobs", type=int, default=os.cpu_count() or 1, help="parallel compile jobs (default: %(default)s)")
+    parser.add_argument("--out", type=Path, default=OUT_DIR, help="install directory (default: %(default)s)")
     args = parser.parse_args()
 
     kind = "static" if args.static else "shared"
@@ -217,8 +221,12 @@ def main():
     cmake = check_cmake()
     # img2ffpsd-ui reads PNG and JPEG too; without either there is no window to build.
     ui = not (args.no_apps or args.no_png or args.no_jpeg)
-    check_vendor((() if args.no_png else PNG_VENDORED) + (() if args.no_jpeg else JPEG_VENDORED)
-                 + (() if args.no_webp else WEBP_VENDORED) + (UI_VENDORED if ui else ()))
+    check_vendor(
+        (() if args.no_png else PNG_VENDORED)
+        + (() if args.no_jpeg else JPEG_VENDORED)
+        + (() if args.no_webp else WEBP_VENDORED)
+        + (UI_VENDORED if ui else ())
+    )
     generator = pick_generator()
     env = build_env(args.msvc)
 
@@ -229,16 +237,27 @@ def main():
         wipe(build_dir)
     wipe(out_dir)  # start from an empty tree so no stale files survive
 
-    run([cmake, "-S", ROOT, "-B", build_dir, "-G", generator,
-         "-DCMAKE_BUILD_TYPE=Release",
-         f"-DBUILD_SHARED_LIBS={'OFF' if args.static else 'ON'}",
-         f"-DFFPSD_BUILD_APPS={'OFF' if args.no_apps else 'ON'}",
-         f"-DFFPSD_WITH_PNG={'OFF' if args.no_png else 'ON'}",
-         f"-DFFPSD_WITH_JPEG={'OFF' if args.no_jpeg else 'ON'}",
-         f"-DFFPSD_WITH_WEBP={'OFF' if args.no_webp else 'ON'}",
-         f"-DFFPSD_WITH_IMGUI={'ON' if ui else 'OFF'}",
-         f"-DFFPSD_MSVC_STATIC_RUNTIME={'ON' if crt == 'static' else 'OFF'}",
-         f"-DCMAKE_INSTALL_PREFIX={out_dir}"], env)
+    run(
+        [
+            cmake,
+            "-S",
+            ROOT,
+            "-B",
+            build_dir,
+            "-G",
+            generator,
+            "-DCMAKE_BUILD_TYPE=Release",
+            f"-DBUILD_SHARED_LIBS={'OFF' if args.static else 'ON'}",
+            f"-DFFPSD_BUILD_APPS={'OFF' if args.no_apps else 'ON'}",
+            f"-DFFPSD_WITH_PNG={'OFF' if args.no_png else 'ON'}",
+            f"-DFFPSD_WITH_JPEG={'OFF' if args.no_jpeg else 'ON'}",
+            f"-DFFPSD_WITH_WEBP={'OFF' if args.no_webp else 'ON'}",
+            f"-DFFPSD_WITH_IMGUI={'ON' if ui else 'OFF'}",
+            f"-DFFPSD_MSVC_STATIC_RUNTIME={'ON' if crt == 'static' else 'OFF'}",
+            f"-DCMAKE_INSTALL_PREFIX={out_dir}",
+        ],
+        env,
+    )
     run([cmake, "--build", build_dir, "--config", "Release", "--parallel", args.jobs], env)
     run([cmake, "--install", build_dir, "--config", "Release"], env)
 

@@ -22,3 +22,10 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
+
+      - id: ruff-format
+        name: Format Python sources
+        entry: ruff format
+        language: python
+        additional_dependencies: ['ruff==0.17.3']
+        types: [python]

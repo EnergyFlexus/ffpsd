@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 #include <optional>
 #include <stdexcept>
+#include <string>
 
 using namespace ffpsd_test;
 
@@ -74,6 +75,21 @@ TEST(LayerMaskTest, AMaskIsSetReplacedAndRemovedWhereItCanGo)
     EXPECT_THROW(unmasked->SetMask(Pattern(2, 2, 1, 16), 0, 0), std::invalid_argument);
     EXPECT_THROW(unmasked->SetMask(Pattern(2, 2, 1), 0, 0, 7), std::invalid_argument);
     EXPECT_FALSE(unmasked->GetMask().has_value());
+}
+
+TEST(LayerMaskTest, AnErrorNamesTheLayerAsPhotoshopShowsIt)
+{
+    // Layer 3 is "Слой 3" in 'luni', and the same in Windows-1251 in its legacy name, which is not UTF-8.
+    ffpsd::Document photoshop = ffpsd::Document::Open(kRgbMasksPsd);
+    try
+    {
+        photoshop.GetLayerByIndex(3)->SetPosition(1, 1);
+        ADD_FAILURE() << "SetPosition beside a vector mask did not throw";
+    }
+    catch (const std::logic_error& e)
+    {
+        EXPECT_NE(std::string(e.what()).find("'\xD0\xA1\xD0\xBB\xD0\xBE\xD0\xB9 3'"), std::string::npos) << e.what();
+    }
 }
 
 TEST(LayerMaskTest, AMaskMovesAndScalesWithItsLayer)

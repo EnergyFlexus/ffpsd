@@ -61,6 +61,9 @@ namespace ffpsd::detail
         // A deep copy, blocks included; a new field has to be added here too.
         LayerRecord Copy() const;
 
+        // UTF-8 from 'luni', or the stored name, in a legacy code page, when that block is missing.
+        std::string GetName() const;
+
         const ChannelImageData* FindChannel(std::int16_t id) const noexcept;
         void RemoveChannels(std::int16_t id);
 

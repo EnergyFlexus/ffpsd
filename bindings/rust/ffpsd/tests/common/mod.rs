@@ -24,9 +24,7 @@ pub const RGBA_PLANES: [u8; 24] = [
 ];
 
 pub fn data(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../tests/data")
-        .join(name)
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../tests/data").join(name)
 }
 
 /// A file in the temporary folder that no other test writes.
@@ -55,15 +53,8 @@ pub fn rgba_info() -> ImageInfo {
 /// Planes of one value each, 8 bit.
 pub fn flat(width: u32, height: u32, values: &[u8]) -> Image {
     let size = width as usize * height as usize;
-    let data = values
-        .iter()
-        .flat_map(|&value| std::iter::repeat(value).take(size))
-        .collect();
-    let color_mode = if values.len() < 3 {
-        ColorMode::Grayscale
-    } else {
-        ColorMode::Rgb
-    };
+    let data = values.iter().flat_map(|&value| std::iter::repeat(value).take(size)).collect();
+    let color_mode = if values.len() < 3 { ColorMode::Grayscale } else { ColorMode::Rgb };
     Image {
         info: ImageInfo {
             width,

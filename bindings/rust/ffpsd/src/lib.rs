@@ -22,9 +22,9 @@ pub use document::{Document, Layers};
 pub use error::{Error, ErrorKind, Result};
 pub use layer::{Layer, LayerMut};
 pub use types::{
-    fourcc, Anchor, ChannelCompression, ChannelInfo, ColorMode, Compression, FlipDirection, Format, Image, ImageInfo,
-    ImageResource, ImageView, LayerKind, Levels, LevelsChannel, Mask, PngCompression, Rect, ResampleFilter,
-    ResolutionInfo, Rotation, TaggedBlock, VersionInfo,
+    fourcc, Anchor, ChannelCompression, ChannelInfo, ColorMode, Compression, FlipDirection, Format, Image, ImageInfo, ImageResource,
+    ImageView, LayerKind, Levels, LevelsChannel, Mask, PngCompression, Rect, ResampleFilter, ResolutionInfo, Rotation, TaggedBlock,
+    VersionInfo,
 };
 
 /// ffpsd's version, such as "0.4.4".

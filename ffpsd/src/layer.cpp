@@ -7,7 +7,6 @@
 #include "detail/layer_and_mask/layer_pixels.hpp"
 #include "detail/layer_and_mask/layer_record.hpp"
 #include "detail/layer_and_mask/tagged_blocks/section_divider_setting.hpp"
-#include "detail/layer_and_mask/tagged_blocks/unicode_layer_name.hpp"
 #include "detail/limits.hpp"
 
 #include <cstdint>
@@ -58,8 +57,7 @@ namespace ffpsd
 
     std::string Layer::GetName() const
     {
-        std::optional<detail::UnicodeLayerName> name = detail::GetTaggedBlock<detail::UnicodeLayerName>(record_->blocks);
-        return name.has_value() ? std::move(name->name) : record_->name;
+        return record_->GetName();
     }
 
     std::uint8_t Layer::GetOpacity() const noexcept

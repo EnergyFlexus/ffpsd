@@ -63,4 +63,4 @@ and branch that is no longer covered. `--html DIR` shows it line by line.
 the library is checked against. `generated/` is written by
 `scripts/make_png_files.py` with zlib alone, so libpng is checked against
 another encoder, and by `scripts/make_jpeg_files.py` and `scripts/make_webp_files.py` with Pillow
-(`pip install -r scripts/requirements.txt`); run them again after changing them.
+(`pip install -r requirements-dev.txt` at the root); run them again after changing them.

@@ -3,8 +3,8 @@ mod common;
 
 use common::*;
 use ffpsd::{
-    fourcc, Anchor, ColorMode, Compression, Document, ErrorKind, FlipDirection, ImageResource, LayerKind, Levels,
-    LevelsChannel, ResampleFilter, Rotation, TaggedBlock,
+    fourcc, Anchor, ColorMode, Compression, Document, ErrorKind, FlipDirection, ImageResource, LayerKind, Levels, LevelsChannel,
+    ResampleFilter, Rotation, TaggedBlock,
 };
 
 fn round_trip(doc: &Document) -> Document {
@@ -63,8 +63,7 @@ fn layers_change_in_place() {
 #[test]
 fn stack_takes_copies_groups_and_moves() {
     let mut doc = Document::new(4, 4, ColorMode::Rgb, 8).unwrap();
-    doc.add_layer("bottom", Some(flat(4, 4, &[1, 2, 3, 255]).view()), 0, 0)
-        .unwrap();
+    doc.add_layer("bottom", Some(flat(4, 4, &[1, 2, 3, 255]).view()), 0, 0).unwrap();
     doc.duplicate_layer(0).unwrap().set_name("copy").unwrap();
     let mut group = doc.add_group("group").unwrap();
     group.set_group_open(false).unwrap();
@@ -74,12 +73,7 @@ fn stack_takes_copies_groups_and_moves() {
     let kinds: Vec<LayerKind> = doc.layers().map(|layer| layer.kind()).collect();
     assert_eq!(
         kinds,
-        [
-            LayerKind::Raster,
-            LayerKind::Raster,
-            LayerKind::GroupEnd,
-            LayerKind::GroupClosed
-        ]
+        [LayerKind::Raster, LayerKind::Raster, LayerKind::GroupEnd, LayerKind::GroupClosed]
     );
 
     doc.move_layer(1, 2).unwrap();
@@ -103,8 +97,7 @@ fn stack_takes_copies_groups_and_moves() {
 #[test]
 fn background_is_set_and_unset() {
     let mut doc = Document::new(4, 4, ColorMode::Rgb, 8).unwrap();
-    doc.add_background_layer("Фон", Some(flat(4, 4, &[9, 9, 9]).view()))
-        .unwrap();
+    doc.add_background_layer("Фон", Some(flat(4, 4, &[9, 9, 9]).view())).unwrap();
     assert!(doc.layer(0).unwrap().is_background());
     assert!(doc.unset_background_layer().unwrap());
     assert!(!doc.unset_background_layer().unwrap());
@@ -129,10 +122,7 @@ fn levels_layer_keeps_its_records() {
     doc.add_levels_layer("Ничего", None).unwrap();
 
     let read = round_trip(&doc);
-    assert_eq!(
-        read.layer(0).unwrap().levels().unwrap().unwrap().channels[..2],
-        levels.channels[..]
-    );
+    assert_eq!(read.layer(0).unwrap().levels().unwrap().unwrap().channels[..2], levels.channels[..]);
     assert_eq!(read.layer(1).unwrap().adjustment_key(), Some(fourcc(b"levl")));
 
     let mut doc = read;
@@ -200,8 +190,7 @@ fn resources_and_blocks_round_trip() {
 #[test]
 fn canvas_changes_and_composite_is_kept() {
     let mut doc = Document::new(4, 2, ColorMode::Rgb, 8).unwrap();
-    doc.add_layer("a", Some(flat(4, 2, &[1, 2, 3, 255]).view()), 0, 0)
-        .unwrap();
+    doc.add_layer("a", Some(flat(4, 2, &[1, 2, 3, 255]).view()), 0, 0).unwrap();
     doc.set_merged_image(flat(4, 2, &[1, 2, 3]).view()).unwrap();
     assert!(doc.has_real_merged_data());
     assert_eq!(round_trip(&doc).merged_image().unwrap(), flat(4, 2, &[1, 2, 3]));
@@ -231,14 +220,8 @@ fn files_are_written_and_errors_say_why() {
     let missing = Document::open(temp("missing.psd")).unwrap_err();
     assert_eq!(missing.kind(), ErrorKind::Io);
     assert!(!missing.to_string().is_empty());
-    assert_eq!(
-        Document::open_from_memory(b"not a psd").unwrap_err().kind(),
-        ErrorKind::InvalidFile
-    );
-    assert_eq!(
-        Document::open("a\0b.psd").unwrap_err().kind(),
-        ErrorKind::InvalidArgument
-    );
+    assert_eq!(Document::open_from_memory(b"not a psd").unwrap_err().kind(), ErrorKind::InvalidFile);
+    assert_eq!(Document::open("a\0b.psd").unwrap_err().kind(), ErrorKind::InvalidArgument);
     assert_eq!(
         Document::new(4, 4, ColorMode::Multichannel, 8).unwrap_err().kind(),
         ErrorKind::InvalidArgument

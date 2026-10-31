@@ -34,7 +34,6 @@ BUILD_DIR = ROOT / "build" / PRESET
 RESULTS_DIR = BUILD_DIR / "results"
 EXECUTABLE_NAME = "ffpsd_benchmarks.exe" if build.IS_WINDOWS else "ffpsd_benchmarks"
 COMPARE = ROOT / "vendor" / "benchmark" / "tools" / "compare.py"
-COMPARE_REQUIREMENTS = ROOT / "vendor" / "benchmark" / "tools" / "requirements.txt"
 
 # What a build of the library and the benchmarks takes from vendor/; the rest is for the apps and the tests.
 BASELINE_VENDORED = ("benchmark",) + build.PNG_VENDORED + build.JPEG_VENDORED + build.WEBP_VENDORED
@@ -52,8 +51,7 @@ def check_benchmark_submodule():
 def check_compare_requirements():
     missing = [name for name in ("numpy", "scipy") if importlib.util.find_spec(name) is None]
     if missing:
-        build.fail("comparing needs " + " and ".join(missing),
-                   f"pip install -r {COMPARE_REQUIREMENTS.relative_to(ROOT)}")
+        build.fail("comparing needs " + " and ".join(missing), "pip install -r requirements-dev.txt")
 
 
 def git(*args, cwd=ROOT):
@@ -92,8 +90,7 @@ def baseline_sources(ref):
             try:
                 extract(entry[2], source / "vendor" / name, cwd=ROOT / "vendor" / name)
             except subprocess.CalledProcessError:
-                build.fail(f"vendor/{name} lacks {entry[2][:10]}, which {ref} pins",
-                           f"git -C vendor/{name} fetch origin {entry[2]}")
+                build.fail(f"vendor/{name} lacks {entry[2][:10]}, which {ref} pins", f"git -C vendor/{name} fetch origin {entry[2]}")
         directory.mkdir(parents=True, exist_ok=True)
         stamp.write_text(commit + "\n")
 
@@ -106,20 +103,38 @@ def baseline_sources(ref):
 def build_baseline(ref, cmake, env):
     directory = baseline_sources(ref)
     binary = directory / "build"
-    build.run([cmake, "-S", directory / "src", "-B", binary, "-G", "Ninja",
-               "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_SHARED_LIBS=OFF", "-DFFPSD_MSVC_STATIC_RUNTIME=OFF",
-               "-DFFPSD_BUILD_APPS=OFF", "-DFFPSD_BUILD_TESTS=OFF", "-DFFPSD_BUILD_EXAMPLES=OFF",
-               "-DFFPSD_BUILD_BENCHMARKS=ON", f"-DFFPSD_BENCHMARK_DATA_DIR={(ROOT / 'tests' / 'data').as_posix()}"], env)
+    build.run(
+        [
+            cmake,
+            "-S",
+            directory / "src",
+            "-B",
+            binary,
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DBUILD_SHARED_LIBS=OFF",
+            "-DFFPSD_MSVC_STATIC_RUNTIME=OFF",
+            "-DFFPSD_BUILD_APPS=OFF",
+            "-DFFPSD_BUILD_TESTS=OFF",
+            "-DFFPSD_BUILD_EXAMPLES=OFF",
+            "-DFFPSD_BUILD_BENCHMARKS=ON",
+            f"-DFFPSD_BENCHMARK_DATA_DIR={(ROOT / 'tests' / 'data').as_posix()}",
+        ],
+        env,
+    )
     build.run([cmake, "--build", binary, "--target", "ffpsd_benchmarks"], env)
     return binary / "bin" / EXECUTABLE_NAME
 
 
 def run_benchmarks(executable, args, result, env):
-    command = [executable,
-               f"--benchmark_repetitions={args.repetitions}",
-               "--benchmark_display_aggregates_only=true",  # the file keeps every repetition
-               f"--benchmark_out={result}",
-               "--benchmark_out_format=json"]
+    command = [
+        executable,
+        f"--benchmark_repetitions={args.repetitions}",
+        "--benchmark_display_aggregates_only=true",  # the file keeps every repetition
+        f"--benchmark_out={result}",
+        "--benchmark_out_format=json",
+    ]
     if args.filter:
         command.append(f"--benchmark_filter={args.filter}")
     print()
@@ -130,25 +145,26 @@ def run_benchmarks(executable, args, result, env):
 def main():
     parser = argparse.ArgumentParser(description="Build and run the ffpsd benchmarks in Release.")
     parser.add_argument("--filter", help="run only the benchmarks whose name matches this regex, such as Formats/")
-    parser.add_argument("--repetitions", type=int, default=10,
-                        help="runs of each benchmark; the report shows their mean, median "
-                             "and spread (default: %(default)s)")
-    parser.add_argument("--save", metavar="NAME", default="last",
-                        help="name to keep this run under (default: %(default)s)")
+    parser.add_argument(
+        "--repetitions",
+        type=int,
+        default=10,
+        help="runs of each benchmark; the report shows their mean, median and spread (default: %(default)s)",
+    )
+    parser.add_argument("--save", metavar="NAME", default="last", help="name to keep this run under (default: %(default)s)")
     which = parser.add_mutually_exclusive_group()
-    which.add_argument("--compare", metavar="NAME",
-                       help="compare this run with a saved one, such as 'before'")
-    which.add_argument("--against", metavar="REF",
-                       help="build the library of a tag, branch or commit with these benchmarks, "
-                            "run it before this one and compare")
-    parser.add_argument("--no-build", action="store_true",
-                        help="run what is already built, without configuring and building")
+    which.add_argument("--compare", metavar="NAME", help="compare this run with a saved one, such as 'before'")
+    which.add_argument(
+        "--against",
+        metavar="REF",
+        help="build the library of a tag, branch or commit with these benchmarks, run it before this one and compare",
+    )
+    parser.add_argument("--no-build", action="store_true", help="run what is already built, without configuring and building")
     args = parser.parse_args()
 
     baseline = result_path(args.compare) if args.compare else None
     if baseline is not None and not baseline.is_file():
-        build.fail(f"no saved run {baseline.relative_to(ROOT)}",
-                   f"make one first: python scripts/run_benchmarks.py --save {args.compare}")
+        build.fail(f"no saved run {baseline.relative_to(ROOT)}", f"make one first: python scripts/run_benchmarks.py --save {args.compare}")
     if args.compare or args.against:
         check_compare_requirements()
 

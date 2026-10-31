@@ -44,3 +44,13 @@ __pycache__/
 # Rust
 /target/
 /Cargo.lock
+
+# Python packages
+/dist/
+/wheelhouse/
+/venv/
+
+# Python tool caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/

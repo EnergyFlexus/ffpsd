@@ -192,6 +192,12 @@ namespace ffpsd::detail
         channels.erase(std::remove_if(channels.begin(), channels.end(), has_id), channels.end());
     }
 
+    std::string LayerRecord::GetName() const
+    {
+        std::optional<UnicodeLayerName> unicode = GetTaggedBlock<UnicodeLayerName>(blocks);
+        return unicode.has_value() ? std::move(unicode->name) : name;
+    }
+
     bool LayerRecord::HasLayerMask() const noexcept
     {
         for (const ChannelImageData& channel : channels)

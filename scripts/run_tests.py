@@ -30,11 +30,9 @@ def check_googletest_submodule():
 
 def check_test_data():
     """A clone without Git LFS has pointer files where the PSDs should be."""
-    pointers = [path.name for path in sorted(TEST_DATA.rglob("*.ps[db]"))
-                if path.read_bytes()[:len(LFS_POINTER)] == LFS_POINTER]
+    pointers = [path.name for path in sorted(TEST_DATA.rglob("*.ps[db]")) if path.read_bytes()[: len(LFS_POINTER)] == LFS_POINTER]
     if pointers:
-        build.fail("tests/data holds Git LFS pointers, not files: " + ", ".join(pointers),
-                   "git lfs install && git lfs pull")
+        build.fail("tests/data holds Git LFS pointers, not files: " + ", ".join(pointers), "git lfs install && git lfs pull")
 
 
 def main():
@@ -43,8 +41,7 @@ def main():
     kind.add_argument("--shared", action="store_true", help="test the DLL build (shared-debug)")
     kind.add_argument("--all", action="store_true", help="test the static build, then the DLL build")
     parser.add_argument("--filter", help="run only the tests whose name matches this regex")
-    parser.add_argument("--no-build", action="store_true",
-                        help="run what is already built, without configuring and building")
+    parser.add_argument("--no-build", action="store_true", help="run what is already built, without configuring and building")
     args = parser.parse_args()
 
     if args.all:

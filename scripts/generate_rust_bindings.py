@@ -29,17 +29,24 @@ def generate():
         if not shutil.which(tool):
             sys.exit(f"error: {tool} is not on the PATH; see the top of {Path(__file__).name}")
     command = [
-        "bindgen", str(HEADER),
-        "--allowlist-function", "ffpsd_.*",
-        "--allowlist-type", "ffpsd_.*",
-        "--allowlist-var", "FFPSD_.*",
+        "bindgen",
+        str(HEADER),
+        "--allowlist-function",
+        "ffpsd_.*",
+        "--allowlist-type",
+        "ffpsd_.*",
+        "--allowlist-var",
+        "FFPSD_.*",
         "--no-prepend-enum-name",
         "--no-layout-tests",
         "--no-doc-comments",
         "--merge-extern-blocks",
         "--sort-semantically",
-        "--formatter", "rustfmt",
-        "--", f"-I{HEADER.parent.parent}", "-DFFPSD_STATIC",
+        "--formatter",
+        "rustfmt",
+        "--",
+        f"-I{HEADER.parent.parent}",
+        "-DFFPSD_STATIC",
     ]
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode != 0:
@@ -61,8 +68,9 @@ def main():
     if args.check:
         current = OUTPUT.read_text(encoding="utf-8") if OUTPUT.exists() else ""
         if current != text:
-            sys.stdout.writelines(difflib.unified_diff(current.splitlines(True), text.splitlines(True),
-                                                       str(OUTPUT.relative_to(ROOT)), "bindgen"))
+            sys.stdout.writelines(
+                difflib.unified_diff(current.splitlines(True), text.splitlines(True), str(OUTPUT.relative_to(ROOT)), "bindgen")
+            )
             sys.exit(f"error: {OUTPUT.relative_to(ROOT)} is out of date; run {Path(__file__).name}")
         print(f"{OUTPUT.relative_to(ROOT)} is up to date")
     else:

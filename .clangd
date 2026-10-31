@@ -8,3 +8,9 @@ Diagnostics:
     Remove: "*"
 Index:
   Background: Skip
+---
+# pip builds the Python module outside the presets; scripts/python_compile_commands.py writes its flags here.
+If:
+  PathMatch: bindings/python/.*
+CompileFlags:
+  CompilationDatabase: build/python-clangd

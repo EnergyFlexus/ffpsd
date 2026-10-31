@@ -7,10 +7,7 @@ use ffpsd::{fourcc, ChannelCompression, ColorMode, Document, ErrorKind, LayerKin
 #[test]
 fn grayscale_file_reads_as_the_dump_says() {
     let doc = Document::open(data(GRAYSCALE_PSD)).unwrap();
-    assert_eq!(
-        (doc.width(), doc.height(), doc.channel_count(), doc.depth()),
-        (836, 882, 1, 8)
-    );
+    assert_eq!((doc.width(), doc.height(), doc.channel_count(), doc.depth()), (836, 882, 1, 8));
     assert_eq!(doc.color_mode(), ColorMode::Grayscale);
     assert!(!doc.is_psb());
 
@@ -66,10 +63,7 @@ fn rgb_file_reads_as_the_dump_says() {
 
     let merged = doc.merged_image().unwrap();
     assert_eq!(merged.info, doc.merged_image_info().unwrap());
-    assert_eq!(
-        (merged.info.width, merged.info.height, merged.info.channel_count),
-        (1890, 1417, 3)
-    );
+    assert_eq!((merged.info.width, merged.info.height, merged.info.channel_count), (1890, 1417, 3));
     let sums: Vec<u64> = (0..3).map(|plane| plane_sum(&merged, plane)).collect();
     assert_eq!(sums, [183326186, 682923150, 206836566]);
     assert_eq!(doc.merged_compression().unwrap(), Some(ChannelCompression::Rle));
@@ -135,10 +129,7 @@ fn masks_read_and_refuse_what_photoshop_would() {
         vector.set_mask(pattern.view(), 0, 0, 0).unwrap_err().kind(),
         ErrorKind::InvalidOperation
     );
-    assert_eq!(
-        vector.set_position(1, 1).unwrap_err().kind(),
-        ErrorKind::InvalidOperation
-    );
+    assert_eq!(vector.set_position(1, 1).unwrap_err().kind(), ErrorKind::InvalidOperation);
 
     let mut unmasked = doc.layer_mut(1).unwrap();
     let three = flat(2, 2, &[1, 2, 3]);

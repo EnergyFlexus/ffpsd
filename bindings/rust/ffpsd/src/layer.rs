@@ -1,8 +1,8 @@
 use crate::document::Document;
 use crate::error::{c_string, check, check_found, Result};
 use crate::types::{
-    empty_view, ChannelCompression, ChannelInfo, FlipDirection, Image, ImageInfo, ImageView, LayerKind, Levels, Mask,
-    Rect, ResampleFilter, Rotation, TaggedBlock,
+    empty_view, ChannelCompression, ChannelInfo, FlipDirection, Image, ImageInfo, ImageView, LayerKind, Levels, Mask, Rect, ResampleFilter,
+    Rotation, TaggedBlock,
 };
 use ffpsd_sys as sys;
 use std::fmt;
@@ -57,9 +57,7 @@ impl<'a> Layer<'a> {
         let mut length = 0usize;
         expect_ok(unsafe { sys::ffpsd_layer_get_name(self.ptr, ptr::null_mut(), 0, &mut length) });
         let mut buffer = vec![0u8; length + 1];
-        expect_ok(unsafe {
-            sys::ffpsd_layer_get_name(self.ptr, buffer.as_mut_ptr().cast(), buffer.len(), &mut length)
-        });
+        expect_ok(unsafe { sys::ffpsd_layer_get_name(self.ptr, buffer.as_mut_ptr().cast(), buffer.len(), &mut length) });
         buffer.truncate(length);
         String::from_utf8_lossy(&buffer).into_owned()
     }
