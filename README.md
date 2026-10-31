@@ -1,17 +1,41 @@
 # ffpsd
 
-Read and write Photoshop PSD and PSB files, with two APIs from one build:
+Read and write Photoshop PSD and PSB files from C++, C, Rust and Python:
 
 * `ffpsd/ffpsd.hpp` - C++
 * `ffpsd/c_api.h` - C, for other languages and toolchains
+* Rust - the [ffpsd](https://crates.io/crates/ffpsd) crate, sources in [bindings/rust/](bindings/rust/ffpsd/README.md)
+* Python - the [ffpsd](https://pypi.org/project/ffpsd/) package, sources in [bindings/python/](bindings/python/README.md)
 
 Until 1.0.0 the APIs are not stable: a release may break source and binary compatibility.
 What comes next: [ROADMAP.md](ROADMAP.md).
 
-Bindings, built from this repository:
+## What it does for now
 
-* Rust - [ffpsd](https://crates.io/crates/ffpsd) on crates.io, sources in [bindings/rust/](bindings/rust/ffpsd/README.md)
-* Python - [ffpsd](https://pypi.org/project/ffpsd/) on PyPI, sources in [bindings/python/](bindings/python/README.md)
+* PSD and PSB, and either into the other; RGB and gray documents, and either into the other.
+* Layers: raster layers, groups, the background and Levels adjustments; added, copied from this or another
+  document, moved and removed; name, opacity, visibility, clipping and blend mode; pixels in and out.
+* Pixel masks, read, set and removed.
+* The canvas and the layers resized, turned and flipped; the canvas grown or cut from any anchor.
+* The composite the file stores, read and replaced; resolution and version info.
+* Every image resource and tagged block, raw, for what ffpsd does not interpret itself.
+* PNG, JPEG and WebP in and out.
+
+## How it works
+
+* Single-threaded, with no global state: a document belongs to one thread at a time, and separate documents
+  work in separate threads at once, so a batch of files spreads over every core.
+* Nothing is lost: blocks, resources and channels ffpsd does not interpret are written back byte for byte,
+  and a document saved unchanged is the file it was read from.
+* Lazy: a channel is decoded when its pixels are asked for and written back as stored until they change,
+  so opening and saving cost little more than the file's size.
+* In memory: opening reads the whole file and closes it, so the file is not locked while you work; saving
+  builds the new file in memory and writes it once. The price is memory: about the
+  file's size for the document, twice that while opening or saving, plus any pixels you decode.
+* Self-contained: libpng, zlib-ng, libjpeg-turbo and libwebp are built in under renamed symbols, so other
+  copies in the same program do not clash, and PNG, JPEG and WebP load and save with nothing else installed.
+
+## Getting the sources
 
 Code style: [CONTRIBUTING.md](CONTRIBUTING.md). Programs in C++, C, Rust and Python:
 [examples/](examples/README.md).
