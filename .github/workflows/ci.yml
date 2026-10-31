@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: apt-get update && apt-get install -y bindgen clang rustfmt python3
-      - run: python3 scripts/generate_rust_bindings.py --check
+      - run: python3 scripts/generate_rust_bindings.py --no-docker --check
 
   # Debug with the tests, static and then shared.
   test:
