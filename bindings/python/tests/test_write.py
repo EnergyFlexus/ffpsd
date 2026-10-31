@@ -5,7 +5,7 @@ import threading
 import ffpsd
 import numpy as np
 import pytest
-from conftest import BACKGROUND_COPY_NAME, GRAYSCALE_PSD, RGB_PSD, flat
+from conftest import BACKGROUND_COPY_NAME, GRAYSCALE_PSD, RGB_PSD, flat, found
 from ffpsd import fourcc
 
 
@@ -53,7 +53,7 @@ def test_layers_change_in_place():
 
     # One plane may come as (height, width).
     layer.set_mask(np.zeros((2, 2), np.uint8), 1, 1, 255)
-    mask = layer.mask()
+    mask = found(layer.mask())
     assert (mask.bounds.top, mask.bounds.left, mask.default_color) == (1, 1, 255)
     assert layer.remove_mask()
     assert layer.mask() is None

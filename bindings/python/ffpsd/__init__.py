@@ -50,6 +50,7 @@ from ._ffpsd import (  # pyright: ignore[reportMissingImports]
     save_webp,
     version,
 )
+from ._pil import from_pil, to_pil
 
 __version__ = version()
 
@@ -101,6 +102,7 @@ __all__ = [
     "encode_png",
     "encode_webp",
     "fourcc",
+    "from_pil",
     "is_format_supported",
     "load_jpeg",
     "load_picture",
@@ -109,5 +111,6 @@ __all__ = [
     "save_jpeg",
     "save_png",
     "save_webp",
+    "to_pil",
     "version",
 ]

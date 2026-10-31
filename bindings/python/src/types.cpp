@@ -31,7 +31,7 @@ namespace ffpsd_python
             return "'" + text + "'";
         }
 
-        std::vector<std::uint8_t> ToVector(const ByteArray& data)
+        std::vector<std::uint8_t> ToVector(const BytesLike& data)
         {
             return std::vector<std::uint8_t>(data.data(), data.data() + data.size());
         }
@@ -201,7 +201,7 @@ namespace ffpsd_python
         nb::class_<ffpsd::ImageResource>(m, "ImageResource")
             .def(
                 "__init__",
-                [](ffpsd::ImageResource* self, std::uint16_t id, std::string name, const ByteArray& data) {
+                [](ffpsd::ImageResource* self, std::uint16_t id, std::string name, const BytesLike& data) {
                     new (self) ffpsd::ImageResource{id, std::move(name), ToVector(data)};
                 },
                 "id"_a, "name"_a = "", "data"_a = nb::bytes("", 0))
@@ -209,7 +209,7 @@ namespace ffpsd_python
             .def_rw("name", &ffpsd::ImageResource::name)
             .def_prop_rw(
                 "data", [](const ffpsd::ImageResource& r) { return ToBytes(r.data.data(), r.data.size()); },
-                [](ffpsd::ImageResource& r, const ByteArray& data) { r.data = ToVector(data); })
+                [](ffpsd::ImageResource& r, const BytesLike& data) { r.data = ToVector(data); })
             .def(
                 "__eq__",
                 [](const ffpsd::ImageResource& x, const ffpsd::ImageResource& y) {
@@ -224,7 +224,7 @@ namespace ffpsd_python
         nb::class_<ffpsd::TaggedBlock>(m, "TaggedBlock")
             .def(
                 "__init__",
-                [](ffpsd::TaggedBlock* self, std::uint32_t key, const ByteArray& data, std::uint32_t signature) {
+                [](ffpsd::TaggedBlock* self, std::uint32_t key, const BytesLike& data, std::uint32_t signature) {
                     new (self) ffpsd::TaggedBlock{signature, key, ToVector(data)};
                 },
                 "key"_a, "data"_a = nb::bytes("", 0), "signature"_a = ffpsd::TaggedBlock().signature)
@@ -232,7 +232,7 @@ namespace ffpsd_python
             .def_rw("key", &ffpsd::TaggedBlock::key)
             .def_prop_rw(
                 "data", [](const ffpsd::TaggedBlock& b) { return ToBytes(b.data.data(), b.data.size()); },
-                [](ffpsd::TaggedBlock& b, const ByteArray& data) { b.data = ToVector(data); })
+                [](ffpsd::TaggedBlock& b, const BytesLike& data) { b.data = ToVector(data); })
             .def(
                 "__eq__",
                 [](const ffpsd::TaggedBlock& x, const ffpsd::TaggedBlock& y) {
@@ -275,7 +275,9 @@ namespace ffpsd_python
             .def(
                 "__init__",
                 [](ffpsd::LevelsInfo* self, std::vector<Channel> channels) { new (self) ffpsd::LevelsInfo{std::move(channels)}; },
-                "channels"_a = std::vector<Channel>())
+                "channels"_a = std::vector<Channel>(),
+                // Any iterable converts, a list too, which the stub would otherwise not let through.
+                nb::sig("def __init__(self, channels: collections.abc.Iterable[LevelsChannel] = ...) -> None"))
             .def_rw("channels", &ffpsd::LevelsInfo::channels)
             .def(
                 "__eq__",

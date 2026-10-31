@@ -42,7 +42,7 @@ namespace ffpsd_python
                 "path"_a)
             .def_static(
                 "from_bytes",
-                [](const ByteArray& data) {
+                [](const BytesLike& data) {
                     nb::gil_scoped_release release;
                     return Opened(ffpsd::Document::Parse(data.data(), data.size()));
                 },

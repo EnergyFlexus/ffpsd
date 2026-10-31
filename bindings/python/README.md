@@ -13,6 +13,8 @@ document.duplicate_layer(-1).name = "Copy"
 document.save("out.psd", ffpsd.Compression.RLE_OR_RAW)
 ```
 
+With `pip install ffpsd[pil]`, `ffpsd.from_pil` and `ffpsd.to_pil` take and give Pillow images.
+
 ## License
 
 MIT

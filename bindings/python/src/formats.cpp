@@ -56,7 +56,7 @@ namespace ffpsd_python
             "path"_a, "color_mode"_a = ffpsd::ColorMode::kRgb, "depth"_a = 8);
         m.def(
             "decode_picture",
-            [](const ByteArray& data, ffpsd::ColorMode color_mode, std::uint16_t depth) {
+            [](const BytesLike& data, ffpsd::ColorMode color_mode, std::uint16_t depth) {
                 return Decoded([&] { return ffpsd::LoadPicture(data.data(), data.size(), color_mode, depth); });
             },
             "data"_a, "color_mode"_a = ffpsd::ColorMode::kRgb, "depth"_a = 8);
@@ -74,7 +74,7 @@ namespace ffpsd_python
             "path"_a, "color_mode"_a = ffpsd::ColorMode::kRgb, "depth"_a = 8);
         m.def(
             "decode_png",
-            [](const ByteArray& data, ffpsd::ColorMode color_mode, std::uint16_t depth) -> NumpyArray {
+            [](const BytesLike& data, ffpsd::ColorMode color_mode, std::uint16_t depth) -> NumpyArray {
 #if defined(FFPSD_HAS_PNG)
                 return Decoded([&] { return ffpsd::LoadPng(data.data(), data.size(), color_mode, depth); });
 #else
@@ -120,7 +120,7 @@ namespace ffpsd_python
             "path"_a, "color_mode"_a = ffpsd::ColorMode::kRgb, "depth"_a = 8, "apply_orientation"_a = true);
         m.def(
             "decode_jpeg",
-            [](const ByteArray& data, ffpsd::ColorMode color_mode, std::uint16_t depth, bool apply_orientation) -> NumpyArray {
+            [](const BytesLike& data, ffpsd::ColorMode color_mode, std::uint16_t depth, bool apply_orientation) -> NumpyArray {
 #if defined(FFPSD_HAS_JPEG)
                 return Decoded([&] { return ffpsd::LoadJpeg(data.data(), data.size(), color_mode, depth, apply_orientation); });
 #else
@@ -165,7 +165,7 @@ namespace ffpsd_python
             "path"_a, "color_mode"_a = ffpsd::ColorMode::kRgb, "depth"_a = 8);
         m.def(
             "decode_webp",
-            [](const ByteArray& data, ffpsd::ColorMode color_mode, std::uint16_t depth) -> NumpyArray {
+            [](const BytesLike& data, ffpsd::ColorMode color_mode, std::uint16_t depth) -> NumpyArray {
 #if defined(FFPSD_HAS_WEBP)
                 return Decoded([&] { return ffpsd::LoadWebp(data.data(), data.size(), color_mode, depth); });
 #else

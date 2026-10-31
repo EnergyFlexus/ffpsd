@@ -11,6 +11,7 @@ from conftest import (
     RGB_MASKS_PSD,
     RGB_PSD,
     flat,
+    found,
     plane_sums,
 )
 from ffpsd import fourcc
@@ -54,8 +55,8 @@ def test_rgb_file_reads_as_the_dump_says():
     assert (version.writer_name, version.reader_name) == ("Adobe Photoshop", "Adobe Photoshop 2026")
 
     # 1044, the last layer id handed out, and 1024, the target layer counted from the bottom.
-    assert doc.find_image_resource(1044).data == bytes([0, 0, 0, 2])
-    assert doc.find_image_resource(1024).data == bytes([0, 1])
+    assert found(doc.find_image_resource(1044)).data == bytes([0, 0, 0, 2])
+    assert found(doc.find_image_resource(1024)).data == bytes([0, 1])
     assert doc.find_image_resource(4242) is None
 
     background = doc.layer(0).pixels()
@@ -64,8 +65,8 @@ def test_rgb_file_reads_as_the_dump_says():
     assert plane_sums(background)[0] == 682923150
     assert plane_sums(copy) == [183326186, 682923150, 206836566, 682923150]
 
-    merged = doc.merged_image()
-    info = doc.merged_image_info()
+    merged = found(doc.merged_image())
+    info = found(doc.merged_image_info())
     assert merged.shape == (info.channel_count, info.height, info.width) == (3, 1417, 1890)
     assert plane_sums(merged) == [183326186, 682923150, 206836566]
     assert doc.merged_compression == ffpsd.ChannelCompression.RLE
@@ -73,7 +74,7 @@ def test_rgb_file_reads_as_the_dump_says():
     # The blocks after the layers, in file order.
     expected = [("Patt", 0), ("CAI ", 77), ("OCIO", 170), ("GenI", 84), ("FMsk", 12), ("cinf", 410)]
     assert [(block.key, len(block.data)) for block in doc.tagged_blocks] == [(fourcc(k), n) for k, n in expected]
-    assert len(doc.find_tagged_block(fourcc("OCIO")).data) == 170
+    assert len(found(doc.find_tagged_block(fourcc("OCIO"))).data) == 170
 
 
 def test_levels_layer_reads_its_records():
@@ -82,7 +83,7 @@ def test_levels_layer_reads_its_records():
     assert levels.name == LEVELS_NAME
     assert levels.kind == ffpsd.LayerKind.ADJUSTMENT
     assert levels.adjustment_key == fourcc("levl")
-    assert len(levels.levels.channels) > 0
+    assert len(found(levels.levels).channels) > 0
 
     background = doc.layer(0)
     assert background.adjustment_key is None
@@ -93,7 +94,7 @@ def test_masks_read_and_refuse_what_photoshop_would():
     doc = ffpsd.Document.open(RGB_MASKS_PSD)
     assert doc.layer(1).mask() is None
 
-    mask = doc.layer(2).mask()
+    mask = found(doc.layer(2).mask())
     assert mask.bounds == ffpsd.Rect(top=0, left=935, bottom=1417, right=1890)
     assert mask.default_color == 255
     assert mask.image.shape == (1, 1417, 955)

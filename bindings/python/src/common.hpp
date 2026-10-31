@@ -31,6 +31,21 @@ namespace ffpsd_python
     // Any bytes-like object: bytes, bytearray, memoryview, a uint8 array.
     using ByteArray = nb::ndarray<const std::uint8_t, nb::ndim<1>, nb::c_contig, nb::device::cpu>;
 
+    // A ByteArray argument that the type stubs call bytes rather than NDArray[uint8].
+    struct BytesLike
+    {
+        ByteArray array;
+
+        const std::uint8_t* data() const
+        {
+            return array.data();
+        }
+        std::size_t size() const
+        {
+            return array.size();
+        }
+    };
+
     struct DocumentObject
     {
         ffpsd::Document document;
@@ -86,5 +101,22 @@ namespace ffpsd_python
     void BindLayer(nb::module_& m);
     void BindFormats(nb::module_& m);
 } // namespace ffpsd_python
+
+namespace nanobind::detail
+{
+    template <> struct type_caster<ffpsd_python::BytesLike>
+    {
+        NB_TYPE_CASTER(ffpsd_python::BytesLike, const_name("bytes | bytearray | memoryview"))
+
+        bool from_python(handle src, uint32_t flags, cleanup_list* cleanup) noexcept
+        {
+            make_caster<ffpsd_python::ByteArray> array;
+            if (!array.from_python(src, flags, cleanup))
+                return false;
+            value.array = std::move(array.value);
+            return true;
+        }
+    };
+} // namespace nanobind::detail
 
 #endif // FFPSD_PYTHON_COMMON_HPP_

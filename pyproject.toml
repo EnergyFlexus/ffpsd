@@ -21,6 +21,8 @@ license-files = [
 ]
 requires-python = ">=3.10"
 dependencies = ["numpy>=1.22"]
+# ffpsd.from_pil and ffpsd.to_pil, for the formats ffpsd does not read or write itself.
+optional-dependencies = { pil = ["Pillow>=9.1"] }
 # The same keywords as the crates; the GitHub topics hold them and more.
 keywords = ["psd", "psb", "photoshop", "image", "layers"]
 classifiers = [
@@ -85,7 +87,7 @@ regex = 'VERSION\s+(?P<value>\d+\.\d+\.\d+)'
 build = ["cp310-*", "cp311-*", "cp312-*"]
 build-frontend = "pip" # python -m build in the project folder would run build.py, not the build package
 skip = ["*-musllinux_*"]
-test-requires = ["pytest"]
+test-requires = ["pytest", "Pillow"]
 test-command = "pytest {project}/bindings/python/tests"
 build-verbosity = 1
 

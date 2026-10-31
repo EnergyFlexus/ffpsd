@@ -1,6 +1,7 @@
 """What the tests share: the files of tests/data, whose values come from independent dumps."""
 
 from pathlib import Path
+from typing import TypeVar
 
 import numpy as np
 import pytest
@@ -29,6 +30,15 @@ RGBA_PLANES = np.array(
     ],
     dtype=np.uint8,
 )
+
+
+T = TypeVar("T")
+
+
+def found(value: T | None) -> T:
+    """What a lookup that has to succeed returned, typed without its None."""
+    assert value is not None
+    return value
 
 
 def flat(width, height, values):
