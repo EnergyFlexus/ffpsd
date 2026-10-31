@@ -5,8 +5,9 @@ name = "ffpsd-sys"
 version.workspace = true
 description = "Raw bindings to ffpsd, a library that reads and writes Photoshop PSD and PSB files"
 readme = "bindings/rust/ffpsd-sys/README.md"
-keywords = ["psd", "psb", "photoshop", "ffi"]
-categories = ["external-ffi-bindings", "multimedia::images"]
+# The same keywords as the ffpsd crate and the Python package; the GitHub topics hold them and more.
+keywords = ["psd", "psb", "photoshop", "image", "layers"]
+categories = ["external-ffi-bindings", "multimedia::images", "multimedia::encoding", "parser-implementations"]
 links = "ffpsd"
 build = "bindings/rust/ffpsd-sys/build.rs"
 edition.workspace = true

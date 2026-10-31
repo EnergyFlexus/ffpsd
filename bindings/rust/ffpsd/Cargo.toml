@@ -3,8 +3,9 @@ name = "ffpsd"
 version.workspace = true
 description = "Rust bindings to ffpsd, a library that reads and writes Photoshop PSD and PSB files"
 readme = "README.md"
+# The same keywords as ffpsd-sys and the Python package; the GitHub topics hold them and more.
 keywords = ["psd", "psb", "photoshop", "image", "layers"]
-categories = ["multimedia::images", "encoding", "api-bindings"]
+categories = ["multimedia::images", "multimedia::encoding", "encoding", "parser-implementations", "api-bindings"]
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
