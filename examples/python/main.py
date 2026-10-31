@@ -38,6 +38,8 @@ def run(input_path, output_path):
 
 
 def main():
+    # Layer names are UTF-8; on Windows a redirected stdout would otherwise take the system code page, cp1252 say.
+    sys.stdout.reconfigure(encoding="utf-8")
     if len(sys.argv) != 3:
         print("usage: python examples/python/main.py <in.psd> <out.psd>", file=sys.stderr)
         return 2
