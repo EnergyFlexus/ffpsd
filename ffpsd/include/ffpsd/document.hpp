@@ -153,10 +153,6 @@ namespace ffpsd
         // Repoints the layers at this document after a move.
         void RebindLayers() noexcept;
 
-        void MarkStackChanged();
-
-        void DropMergedImage();
-
         void Apply(
             const detail::Transform& transform, std::uint32_t width, std::uint32_t height,
             ResampleFilter filter = ResampleFilter::kNearest);

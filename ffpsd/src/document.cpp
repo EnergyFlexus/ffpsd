@@ -129,6 +129,27 @@ namespace ffpsd
             if (index >= count)
                 throw std::out_of_range("ffpsd: layer index " + std::to_string(index) + " of " + std::to_string(count));
         }
+
+        // 1024 holds a layer index and 1026 and 1072 one entry per layer; stale ones are worse than none.
+        void MarkStackChanged(detail::ImageResources& resources)
+        {
+            const auto stale = [](const std::unique_ptr<ImageResource>& resource) {
+                const std::uint16_t id = resource->id;
+                return id == detail::kLayerStateInformation || id == detail::kLayersGroupInformation || id == detail::kLayerGroupsEnabledId;
+            };
+            resources.erase(std::remove_if(resources.begin(), resources.end(), stale), resources.end());
+
+            detail::SetHasRealMergedData(resources, false);
+        }
+
+        void DropMergedImage(detail::PixelData& image_data, detail::ImageResources& resources)
+        {
+            if (image_data.IsEmpty())
+                return;
+
+            image_data = detail::PixelData();
+            detail::SetHasRealMergedData(resources, false);
+        }
     } // namespace
 
     struct Document::Impl
@@ -403,7 +424,7 @@ namespace ffpsd
         }
 
         if (converted.IsEmpty())
-            DropMergedImage();
+            DropMergedImage(impl_->image_data, impl_->image_resources);
         else
             SetMergedImage(converted);
         SetHasRealMergedData(!converted.IsEmpty());
@@ -501,7 +522,7 @@ namespace ffpsd
         detail::ReplaceLayerPixels(*record, image, info.color_mode, false, IsPsb());
         AssignLayerId(*record);
         impl_->layers.push_back(std::unique_ptr<Layer>(new Layer(std::move(record), this)));
-        MarkStackChanged();
+        MarkStackChanged(impl_->image_resources);
         return impl_->layers.back().get();
     }
 
@@ -520,7 +541,7 @@ namespace ffpsd
         // Bottom to top, the end marker first; a whole group keeps the stack as valid as it was.
         add(detail::LayerRecord::GroupEnd());
         Layer* header = add(detail::LayerRecord::GroupHeader(name));
-        MarkStackChanged();
+        MarkStackChanged(impl_->image_resources);
         return header;
     }
 
@@ -550,7 +571,7 @@ namespace ffpsd
         record->MarkAsBackground();
         AssignLayerId(*record);
         impl_->layers.insert(impl_->layers.begin(), std::unique_ptr<Layer>(new Layer(std::move(record), this)));
-        MarkStackChanged();
+        MarkStackChanged(impl_->image_resources);
         return impl_->layers.front().get();
     }
 
@@ -584,7 +605,7 @@ namespace ffpsd
 
         const auto first = layers.begin();
         std::rotate(first, first + static_cast<std::ptrdiff_t>(index), first + static_cast<std::ptrdiff_t>(index) + 1);
-        MarkStackChanged();
+        MarkStackChanged(impl_->image_resources);
     }
 
     bool Document::UnsetBackgroundLayer()
@@ -608,7 +629,7 @@ namespace ffpsd
         auto record = std::make_unique<detail::LayerRecord>(detail::CreateAdjustmentLayerRecord(name, std::move(settings), color_mode));
         AssignLayerId(*record);
         impl_->layers.push_back(std::unique_ptr<Layer>(new Layer(std::move(record), this)));
-        MarkStackChanged();
+        MarkStackChanged(impl_->image_resources);
         return impl_->layers.back().get();
     }
 
@@ -641,7 +662,7 @@ namespace ffpsd
             impl_->layers.push_back(std::unique_ptr<Layer>(new Layer(std::move(record), this)));
         }
 
-        MarkStackChanged();
+        MarkStackChanged(impl_->image_resources);
         return impl_->layers.back().get();
     }
 
@@ -659,7 +680,7 @@ namespace ffpsd
             throw std::invalid_argument("ffpsd: removing layer " + std::to_string(index) + " " + problem);
         }
 
-        MarkStackChanged();
+        MarkStackChanged(impl_->image_resources);
     }
 
     void Document::MoveLayer(std::size_t from, std::size_t to)
@@ -691,7 +712,7 @@ namespace ffpsd
             throw std::invalid_argument("ffpsd: moving layer " + std::to_string(from) + " to " + std::to_string(to) + " " + problem);
         }
 
-        MarkStackChanged();
+        MarkStackChanged(impl_->image_resources);
     }
 
     std::size_t Document::GetTaggedBlockCount() const noexcept
@@ -778,28 +799,6 @@ namespace ffpsd
 
         detail::SetTaggedBlock(record.blocks, detail::LayerId{last + 1});
         detail::SetImageResource(impl_->image_resources, DocumentSpecificIdsSeedNumber{last + 1});
-    }
-
-    // 1024 holds a layer index and 1026 and 1072 one entry per layer; stale ones are worse than none.
-    void Document::MarkStackChanged()
-    {
-        auto& resources = impl_->image_resources;
-        const auto stale = [](const std::unique_ptr<ImageResource>& resource) {
-            const std::uint16_t id = resource->id;
-            return id == detail::kLayerStateInformation || id == detail::kLayersGroupInformation || id == detail::kLayerGroupsEnabledId;
-        };
-        resources.erase(std::remove_if(resources.begin(), resources.end(), stale), resources.end());
-
-        SetHasRealMergedData(false);
-    }
-
-    void Document::DropMergedImage()
-    {
-        if (impl_->image_data.IsEmpty())
-            return;
-
-        impl_->image_data = detail::PixelData();
-        SetHasRealMergedData(false);
     }
 
     std::vector<std::uint8_t> Document::Save(Compression compression) const
