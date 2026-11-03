@@ -156,9 +156,6 @@ namespace ffpsd
         void Apply(
             const detail::Transform& transform, std::uint32_t width, std::uint32_t height,
             ResampleFilter filter = ResampleFilter::kNearest);
-
-        // The next id after resource 1044 and every layer's, written to both.
-        void AssignLayerId(detail::LayerRecord& record);
     };
 } // namespace ffpsd
 

@@ -150,6 +150,25 @@ namespace ffpsd
             image_data = detail::PixelData();
             detail::SetHasRealMergedData(resources, false);
         }
+
+        // The next id after resource 1044 and every layer's, written to both.
+        void AssignLayerId(const Layers& layers, detail::ImageResources& resources, detail::LayerRecord& record)
+        {
+            using detail::DocumentSpecificIdsSeedNumber;
+            const auto seed = detail::GetImageResource<DocumentSpecificIdsSeedNumber>(resources);
+            std::uint32_t last = seed.has_value() ? seed->value : 0;
+            for (const std::unique_ptr<Layer>& layer : layers)
+            {
+                const TaggedBlock* block = layer->GetTaggedBlockByKey(detail::LayerId::kKey);
+                if (block == nullptr)
+                    continue;
+                if (const std::optional<detail::LayerId> id = detail::DecodeTaggedBlock<detail::LayerId>(block->data))
+                    last = std::max(last, id->id);
+            }
+
+            detail::SetTaggedBlock(record.blocks, detail::LayerId{last + 1});
+            detail::SetImageResource(resources, DocumentSpecificIdsSeedNumber{last + 1});
+        }
     } // namespace
 
     struct Document::Impl
@@ -520,7 +539,7 @@ namespace ffpsd
 
         auto record = std::make_unique<detail::LayerRecord>(detail::LayerRecord::Empty(name, top, left));
         detail::ReplaceLayerPixels(*record, image, info.color_mode, false, IsPsb());
-        AssignLayerId(*record);
+        AssignLayerId(impl_->layers, impl_->image_resources, *record);
         impl_->layers.push_back(std::unique_ptr<Layer>(new Layer(std::move(record), this)));
         MarkStackChanged(impl_->image_resources);
         return impl_->layers.back().get();
@@ -533,7 +552,7 @@ namespace ffpsd
         const auto add = [this](detail::LayerRecord made) {
             auto record = std::make_unique<detail::LayerRecord>(std::move(made));
             detail::ReplaceLayerPixels(*record, ImageView(), impl_->image_data_info.color_mode, false, IsPsb());
-            AssignLayerId(*record);
+            AssignLayerId(impl_->layers, impl_->image_resources, *record);
             impl_->layers.push_back(std::unique_ptr<Layer>(new Layer(std::move(record), this)));
             return impl_->layers.back().get();
         };
@@ -569,7 +588,7 @@ namespace ffpsd
         auto record = std::make_unique<detail::LayerRecord>(detail::LayerRecord::Empty(name, 0, 0));
         detail::ReplaceLayerPixels(*record, opaque, info.color_mode, true, IsPsb());
         record->MarkAsBackground();
-        AssignLayerId(*record);
+        AssignLayerId(impl_->layers, impl_->image_resources, *record);
         impl_->layers.insert(impl_->layers.begin(), std::unique_ptr<Layer>(new Layer(std::move(record), this)));
         MarkStackChanged(impl_->image_resources);
         return impl_->layers.front().get();
@@ -627,7 +646,7 @@ namespace ffpsd
         settings->data = detail::EncodeAdjustment(value);
 
         auto record = std::make_unique<detail::LayerRecord>(detail::CreateAdjustmentLayerRecord(name, std::move(settings), color_mode));
-        AssignLayerId(*record);
+        AssignLayerId(impl_->layers, impl_->image_resources, *record);
         impl_->layers.push_back(std::unique_ptr<Layer>(new Layer(std::move(record), this)));
         MarkStackChanged(impl_->image_resources);
         return impl_->layers.back().get();
@@ -658,7 +677,7 @@ namespace ffpsd
         // A whole group nests as it did, so the stack stays as valid as it was; the sources' ids stay with them.
         for (std::unique_ptr<detail::LayerRecord>& record : records)
         {
-            AssignLayerId(*record);
+            AssignLayerId(impl_->layers, impl_->image_resources, *record);
             impl_->layers.push_back(std::unique_ptr<Layer>(new Layer(std::move(record), this)));
         }
 
@@ -784,21 +803,6 @@ namespace ffpsd
         if (image.channel_count == colors)
             impl_->layer_and_mask.merged_alpha = false;
         SetHasRealMergedData(true);
-    }
-
-    void Document::AssignLayerId(detail::LayerRecord& record)
-    {
-        using detail::DocumentSpecificIdsSeedNumber;
-        const auto seed = detail::GetImageResource<DocumentSpecificIdsSeedNumber>(impl_->image_resources);
-        std::uint32_t last = seed.has_value() ? seed->value : 0;
-        for (const std::unique_ptr<Layer>& layer : impl_->layers)
-        {
-            if (const std::optional<detail::LayerId> id = detail::GetTaggedBlock<detail::LayerId>(layer->record_->blocks))
-                last = std::max(last, id->id);
-        }
-
-        detail::SetTaggedBlock(record.blocks, detail::LayerId{last + 1});
-        detail::SetImageResource(impl_->image_resources, DocumentSpecificIdsSeedNumber{last + 1});
     }
 
     std::vector<std::uint8_t> Document::Save(Compression compression) const
